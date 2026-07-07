@@ -1,0 +1,174 @@
+﻿/**
+ * Kelmon Design System
+ *
+ * Design tokens as CSS custom properties (--kelmon-*).
+ * Import in Next.js root layout:
+ *   import "@/styles/design.css";
+ *
+ * Use .env for secrets (Firebase, M-Pesa keys) — not for colors or fonts.
+ */
+
+:root {
+  /* Backgrounds */
+  --kelmon-bg-primary: #0b0b0b;
+  --kelmon-bg-elevated: #141414;
+  --kelmon-bg-surface: #1a1a1a;
+  --kelmon-bg-glass: rgba(20, 20, 20, 0.72);
+  --kelmon-bg-overlay: rgba(0, 0, 0, 0.6);
+  --kelmon-white-glow: rgba(255, 255, 255, 0.08);
+
+  /* Purple */
+  --kelmon-purple-deep: #6a2b8e;
+  --kelmon-purple-brand: #8e44ad;
+  --kelmon-purple-light: #a366cc;
+  --kelmon-purple-muted: rgba(142, 68, 173, 0.15);
+  --kelmon-purple-glow: rgba(142, 68, 173, 0.35);
+
+  /* Gold */
+  --kelmon-gold-primary: #d4af37;
+  --kelmon-gold-light: #e8c547;
+  --kelmon-gold-muted: #c5a028;
+  --kelmon-text-gold: #d4af37;
+
+  /* Text */
+  --kelmon-text-primary: #fdfdfd;
+  --kelmon-text-secondary: #a3a3a3;
+  --kelmon-text-disabled: #6b6b6b;
+  --kelmon-text-inverse: #0b0b0b;
+
+  /* Borders */
+  --kelmon-border-subtle: rgba(212, 175, 55, 0.25);
+  --kelmon-border-default: rgba(255, 255, 255, 0.1);
+  --kelmon-border-focus: #8e44ad;
+
+  /* Semantic */
+  --kelmon-success: #22c55e;
+  --kelmon-success-muted: rgba(34, 197, 94, 0.15);
+  --kelmon-error: #ef4444;
+  --kelmon-error-muted: rgba(239, 68, 68, 0.15);
+  --kelmon-warning: #f59e0b;
+  --kelmon-warning-muted: rgba(245, 158, 11, 0.15);
+  --kelmon-info: #3b82f6;
+
+  /* Gradients */
+  --kelmon-gradient-purple: linear-gradient(135deg, #6a2b8e 0%, #8e44ad 50%, #a366cc 100%);
+  --kelmon-gradient-gold: linear-gradient(90deg, #c5a028 0%, #d4af37 50%, #e8c547 100%);
+  --kelmon-gradient-hero-glow: radial-gradient(ellipse at center, rgba(142, 68, 173, 0.25) 0%, rgba(11, 11, 11, 0) 70%);
+
+  /* Typography */
+  --kelmon-font-display: "Playfair Display", Georgia, serif;
+  --kelmon-font-tagline: "Cormorant Garamond", Georgia, serif;
+  --kelmon-font-body: "Inter", system-ui, sans-serif;
+  --kelmon-font-mono: "JetBrains Mono", monospace;
+
+  /* Spacing */
+  --kelmon-space-1: 4px;
+  --kelmon-space-2: 8px;
+  --kelmon-space-3: 12px;
+  --kelmon-space-4: 16px;
+  --kelmon-space-6: 24px;
+  --kelmon-space-8: 32px;
+  --kelmon-space-12: 48px;
+
+  /* Radius */
+  --kelmon-radius-sm: 6px;
+  --kelmon-radius-md: 10px;
+  --kelmon-radius-lg: 16px;
+  --kelmon-radius-xl: 24px;
+  --kelmon-radius-full: 9999px;
+
+  /* Shadows & layout */
+  --kelmon-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --kelmon-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --kelmon-shadow-glow-purple: 0 0 24px rgba(142, 68, 173, 0.4);
+  --kelmon-shadow-glow-gold: 0 0 16px rgba(212, 175, 55, 0.3);
+  --kelmon-button-height: 48px;
+  --kelmon-sidebar-width: 260px;
+  --kelmon-content-max-width: 1280px;
+}
+
+.kelmon-theme {
+  color: var(--kelmon-text-primary);
+  background-color: var(--kelmon-bg-primary);
+  font-family: var(--kelmon-font-body);
+}
+
+.kelmon-btn-primary {
+  height: var(--kelmon-button-height);
+  padding: 0 var(--kelmon-space-6);
+  border: none;
+  border-radius: var(--kelmon-radius-md);
+  background: var(--kelmon-gradient-purple);
+  color: var(--kelmon-text-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kelmon-btn-primary:hover {
+  box-shadow: var(--kelmon-shadow-glow-purple);
+}
+
+.kelmon-btn-secondary {
+  height: var(--kelmon-button-height);
+  padding: 0 var(--kelmon-space-6);
+  border: 1px solid var(--kelmon-gold-primary);
+  border-radius: var(--kelmon-radius-md);
+  background: transparent;
+  color: var(--kelmon-gold-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kelmon-card {
+  background: var(--kelmon-bg-elevated);
+  border: 1px solid var(--kelmon-border-subtle);
+  border-radius: var(--kelmon-radius-lg);
+  padding: var(--kelmon-space-4);
+  box-shadow: var(--kelmon-shadow-sm);
+}
+
+.kelmon-input {
+  width: 100%;
+  height: var(--kelmon-button-height);
+  padding: 0 var(--kelmon-space-3);
+  border: 1px solid var(--kelmon-border-default);
+  border-radius: var(--kelmon-radius-md);
+  background: var(--kelmon-bg-surface);
+  color: var(--kelmon-text-primary);
+}
+
+.kelmon-input:focus {
+  outline: none;
+  border-color: var(--kelmon-border-focus);
+  box-shadow: var(--kelmon-shadow-glow-purple);
+}
+
+.kelmon-price {
+  color: var(--kelmon-gold-primary);
+  font-family: var(--kelmon-font-display);
+  font-weight: 600;
+}
+
+.kelmon-tagline {
+  color: var(--kelmon-text-gold);
+  font-family: var(--kelmon-font-tagline);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.kelmon-heading {
+  font-family: var(--kelmon-font-display);
+  font-weight: 700;
+  color: var(--kelmon-text-primary);
+}
+
+.kelmon-glass-nav {
+  background: var(--kelmon-bg-glass);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--kelmon-border-subtle);
+}
+
+.kelmon-hero-glow {
+  background: var(--kelmon-gradient-hero-glow);
+}
