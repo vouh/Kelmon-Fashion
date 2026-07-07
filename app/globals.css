@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import "../styles/design.css";
-
 @layer utilities {
   .glass-panel {
     background: rgba(20, 20, 20, 0.72);
