@@ -6,8 +6,8 @@ import { shopProducts, formatKes } from "@/lib/products";
 export default function ShopPage() {
   return (
     <AppShell activeNav="shop">
-      <main className="flex-1 w-full flex flex-col pt-16 md:pt-0 min-h-screen">
-        <div className="px-margin-mobile md:px-margin-desktop pt-lg pb-md bg-surface border-b border-white/5 sticky top-16 md:top-0 z-30 shadow-lg">
+      <main className="flex-1 w-full flex flex-col min-h-screen">
+        <div className="px-margin-mobile md:px-margin-desktop pt-lg pb-md bg-surface border-b border-white/5 sticky top-0 z-30 shadow-lg">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8">
             <div>
               <h1 className="font-display-lg text-display-lg text-on-surface mb-2 tracking-tight">Shop</h1>

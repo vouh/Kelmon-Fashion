@@ -16,7 +16,7 @@ interface BottomNavProps {
 
 export default function BottomNav({ active, cartCount = 0 }: BottomNavProps) {
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 bg-surface-container/80 backdrop-blur-2xl rounded-t-xl border-t border-white/5 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+    <nav className="md:hidden fixed bottom-3 left-3 right-3 z-50 flex justify-around items-center px-4 py-3 rounded-2xl glass-panel shadow-nav border border-[var(--kelmon-border-subtle)]">
       {navItems.map(({ href, label, icon, key }) => {
         const isActive = active === key;
         return (

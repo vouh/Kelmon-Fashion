@@ -40,7 +40,7 @@ const total = subtotal + delivery;
 export default function CartPage() {
   return (
     <AppShell activeNav="cart" cartCount={3}>
-      <main className="flex-1 mt-20 md:mt-0 px-margin-mobile md:px-margin-desktop py-lg max-w-4xl mx-auto w-full">
+      <main className="flex-1 px-margin-mobile md:px-margin-desktop py-lg max-w-4xl mx-auto w-full">
         <div className="flex justify-between items-end mb-8">
           <h1 className="font-display-md text-display-md text-on-surface">My Cart (3)</h1>
           <button className="font-body-md text-body-md text-on-surface-variant hover:text-error transition-colors underline underline-offset-4">

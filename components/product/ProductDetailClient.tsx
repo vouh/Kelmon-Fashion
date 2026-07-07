@@ -18,7 +18,7 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
 
   return (
     <AppShell activeNav="shop" hideBottomNav>
-      <main className="w-full max-w-[1200px] mx-auto mt-16 md:mt-0 p-margin-mobile md:p-margin-desktop grid grid-cols-1 md:grid-cols-12 gap-xl pb-32 md:pb-12">
+      <main className="w-full max-w-[1200px] mx-auto p-margin-mobile md:p-margin-desktop grid grid-cols-1 md:grid-cols-12 gap-xl pb-32 md:pb-12">
         <section className="md:col-span-6 lg:col-span-7 flex flex-col gap-sm">
           <div className="relative w-full aspect-[4/5] bg-[#141414] rounded-xl overflow-hidden hairline-gold shadow-[0_20px_40px_rgba(0,0,0,0.5)] group">
             <Image src={product.image} alt={product.name} fill className="object-cover transition-transform duration-700 group-hover:scale-105" sizes="(max-width: 768px) 100vw, 50vw" priority />

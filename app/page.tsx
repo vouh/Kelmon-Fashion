@@ -2,17 +2,18 @@ import Link from "next/link";
 import Image from "next/image";
 import AppShell from "@/components/layout/AppShell";
 import ProductCard from "@/components/shop/ProductCard";
+import logo from "@/lib/logo";
 import { categories, featuredProducts } from "@/lib/products";
 
 export default function HomePage() {
   return (
     <AppShell activeNav="home">
-      <main className="flex-grow pt-16 md:pt-0">
+      <main className="flex-grow">
         {/* Hero */}
         <section className="relative min-h-[70vh] flex flex-col items-center justify-center px-margin-mobile md:px-margin-desktop py-xl overflow-hidden radial-glow-hero border-b border-white/5">
           <div className="relative z-10 flex flex-col items-center text-center max-w-3xl mx-auto space-y-6">
             <div className="w-48 md:w-64 mb-8 drop-shadow-[0_0_30px_rgba(142,68,173,0.4)]">
-              <Image src="/logo.png" alt="Kelmon Logo" width={256} height={256} className="w-full h-auto object-contain" priority />
+              <Image src={logo} alt="Kelmon Logo" width={256} height={256} className="w-full h-auto object-contain" priority />
             </div>
             <h2 className="font-label-caps text-label-caps text-secondary tracking-widest uppercase">
               BEAUTY • FASHION • GLAMOUR

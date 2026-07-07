@@ -8,7 +8,8 @@
  * Use .env for secrets (Firebase, M-Pesa keys) — not for colors or fonts.
  */
 
-:root {
+:root,
+.dark {
   /* Backgrounds */
   --kelmon-bg-primary: #0b0b0b;
   --kelmon-bg-elevated: #141414;
@@ -50,10 +51,36 @@
   --kelmon-warning-muted: rgba(245, 158, 11, 0.15);
   --kelmon-info: #3b82f6;
 
+  /* Semantic surfaces (Tailwind theme tokens) */
+  --theme-bg: #171218;
+  --theme-surface: #171218;
+  --theme-surface-dim: #171218;
+  --theme-surface-container: #231e25;
+  --theme-surface-container-high: #2e282f;
+  --theme-surface-container-highest: #39333a;
+  --theme-surface-container-lowest: #110c13;
+  --theme-on-surface: #ebdfe9;
+  --theme-on-surface-variant: #d1c2d2;
+  --theme-on-background: #ebdfe9;
+  --theme-primary: #ecb2ff;
+  --theme-primary-container: #8e44ad;
+  --theme-on-primary: #520071;
+  --theme-secondary: #e9c349;
+  --theme-inverse-primary: #873da6;
+  --theme-outline: #9a8c9b;
+  --theme-error: #ffb4ab;
+
   /* Gradients */
   --kelmon-gradient-purple: linear-gradient(135deg, #6a2b8e 0%, #8e44ad 50%, #a366cc 100%);
   --kelmon-gradient-gold: linear-gradient(90deg, #c5a028 0%, #d4af37 50%, #e8c547 100%);
   --kelmon-gradient-hero-glow: radial-gradient(ellipse at center, rgba(142, 68, 173, 0.25) 0%, rgba(11, 11, 11, 0) 70%);
+
+  /* Shadows */
+  --kelmon-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --kelmon-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --kelmon-shadow-glow-purple: 0 0 24px rgba(142, 68, 173, 0.4);
+  --kelmon-shadow-glow-gold: 0 0 16px rgba(212, 175, 55, 0.3);
+  --kelmon-nav-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 
   /* Typography */
   --kelmon-font-display: "Playfair Display", Georgia, serif;
@@ -77,14 +104,53 @@
   --kelmon-radius-xl: 24px;
   --kelmon-radius-full: 9999px;
 
-  /* Shadows & layout */
-  --kelmon-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --kelmon-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
-  --kelmon-shadow-glow-purple: 0 0 24px rgba(142, 68, 173, 0.4);
-  --kelmon-shadow-glow-gold: 0 0 16px rgba(212, 175, 55, 0.3);
   --kelmon-button-height: 48px;
   --kelmon-sidebar-width: 260px;
   --kelmon-content-max-width: 1280px;
+}
+
+.light {
+  --kelmon-bg-primary: #faf8fc;
+  --kelmon-bg-elevated: #ffffff;
+  --kelmon-bg-surface: #f3f0f6;
+  --kelmon-bg-glass: rgba(255, 255, 255, 0.88);
+  --kelmon-bg-overlay: rgba(0, 0, 0, 0.35);
+  --kelmon-white-glow: rgba(142, 68, 173, 0.06);
+
+  --kelmon-purple-muted: rgba(142, 68, 173, 0.1);
+  --kelmon-purple-glow: rgba(142, 68, 173, 0.15);
+
+  --kelmon-text-primary: #1a1220;
+  --kelmon-text-secondary: #6b6075;
+  --kelmon-text-disabled: #a89db0;
+  --kelmon-text-inverse: #fdfdfd;
+
+  --kelmon-border-subtle: rgba(197, 160, 40, 0.35);
+  --kelmon-border-default: rgba(0, 0, 0, 0.08);
+
+  --theme-bg: #faf8fc;
+  --theme-surface: #ffffff;
+  --theme-surface-dim: #f5f2f8;
+  --theme-surface-container: #f0ecf4;
+  --theme-surface-container-high: #e8e2ee;
+  --theme-surface-container-highest: #ddd5e6;
+  --theme-surface-container-lowest: #ffffff;
+  --theme-on-surface: #1a1220;
+  --theme-on-surface-variant: #6b6075;
+  --theme-on-background: #1a1220;
+  --theme-primary: #8e44ad;
+  --theme-primary-container: #8e44ad;
+  --theme-on-primary: #ffffff;
+  --theme-secondary: #c5a028;
+  --theme-inverse-primary: #6a2b8e;
+  --theme-outline: #9a8c9b;
+  --theme-error: #dc2626;
+
+  --kelmon-gradient-hero-glow: radial-gradient(ellipse at center, rgba(142, 68, 173, 0.12) 0%, rgba(250, 248, 252, 0) 70%);
+  --kelmon-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --kelmon-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
+  --kelmon-shadow-glow-purple: 0 0 24px rgba(142, 68, 173, 0.2);
+  --kelmon-nav-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
 }
 
 .kelmon-theme {

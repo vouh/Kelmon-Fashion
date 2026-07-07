@@ -4,25 +4,26 @@
 
 @layer utilities {
   .glass-panel {
-    background: rgba(20, 20, 20, 0.72);
+    background: var(--kelmon-bg-glass);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--kelmon-border-default);
+    box-shadow: var(--kelmon-nav-shadow);
   }
 
   .glass-card {
-    background: rgba(20, 20, 20, 0.8);
+    background: var(--kelmon-bg-glass);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--kelmon-shadow-md);
   }
 
   .elevated-dark {
-    background-color: #141414;
+    background-color: var(--kelmon-bg-elevated);
   }
 
   .hairline-gold {
-    border: 1px solid rgba(212, 175, 55, 0.25);
+    border: 1px solid var(--kelmon-border-subtle);
   }
 
   .primary-gradient-btn {
@@ -31,11 +32,11 @@
   }
 
   .primary-gradient-btn:hover {
-    box-shadow: 0 0 20px rgba(142, 68, 173, 0.5);
+    box-shadow: var(--kelmon-shadow-glow-purple);
   }
 
   .radial-glow-hero {
-    background: radial-gradient(circle at center, rgba(142, 68, 173, 0.15) 0%, transparent 70%);
+    background: var(--kelmon-gradient-hero-glow);
   }
 
   .hide-scrollbar::-webkit-scrollbar {
@@ -48,41 +49,41 @@
   }
 
   .product-card {
-    background: #141414;
-    border: 1px solid rgba(212, 175, 55, 0.25);
+    background: var(--kelmon-bg-elevated);
+    border: 1px solid var(--kelmon-border-subtle);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
 
   .product-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-    border-color: rgba(212, 175, 55, 0.5);
+    box-shadow: var(--kelmon-shadow-md);
+    border-color: var(--kelmon-gold-primary);
   }
 
   .chip {
     background: rgba(233, 195, 73, 0.1);
-    border: 0.5px solid #e9c349;
-    color: #e9c349;
+    border: 0.5px solid var(--theme-secondary);
+    color: var(--theme-secondary);
   }
 
   .chip.active {
-    background: #e9c349;
-    color: #1f1c00;
+    background: var(--theme-secondary);
+    color: var(--kelmon-text-inverse);
   }
 
   .btn-primary {
-    background: linear-gradient(135deg, #8e44ad, #ecb2ff);
+    background: var(--kelmon-gradient-purple);
     transition: all 0.3s ease;
   }
 
   .btn-primary:hover {
-    box-shadow: 0 0 15px rgba(236, 178, 255, 0.4);
+    box-shadow: var(--kelmon-shadow-glow-purple);
   }
 
   .btn-secondary {
     background: transparent;
-    border: 1px solid #e9c349;
-    color: #e9c349;
+    border: 1px solid var(--theme-secondary);
+    color: var(--theme-secondary);
     transition: all 0.3s ease;
   }
 
@@ -91,20 +92,22 @@
   }
 
   .input-dark {
-    background: #0f0f0f;
+    background: var(--kelmon-bg-surface);
     border: none;
     border-bottom: 1px solid transparent;
     transition: border-color 0.3s ease;
+    color: var(--kelmon-text-primary);
   }
 
   .input-dark:focus {
     outline: none;
-    border-bottom-color: #e9c349;
+    border-bottom-color: var(--theme-secondary);
     box-shadow: none;
   }
 }
 
 body {
-  background-color: #0b0b0b;
-  color: #ebdfe9;
+  background-color: var(--kelmon-bg-primary);
+  color: var(--kelmon-text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
