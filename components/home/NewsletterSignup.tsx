@@ -36,11 +36,11 @@ export default function NewsletterSignup() {
         value={phone}
         onChange={(e) => setPhone(e.target.value)}
         placeholder="07XX XXX XXX"
-        className="flex-1 h-12 px-4 bg-surface-container border border-primary/30 text-on-surface font-body-md text-body-md placeholder-on-surface-variant/50 focus:outline-none focus:border-primary transition-colors"
+        className="flex-1 h-12 px-5 rounded-full bg-white text-black font-body-md text-body-md placeholder-black/40 focus:outline-none focus:ring-2 focus:ring-secondary transition-shadow"
       />
       <button
         type="submit"
-        className="h-12 px-8 btn-primary text-white font-button-text text-button-text shrink-0"
+        className="h-12 px-8 rounded-full bg-secondary text-black font-button-text text-button-text shrink-0 hover:opacity-90 transition-opacity"
       >
         Notify me
       </button>

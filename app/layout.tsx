@@ -29,10 +29,10 @@ const themeScript = `
 (function() {
   try {
     var t = localStorage.getItem('kelmon-theme');
-    var d = t || 'dark';
+    var d = t || 'light';
     document.documentElement.classList.add(d);
   } catch (e) {
-    document.documentElement.classList.add('dark');
+    document.documentElement.classList.add('light');
   }
 })();
 `;

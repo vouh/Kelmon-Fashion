@@ -105,80 +105,6 @@
     box-shadow: none;
   }
 
-  .sidebar-wave-toggle {
-    position: relative;
-    flex-shrink: 0;
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    border: none;
-    border-radius: 9999px;
-    background: transparent;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--theme-on-surface-variant);
-    transition: color 0.2s ease;
-  }
-
-  .sidebar-wave-ring {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-  }
-
-  .sidebar-wave-arc {
-    opacity: 0.85;
-    animation: sidebar-wave-travel 7s linear infinite;
-  }
-
-  .sidebar-wave-toggle-active .sidebar-wave-arc {
-    opacity: 1;
-    animation-duration: 5.5s;
-  }
-
-  .sidebar-wave-icon {
-    position: relative;
-    z-index: 1;
-    font-size: 20px;
-    line-height: 1;
-    transition: color 0.2s ease;
-  }
-
-  .sidebar-wave-toggle:hover {
-    color: var(--theme-primary);
-  }
-
-  .sidebar-wave-toggle-active {
-    color: var(--theme-primary);
-  }
-
-  .sidebar-wave-toggle:focus-visible {
-    outline: none;
-  }
-
-  .sidebar-wave-toggle:focus-visible .sidebar-wave-icon {
-    outline: 2px solid var(--theme-primary);
-    outline-offset: 2px;
-    border-radius: 4px;
-  }
-
-  @keyframes sidebar-wave-travel {
-    to {
-      stroke-dashoffset: -102;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .sidebar-wave-arc {
-      animation: none;
-      stroke-dasharray: none;
-      opacity: 0.35;
-    }
-  }
 }
 
 body {
@@ -269,6 +195,12 @@ body {
 .hover-lift:hover {
   transform: translateY(-6px);
   box-shadow: var(--kelmon-shadow-md);
+}
+
+/* Soft arch frame for hero product */
+.hero-arch {
+  border-radius: 9999px 9999px 24px 24px;
+  box-shadow: 0 20px 50px rgba(142, 68, 173, 0.18);
 }
 
 .product-slider-slide.slide-from-right {

@@ -17,7 +17,7 @@ interface BottomNavProps {
 export default function BottomNav({ active, cartCount = 0 }: BottomNavProps) {
   return (
     <nav
-      className="md:hidden fixed bottom-3 left-3 right-3 z-50 flex justify-around items-center px-4 py-3 rounded-2xl glass-panel shadow-nav border border-[var(--kelmon-border-subtle)]"
+      className="md:hidden fixed bottom-3 left-3 right-3 z-50 flex justify-around items-center px-4 py-3 rounded-full bg-white/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(142,68,173,0.15)] border border-primary/15"
       aria-label="Primary"
     >
       {navItems.map(({ href, label, icon, key }) => {
@@ -27,7 +27,7 @@ export default function BottomNav({ active, cartCount = 0 }: BottomNavProps) {
             key={key}
             href={href}
             className={`flex flex-col items-center justify-center min-w-[48px] min-h-[44px] transition-transform ${
-              isActive ? "text-secondary scale-110" : "text-on-surface-variant hover:text-primary active:scale-90"
+              isActive ? "text-primary scale-110" : "text-on-surface-variant hover:text-primary active:scale-90"
             }`}
           >
             <span
@@ -36,7 +36,7 @@ export default function BottomNav({ active, cartCount = 0 }: BottomNavProps) {
             >
               {icon}
               {key === "cart" && cartCount > 0 && (
-                <span className="absolute -top-1 -right-2 bg-primary-container text-white text-[10px] min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-2 bg-primary text-white text-[10px] min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center">
                   {cartCount}
                 </span>
               )}

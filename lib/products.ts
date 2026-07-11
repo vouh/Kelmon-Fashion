@@ -1,4 +1,4 @@
-export type NavItem = "home" | "shop" | "salon" | "cart" | "orders" | "profile";
+export type NavItem = "home" | "shop" | "salon" | "cart" | "orders" | "profile" | "about";
 
 export interface Product {
   id: string;

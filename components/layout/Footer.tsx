@@ -4,14 +4,11 @@ import logo from "@/lib/logo";
 
 export default function Footer() {
   return (
-    <footer className="w-full mt-auto border-t border-secondary/30 bg-black">
+    <footer className="w-full mt-auto border-t border-primary/15 bg-white">
       <div className="px-margin-mobile md:px-margin-desktop py-10 md:py-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 md:gap-6">
           <div className="sm:col-span-2 md:col-span-1 space-y-3">
-            <div className="flex items-center gap-2">
-              <Image src={logo} alt="" width={36} height={36} className="w-9 h-9 object-contain" />
-              <span className="font-display-md text-xl text-on-surface">Kelmon</span>
-            </div>
+            <Image src={logo} alt="Kelmon" width={140} height={48} className="h-12 w-auto object-contain" />
             <p className="font-body-md text-body-md text-on-surface-variant max-w-xs">
               Premium fashion & beauty for UoN campus — shop, salon, delivery.
             </p>
@@ -56,13 +53,13 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/orders" className="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors">
-                  Orders
+                <Link href="/about" className="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors">
+                  About us
                 </Link>
               </li>
               <li>
-                <Link href="/cart" className="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors">
-                  Cart & delivery
+                <Link href="/orders" className="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors">
+                  Orders
                 </Link>
               </li>
             </ul>
@@ -94,9 +91,9 @@ export default function Footer() {
 
         <div className="mt-10 pt-6 border-t border-primary/10 flex flex-col sm:flex-row justify-between gap-3">
           <p className="font-body-md text-body-md text-on-surface-variant">
-            © 2026 Kelmon · Elevating campus style
+            © 2026 Kelmon · Beauty · Fashion · Glamour
           </p>
-          <p className="font-body-md text-body-md text-on-surface-variant">
+          <p className="font-body-md text-body-md text-primary">
             Free campus delivery over KES 3,000
           </p>
         </div>

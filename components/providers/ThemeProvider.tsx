@@ -13,11 +13,11 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
+  const [theme, setThemeState] = useState<Theme>("light");
 
   useEffect(() => {
     const stored = localStorage.getItem("kelmon-theme") as Theme | null;
-    const initial = stored ?? "dark";
+    const initial = stored ?? "light";
     setThemeState(initial);
     document.documentElement.classList.remove("dark", "light");
     document.documentElement.classList.add(initial);
