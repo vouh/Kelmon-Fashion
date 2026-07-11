@@ -151,6 +151,14 @@ body {
   animation: landing-fade-up 0.7s ease-out forwards;
 }
 
+.hero-slide-in-right {
+  animation: slide-from-right 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.hero-slide-in-left {
+  animation: slide-from-left 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @keyframes hero-zoom {
   from {
     transform: scale(1);
@@ -197,10 +205,14 @@ body {
   box-shadow: var(--kelmon-shadow-md);
 }
 
-/* Soft arch frame for hero product */
+/* Soft arch frame for hero product — Eloréa-style window */
 .hero-arch {
-  border-radius: 9999px 9999px 24px 24px;
-  box-shadow: 0 20px 50px rgba(142, 68, 173, 0.18);
+  border-radius: 9999px 9999px 1.75rem 1.75rem;
+  box-shadow: 0 28px 64px rgba(142, 68, 173, 0.18);
+}
+
+.hero-arch-backdrop {
+  border-radius: 9999px 9999px 2rem 2rem;
 }
 
 @keyframes search-backdrop-in {
@@ -270,6 +282,8 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .landing-fade,
+  .hero-slide-in-right,
+  .hero-slide-in-left,
   .product-slider-slide.slide-from-right,
   .product-slider-slide.slide-from-left,
   .hero-zoom,
