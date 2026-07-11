@@ -54,7 +54,7 @@ export default function SalonServicesSection({ services }: SalonServicesSectionP
                   fill
                   unoptimized
                   className="object-cover transition-transform duration-700 group-hover:scale-105"
-                  sizes="240px"
+                  sizes="320px"
                   aria-hidden="true"
                 />
               </div>
