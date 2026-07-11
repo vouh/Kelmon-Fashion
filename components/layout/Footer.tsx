@@ -4,7 +4,7 @@ import logo from "@/lib/logo";
 
 export default function Footer() {
   return (
-    <footer className="w-full mt-auto border-t border-primary/15 bg-surface-container-lowest">
+    <footer className="w-full mt-auto border-t border-secondary/30 bg-black">
       <div className="px-margin-mobile md:px-margin-desktop py-10 md:py-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 md:gap-6">
           <div className="sm:col-span-2 md:col-span-1 space-y-3">

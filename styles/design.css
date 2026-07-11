@@ -10,35 +10,35 @@
 
 :root,
 .dark {
-  /* Backgrounds */
-  --kelmon-bg-primary: #0b0b0b;
-  --kelmon-bg-elevated: #141414;
-  --kelmon-bg-surface: #1a1a1a;
-  --kelmon-bg-glass: rgba(20, 20, 20, 0.72);
-  --kelmon-bg-overlay: rgba(0, 0, 0, 0.6);
-  --kelmon-white-glow: rgba(255, 255, 255, 0.08);
+  /* Backgrounds — solid black brand base */
+  --kelmon-bg-primary: #000000;
+  --kelmon-bg-elevated: #0f0f0f;
+  --kelmon-bg-surface: #141414;
+  --kelmon-bg-glass: rgba(15, 15, 15, 0.92);
+  --kelmon-bg-overlay: rgba(0, 0, 0, 0.55);
+  --kelmon-white-glow: transparent;
 
-  /* Purple */
-  --kelmon-purple-deep: #6a2b8e;
+  /* Purple — solid logo match */
+  --kelmon-purple-deep: #8e44ad;
   --kelmon-purple-brand: #8e44ad;
-  --kelmon-purple-light: #a366cc;
+  --kelmon-purple-light: #8e44ad;
   --kelmon-purple-muted: rgba(142, 68, 173, 0.15);
-  --kelmon-purple-glow: rgba(142, 68, 173, 0.35);
+  --kelmon-purple-glow: transparent;
 
-  /* Gold */
-  --kelmon-gold-primary: #d4af37;
-  --kelmon-gold-light: #e8c547;
-  --kelmon-gold-muted: #c5a028;
-  --kelmon-text-gold: #d4af37;
+  /* Gold — solid logo match */
+  --kelmon-gold-primary: #c5a059;
+  --kelmon-gold-light: #c5a059;
+  --kelmon-gold-muted: #c5a059;
+  --kelmon-text-gold: #c5a059;
 
   /* Text */
   --kelmon-text-primary: #fdfdfd;
   --kelmon-text-secondary: #a3a3a3;
   --kelmon-text-disabled: #6b6b6b;
-  --kelmon-text-inverse: #0b0b0b;
+  --kelmon-text-inverse: #000000;
 
   /* Borders */
-  --kelmon-border-subtle: rgba(212, 175, 55, 0.25);
+  --kelmon-border-subtle: rgba(197, 160, 89, 0.35);
   --kelmon-border-default: rgba(255, 255, 255, 0.1);
   --kelmon-border-focus: #8e44ad;
 
@@ -51,36 +51,36 @@
   --kelmon-warning-muted: rgba(245, 158, 11, 0.15);
   --kelmon-info: #3b82f6;
 
-  /* Semantic surfaces (Tailwind theme tokens) */
-  --theme-bg: #171218;
-  --theme-surface: #171218;
-  --theme-surface-dim: #171218;
-  --theme-surface-container: #231e25;
-  --theme-surface-container-high: #2e282f;
-  --theme-surface-container-highest: #39333a;
-  --theme-surface-container-lowest: #110c13;
-  --theme-on-surface: #ebdfe9;
-  --theme-on-surface-variant: #d1c2d2;
-  --theme-on-background: #ebdfe9;
-  --theme-primary: #ecb2ff;
+  /* Semantic surfaces */
+  --theme-bg: #000000;
+  --theme-surface: #0f0f0f;
+  --theme-surface-dim: #0a0a0a;
+  --theme-surface-container: #141414;
+  --theme-surface-container-high: #1a1a1a;
+  --theme-surface-container-highest: #222222;
+  --theme-surface-container-lowest: #000000;
+  --theme-on-surface: #f5f5f5;
+  --theme-on-surface-variant: #b0b0b0;
+  --theme-on-background: #f5f5f5;
+  --theme-primary: #8e44ad;
   --theme-primary-container: #8e44ad;
-  --theme-on-primary: #520071;
-  --theme-secondary: #e9c349;
-  --theme-inverse-primary: #873da6;
-  --theme-outline: #9a8c9b;
+  --theme-on-primary: #ffffff;
+  --theme-secondary: #c5a059;
+  --theme-inverse-primary: #8e44ad;
+  --theme-outline: #6b6b6b;
   --theme-error: #ffb4ab;
 
-  /* Gradients */
-  --kelmon-gradient-purple: linear-gradient(135deg, #6a2b8e 0%, #8e44ad 50%, #a366cc 100%);
-  --kelmon-gradient-gold: linear-gradient(90deg, #c5a028 0%, #d4af37 50%, #e8c547 100%);
-  --kelmon-gradient-hero-glow: radial-gradient(ellipse at center, rgba(142, 68, 173, 0.25) 0%, rgba(11, 11, 11, 0) 70%);
+  /* Solid fills only — no gradients */
+  --kelmon-gradient-purple: #8e44ad;
+  --kelmon-gradient-gold: #c5a059;
+  --kelmon-gradient-hero-glow: transparent;
 
-  /* Shadows */
-  --kelmon-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --kelmon-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
-  --kelmon-shadow-glow-purple: 0 0 24px rgba(142, 68, 173, 0.4);
-  --kelmon-shadow-glow-gold: 0 0 16px rgba(212, 175, 55, 0.3);
-  --kelmon-nav-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  /* Shadows — flat, no glow */
+  --kelmon-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --kelmon-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.55);
+  --kelmon-shadow-glow-purple: none;
+  --kelmon-shadow-glow-gold: none;
+  --kelmon-nav-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 
   /* Typography */
   --kelmon-font-display: "Playfair Display", Georgia, serif;
@@ -110,53 +110,59 @@
 }
 
 .light {
-  /* Soft light-purple surfaces */
-  --kelmon-bg-primary: #f6f0fb;
+  --kelmon-bg-primary: #faf8fc;
   --kelmon-bg-elevated: #ffffff;
-  --kelmon-bg-surface: #efe6f7;
-  --kelmon-bg-glass: rgba(255, 255, 255, 0.9);
-  --kelmon-bg-overlay: rgba(74, 36, 96, 0.28);
-  --kelmon-white-glow: rgba(168, 112, 204, 0.08);
+  --kelmon-bg-surface: #f3f0f6;
+  --kelmon-bg-glass: rgba(255, 255, 255, 0.95);
+  --kelmon-bg-overlay: rgba(0, 0, 0, 0.4);
+  --kelmon-white-glow: transparent;
 
-  --kelmon-purple-deep: #7a3d9e;
-  --kelmon-purple-brand: #9b59b6;
-  --kelmon-purple-light: #c9a0e0;
-  --kelmon-purple-muted: rgba(155, 89, 182, 0.12);
-  --kelmon-purple-glow: rgba(155, 89, 182, 0.22);
+  --kelmon-purple-deep: #8e44ad;
+  --kelmon-purple-brand: #8e44ad;
+  --kelmon-purple-light: #8e44ad;
+  --kelmon-purple-muted: rgba(142, 68, 173, 0.12);
+  --kelmon-purple-glow: transparent;
 
-  --kelmon-text-primary: #2a1a36;
-  --kelmon-text-secondary: #6e5a7c;
-  --kelmon-text-disabled: #a896b5;
-  --kelmon-text-inverse: #fdfdfd;
+  --kelmon-gold-primary: #c5a059;
+  --kelmon-gold-light: #c5a059;
+  --kelmon-gold-muted: #c5a059;
+  --kelmon-text-gold: #c5a059;
 
-  --kelmon-border-subtle: rgba(155, 89, 182, 0.22);
-  --kelmon-border-default: rgba(106, 43, 142, 0.1);
-  --kelmon-border-focus: #9b59b6;
+  --kelmon-text-primary: #1a1220;
+  --kelmon-text-secondary: #6b6075;
+  --kelmon-text-disabled: #a89db0;
+  --kelmon-text-inverse: #ffffff;
 
-  --theme-bg: #f6f0fb;
+  --kelmon-border-subtle: rgba(197, 160, 89, 0.4);
+  --kelmon-border-default: rgba(0, 0, 0, 0.08);
+  --kelmon-border-focus: #8e44ad;
+
+  --theme-bg: #faf8fc;
   --theme-surface: #ffffff;
-  --theme-surface-dim: #f0e8f7;
-  --theme-surface-container: #ebe0f4;
-  --theme-surface-container-high: #e2d4ef;
-  --theme-surface-container-highest: #d6c4e6;
+  --theme-surface-dim: #f5f2f8;
+  --theme-surface-container: #f0ecf4;
+  --theme-surface-container-high: #e8e2ee;
+  --theme-surface-container-highest: #ddd5e6;
   --theme-surface-container-lowest: #ffffff;
-  --theme-on-surface: #2a1a36;
-  --theme-on-surface-variant: #6e5a7c;
-  --theme-on-background: #2a1a36;
-  --theme-primary: #9b59b6;
-  --theme-primary-container: #9b59b6;
+  --theme-on-surface: #1a1220;
+  --theme-on-surface-variant: #6b6075;
+  --theme-on-background: #1a1220;
+  --theme-primary: #8e44ad;
+  --theme-primary-container: #8e44ad;
   --theme-on-primary: #ffffff;
-  --theme-secondary: #b8942e;
-  --theme-inverse-primary: #6a2b8e;
+  --theme-secondary: #c5a059;
+  --theme-inverse-primary: #8e44ad;
   --theme-outline: #9a8c9b;
   --theme-error: #dc2626;
 
-  --kelmon-gradient-purple: linear-gradient(135deg, #9b59b6 0%, #b07cc9 50%, #c9a0e0 100%);
-  --kelmon-gradient-hero-glow: radial-gradient(ellipse at center, rgba(155, 89, 182, 0.18) 0%, rgba(246, 240, 251, 0) 70%);
-  --kelmon-shadow-sm: 0 1px 3px rgba(106, 43, 142, 0.08);
-  --kelmon-shadow-md: 0 4px 16px rgba(106, 43, 142, 0.1);
-  --kelmon-shadow-glow-purple: 0 0 24px rgba(155, 89, 182, 0.28);
-  --kelmon-nav-shadow: 0 8px 32px rgba(106, 43, 142, 0.1);
+  --kelmon-gradient-purple: #8e44ad;
+  --kelmon-gradient-gold: #c5a059;
+  --kelmon-gradient-hero-glow: transparent;
+  --kelmon-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --kelmon-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
+  --kelmon-shadow-glow-purple: none;
+  --kelmon-shadow-glow-gold: none;
+  --kelmon-nav-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
 .kelmon-theme {
@@ -170,14 +176,14 @@
   padding: 0 var(--kelmon-space-6);
   border: none;
   border-radius: var(--kelmon-radius-md);
-  background: var(--kelmon-gradient-purple);
-  color: var(--kelmon-text-primary);
+  background: #8e44ad;
+  color: #ffffff;
   font-weight: 600;
   cursor: pointer;
 }
 
 .kelmon-btn-primary:hover {
-  box-shadow: var(--kelmon-shadow-glow-purple);
+  background: #7a3a96;
 }
 
 .kelmon-btn-secondary {

@@ -13,10 +13,10 @@ export default function ProductCard({ product, compact = false }: ProductCardPro
   return (
     <Link
       href={`/product/${product.id}`}
-      className={`${compact ? "flex-shrink-0 w-64" : ""} elevated-dark rounded-2xl overflow-hidden border border-primary/15 snap-start group relative block hover:border-primary/35 transition-colors`}
+      className={`${compact ? "flex-shrink-0 w-64" : ""} elevated-dark overflow-hidden border border-primary/25 snap-start group relative block hover:border-primary transition-colors`}
     >
       {product.badge && (
-        <div className="absolute top-3 left-3 z-10 px-3 py-1 bg-primary-container rounded-full font-label-caps text-[10px] uppercase tracking-widest text-white">
+        <div className="absolute top-3 left-3 z-10 px-3 py-1 bg-primary font-label-caps text-[10px] uppercase tracking-widest text-white">
           {product.badge}
         </div>
       )}
