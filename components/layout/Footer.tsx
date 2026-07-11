@@ -60,6 +60,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/contact" className="font-body-md text-body-md text-white/80 hover:text-white transition-colors">
+                  Contact us
+                </Link>
+              </li>
+              <li>
                 <Link href="/salon" className="font-body-md text-body-md text-white/80 hover:text-white transition-colors">
                   Salon booking
                 </Link>
@@ -77,6 +82,11 @@ export default function Footer() {
               Support
             </h3>
             <ul className="space-y-2">
+              <li>
+                <Link href="/contact" className="font-body-md text-body-md text-white/80 hover:text-white transition-colors">
+                  Contact us
+                </Link>
+              </li>
               <li>
                 <a
                   href="https://wa.me/254700000000"

@@ -4,7 +4,7 @@ import AppShell from "@/components/layout/AppShell";
 import Reveal from "@/components/ui/Reveal";
 import HeroShowcase from "@/components/home/HeroShowcase";
 import CircleCollection from "@/components/home/CircleCollection";
-import StarRating from "@/components/ui/StarRating";
+import FeatureProductCard from "@/components/shop/FeatureProductCard";
 import { shopProducts, formatKes } from "@/lib/products";
 import { salonServices } from "@/lib/salon";
 
@@ -37,67 +37,29 @@ export default function HomePage() {
           <CircleCollection products={shopProducts} />
         </Reveal>
 
-        {/* Products — reference-style grid */}
-        <section className="px-margin-mobile md:px-margin-desktop py-16 md:py-20 bg-surface-dim">
+        {/* Our Features — reference product grid */}
+        <section className="px-6 md:px-12 lg:px-16 py-16 md:py-20 bg-[#f5f0f8] dark:bg-surface-dim">
           <Reveal>
-            <div className="text-center mb-10 md:mb-12">
-              <h2 className="font-headline-lg text-[1.85rem] md:text-[2.35rem] text-on-surface tracking-tight">
-                Our products
-              </h2>
-              <p className="font-body-md text-body-md text-on-surface-variant mt-2">
-                Curated picks for campus glam
-              </p>
-            </div>
+            <h2 className="font-display-lg text-[1.75rem] md:text-[2.15rem] text-on-surface text-center tracking-tight mb-12 md:mb-14">
+              Our Features
+            </h2>
           </Reveal>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-5xl mx-auto">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-12 md:gap-x-7 md:gap-y-14 max-w-[1100px] mx-auto">
             {gridProducts.map((product, i) => (
-              <Reveal key={product.id} delay={(i % 4) * 60}>
-                <Link
-                  href={`/product/${product.id}`}
-                  className="group block text-center rounded-[1.25rem] bg-surface p-3 md:p-4 shadow-[0_8px_28px_rgba(142,68,173,0.08)] hover:shadow-[0_12px_36px_rgba(142,68,173,0.14)] transition-shadow"
-                >
-                  <div className="relative aspect-square rounded-xl overflow-hidden bg-surface-container">
-                    {product.badge && (
-                      <span className="absolute top-2.5 left-2.5 z-10 px-2.5 py-1 rounded-full bg-primary text-white font-label-caps text-[10px] uppercase tracking-wider">
-                        {product.badge}
-                      </span>
-                    )}
-                    <Image
-                      src={product.image}
-                      alt={product.name}
-                      fill
-                      unoptimized
-                      className="object-cover transition-transform duration-500 group-hover:scale-105"
-                      sizes="(max-width: 768px) 50vw, 25vw"
-                    />
-                  </div>
-                  <h3 className="mt-3.5 font-title-lg text-title-lg text-on-surface truncate px-1 group-hover:text-primary transition-colors">
-                    {product.name}
-                  </h3>
-                  <div className="mt-1 flex justify-center">
-                    <StarRating rating={product.rating} />
-                  </div>
-                  <p className="mt-2 font-body-md text-body-md text-primary font-semibold">
-                    {product.originalPrice && (
-                      <span className="text-on-surface-variant line-through mr-2 font-normal">
-                        {formatKes(product.originalPrice)}
-                      </span>
-                    )}
-                    {formatKes(product.price)}
-                  </p>
-                </Link>
+              <Reveal key={product.id} delay={(i % 4) * 40}>
+                <FeatureProductCard product={product} />
               </Reveal>
             ))}
           </div>
-          <Reveal delay={80}>
-            <div className="flex justify-center mt-10 md:mt-12">
+          <Reveal delay={60}>
+            <div className="flex justify-center mt-14">
               <Link
                 href="/shop"
-                className="inline-flex h-12 px-10 rounded-full bg-primary text-white font-button-text text-button-text uppercase tracking-[0.1em] items-center gap-2 hover:bg-[#7a3a96] transition-colors"
+                className="inline-flex h-11 px-9 rounded-full bg-primary text-white text-[11px] font-semibold uppercase tracking-[0.18em] items-center gap-2 hover:bg-[#7a3a96] transition-colors"
               >
-                View all
-                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                  arrow_forward
+                Load more
+                <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
+                  refresh
                 </span>
               </Link>
             </div>

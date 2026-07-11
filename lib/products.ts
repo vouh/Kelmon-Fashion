@@ -1,4 +1,4 @@
-export type NavItem = "home" | "shop" | "salon" | "cart" | "orders" | "profile" | "about";
+export type NavItem = "home" | "shop" | "salon" | "cart" | "orders" | "profile" | "about" | "contact";
 
 export interface Product {
   id: string;
@@ -34,11 +34,13 @@ export const featuredProducts: Product[] = [
     id: "lv-speedy-bag",
     name: "LV Speedy Bag",
     price: 8500,
+    originalPrice: 9800,
     category: "Bags",
     image:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuCVWalppuGMjKswUbfn0gKwdvM6wzNBWcP47HWqUNmJiz7YxZH0dbcOXpksDrTRIrY1pzj5du3TMTobGthcdBPNIk9GJPTepo95s-qqwNVuyMmxRtreJrXlCR8MrlKVd44jG7saJGBpNKMefr_8yxgnrkPe1ak7cJPraUVryoY8xQH0ZRB7NQW00wA0Gzt0tviTdc_f8ZbzHBQ1CzqrQsALURf660Tusr9l3b0MV6k5ujgGfVL2Nn6j",
     rating: 4.9,
     reviewCount: 56,
+    badge: "Hot",
   },
   {
     id: "gel-manicure-kit",
@@ -58,11 +60,13 @@ export const shopProducts: Product[] = [
     id: "dior-sauvage",
     name: "Dior Sauvage 100ml",
     price: 4800,
+    originalPrice: 5500,
     category: "Perfumes",
     image:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuAdRyLQb2S_yuMJ59w5MyYSxLNBH8sbWVYkGfpdzxEV7hfB2f36365XFtJZF4YyN8MACrE9ahUb1tCZuj_JAljiWDFmnBShFO01-Up_T2_gB0EkllsyjMI8iobp8W6x2qR8DgAx564yiul2wNUnUUjvKd6Fj2KX3wlDfv3Qy3Gz3BQn2aSdMdW311tqwSaoAU2L1fSZBO9aENtMo7Mly5jXC8Qdwg-7reAjGnQv9OqvgaxMWt2M0eKJ",
     rating: 5,
     reviewCount: 89,
+    badge: "Sale",
   },
   {
     id: "crossbody-mini-bag",
@@ -73,6 +77,7 @@ export const shopProducts: Product[] = [
       "https://lh3.googleusercontent.com/aida-public/AB6AXuBMXUILIEmeN2vV2l8fp8_34rPu0T0rKxow98dTsqBSwPQOoGciIjjgU6jsrQebMpLbqOvBWvsytNqM1DQo3GGmGv9Oki6wnR_af2jtsBQcvGxiOKDCyu9bS_ejnm-l9VKoXlWkKmq9QDvvNtnueSimnq-V-tYzklV_EKKncqLM_hhTp0xdpUp0Shb7pLdZcoiGj_e51e7WyX3R0diDGEA33cIiF6UrRhnFCjFKjl10I0smMQtESlIA",
     rating: 4,
     reviewCount: 42,
+    badge: "Hot",
   },
   {
     id: "gold-hoop-earrings",

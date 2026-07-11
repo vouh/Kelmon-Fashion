@@ -2,19 +2,26 @@ interface StarRatingProps {
   rating: number;
   reviewCount?: number;
   size?: "sm" | "md";
+  tone?: "secondary" | "primary";
 }
 
-export default function StarRating({ rating, reviewCount, size = "sm" }: StarRatingProps) {
+export default function StarRating({
+  rating,
+  reviewCount,
+  size = "sm",
+  tone = "secondary",
+}: StarRatingProps) {
   const iconSize = size === "sm" ? "text-sm" : "text-base";
+  const filledClass = tone === "primary" ? "text-primary" : "text-secondary";
 
   return (
-    <div className="flex items-center gap-1" aria-label={`${rating} out of 5 stars`}>
+    <div className="flex items-center gap-0.5" aria-label={`${rating} out of 5 stars`}>
       {Array.from({ length: 5 }).map((_, i) => {
         const filled = i + 1 <= Math.round(rating);
         return (
           <span
             key={i}
-            className={`material-symbols-outlined ${iconSize} ${filled ? "text-secondary" : "text-on-surface-variant/30"}`}
+            className={`material-symbols-outlined ${iconSize} ${filled ? filledClass : "text-on-surface-variant/30"}`}
             style={filled ? { fontVariationSettings: "'FILL' 1" } : undefined}
             aria-hidden="true"
           >

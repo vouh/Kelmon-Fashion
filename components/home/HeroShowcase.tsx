@@ -94,48 +94,49 @@ export default function HeroShowcase({ products, autoPlayMs = 5000 }: HeroShowca
 
   return (
     <section
-      className="relative overflow-hidden bg-surface-dim"
+      className="relative overflow-hidden bg-[#faf6fc] dark:bg-surface-dim"
       aria-roledescription="carousel"
       aria-label="Featured products"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <div className="relative px-margin-mobile md:px-margin-desktop pt-24 md:pt-28 pb-12 md:pb-16">
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)_minmax(0,1fr)] gap-10 lg:gap-6 items-center min-h-[68vh]">
-          {/* Left copy — moves with slide */}
+      <div className="relative max-w-[1200px] mx-auto px-6 md:px-12 pt-28 md:pt-32 pb-10 md:pb-14">
+        <div className="grid grid-cols-1 lg:grid-cols-3 items-center gap-8 lg:gap-4 min-h-[70vh]">
+          {/* Left — identical layout to reference */}
           <div
             key={`left-${product.id}-${index}`}
-            className={`order-2 lg:order-1 space-y-5 max-w-md ${animClass}`}
+            className={`order-2 lg:order-1 flex flex-col justify-center ${animClass}`}
           >
-            <h1 className="font-display-lg text-[2.5rem] md:text-[3.25rem] leading-[1.12] text-on-surface tracking-tight">
+            <h1 className="font-display-lg text-[2.75rem] md:text-[3.5rem] font-semibold leading-[1.1] text-on-surface tracking-tight max-w-[14ch]">
               {copy.headline}
             </h1>
-            <p className="font-body-lg text-body-lg text-on-surface-variant leading-relaxed max-w-sm">
+            <p className="mt-5 font-body-md text-[0.95rem] md:text-base text-on-surface-variant leading-relaxed max-w-[32ch]">
               {copy.description}
             </p>
             <Link
               href={`/product/${product.id}`}
-              className="inline-flex h-12 px-8 rounded-full bg-primary text-white font-button-text text-button-text uppercase tracking-[0.14em] items-center gap-1 hover:bg-[#7a3a96] transition-colors"
+              className="mt-7 inline-flex self-start h-11 px-7 rounded-full bg-primary text-white text-[0.7rem] font-semibold uppercase tracking-[0.16em] items-center gap-1 hover:bg-[#7a3a96] transition-colors"
             >
               Buy now
-              <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
-                keyboard_double_arrow_right
+              <span className="text-[0.85rem] leading-none" aria-hidden="true">
+                ≫
               </span>
             </Link>
           </div>
 
-          {/* Center — arch frame + arrows */}
-          <div className="relative order-1 lg:order-2 flex flex-col items-center w-full">
-            <div className="relative w-full max-w-[320px] md:max-w-[340px] mx-auto">
-              {/* Outer soft arch wash (reference overlay) */}
+          {/* Center — solid arch backdrop + product ON TOP (not cropped fill) */}
+          <div className="relative order-1 lg:order-2 flex flex-col items-center justify-center">
+            <div className="relative w-[240px] sm:w-[280px] md:w-[300px] h-[420px] sm:h-[480px] md:h-[520px]">
+              {/* Solid arch shape — like Eloréa */}
               <div
-                className="hero-arch-backdrop absolute inset-x-[-6%] inset-y-[-2%] bg-primary/10 pointer-events-none"
+                className="hero-arch-solid absolute inset-0 bg-[#eadff3] dark:bg-surface-container"
                 aria-hidden="true"
               />
 
+              {/* Product floating over arch */}
               <div
                 key={`img-${product.id}-${index}`}
-                className={`hero-arch relative z-[1] w-full aspect-[3/4.2] overflow-hidden bg-surface-container ${animClass}`}
+                className={`absolute inset-x-[8%] inset-y-[6%] z-10 ${animClass}`}
               >
                 <Image
                   src={product.image}
@@ -143,16 +144,17 @@ export default function HeroShowcase({ products, autoPlayMs = 5000 }: HeroShowca
                   fill
                   unoptimized
                   priority
-                  className="object-cover"
-                  sizes="(max-width: 768px) 75vw, 340px"
+                  className="object-contain drop-shadow-[0_20px_40px_rgba(42,26,54,0.18)]"
+                  sizes="300px"
                 />
               </div>
 
+              {/* Arrows on arch edges */}
               <button
                 type="button"
                 onClick={() => goTo(index - 1, "prev")}
                 aria-label="Previous product"
-                className="absolute -left-2 md:-left-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 md:w-10 md:h-10 rounded-full bg-[#1a1a1a] text-white flex items-center justify-center shadow-md hover:bg-black transition-colors"
+                className="absolute -left-4 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-[#1a1a1a] text-white flex items-center justify-center hover:bg-black transition-colors"
               >
                 <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
                   chevron_left
@@ -162,7 +164,7 @@ export default function HeroShowcase({ products, autoPlayMs = 5000 }: HeroShowca
                 type="button"
                 onClick={() => goTo(index + 1, "next")}
                 aria-label="Next product"
-                className="absolute -right-2 md:-right-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 md:w-10 md:h-10 rounded-full bg-primary text-white flex items-center justify-center shadow-md hover:bg-[#7a3a96] transition-colors"
+                className="absolute -right-4 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center hover:bg-[#7a3a96] transition-colors"
               >
                 <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
                   chevron_right
@@ -170,7 +172,8 @@ export default function HeroShowcase({ products, autoPlayMs = 5000 }: HeroShowca
               </button>
             </div>
 
-            <div className="flex gap-2 mt-6" role="tablist" aria-label="Hero products">
+            {/* Pagination — small bars under arch */}
+            <div className="flex items-center gap-2 mt-5" role="tablist" aria-label="Hero products">
               {products.map((p, i) => (
                 <button
                   key={p.id}
@@ -179,25 +182,42 @@ export default function HeroShowcase({ products, autoPlayMs = 5000 }: HeroShowca
                   aria-selected={i === index}
                   aria-label={p.name}
                   onClick={() => goTo(i, i > index ? "next" : "prev")}
-                  className={`h-1.5 rounded-sm transition-all duration-300 ${
-                    i === index ? "w-6 bg-primary" : "w-4 bg-primary/25 hover:bg-primary/45"
+                  className={`h-1 rounded-[1px] transition-all duration-300 ${
+                    i === index ? "w-5 bg-primary" : "w-3 bg-on-surface/25 hover:bg-on-surface/40"
                   }`}
                 />
               ))}
             </div>
           </div>
 
-          {/* Right meta — moves with slide */}
+          {/* Right — product meta */}
           <div
             key={`right-${product.id}-${index}`}
-            className={`order-3 space-y-2 text-left lg:text-right max-w-xs lg:ml-auto ${animClass}`}
+            className={`order-3 flex flex-col justify-center text-left lg:text-right ${animClass}`}
           >
-            <h2 className="font-headline-sm text-headline-sm text-on-surface">{product.name}</h2>
-            <p className="font-body-md text-body-md text-on-surface-variant">{copy.notes}</p>
-            <p className="font-headline-lg text-[1.85rem] md:text-[2.1rem] text-on-surface pt-2 font-semibold tracking-tight">
+            <h2 className="font-display-lg text-xl md:text-2xl font-semibold text-on-surface">
+              {product.name}
+            </h2>
+            <p className="mt-1.5 font-body-md text-sm text-on-surface-variant">{copy.notes}</p>
+            <p className="mt-4 font-display-lg text-3xl md:text-4xl font-semibold text-on-surface tracking-tight">
               {formatKes(product.price)}
             </p>
           </div>
+        </div>
+
+        {/* Social icons — bottom right like reference */}
+        <div className="hidden lg:flex absolute bottom-8 right-12 gap-5 text-on-surface/55">
+          <a href="https://facebook.com" target="_blank" rel="noreferrer" aria-label="Facebook" className="hover:text-primary transition-colors text-sm font-semibold">
+            f
+          </a>
+          <a href="https://instagram.com" target="_blank" rel="noreferrer" aria-label="Instagram" className="hover:text-primary transition-colors text-sm font-semibold">
+            in
+          </a>
+          <a href="https://instagram.com" target="_blank" rel="noreferrer" aria-label="Instagram" className="hover:text-primary transition-colors">
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+              photo_camera
+            </span>
+          </a>
         </div>
       </div>
     </section>

@@ -17,7 +17,7 @@ const navLinks: { href: string; label: string; key: NavItem }[] = [
   { href: "/", label: "Home", key: "home" },
   { href: "/shop", label: "Shop", key: "shop" },
   { href: "/about", label: "About", key: "about" },
-  { href: "/salon", label: "Salon", key: "salon" },
+  { href: "/contact", label: "Contact", key: "contact" },
 ];
 
 export default function FloatingTopNav({ activeNav, cartCount = 0 }: FloatingTopNavProps) {
