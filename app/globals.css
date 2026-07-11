@@ -104,10 +104,123 @@
     border-bottom-color: var(--theme-secondary);
     box-shadow: none;
   }
+
+  .sidebar-wave-toggle {
+    position: relative;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: 9999px;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--theme-on-surface-variant);
+    transition: color 0.2s ease;
+  }
+
+  .sidebar-wave-ring {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .sidebar-wave-arc {
+    opacity: 0.85;
+    animation: sidebar-wave-travel 7s linear infinite;
+  }
+
+  .sidebar-wave-toggle-active .sidebar-wave-arc {
+    opacity: 1;
+    animation-duration: 5.5s;
+  }
+
+  .sidebar-wave-icon {
+    position: relative;
+    z-index: 1;
+    font-size: 20px;
+    line-height: 1;
+    transition: color 0.2s ease;
+  }
+
+  .sidebar-wave-toggle:hover {
+    color: var(--theme-primary);
+  }
+
+  .sidebar-wave-toggle-active {
+    color: var(--theme-primary);
+  }
+
+  .sidebar-wave-toggle:focus-visible {
+    outline: none;
+  }
+
+  .sidebar-wave-toggle:focus-visible .sidebar-wave-icon {
+    outline: 2px solid var(--theme-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  @keyframes sidebar-wave-travel {
+    to {
+      stroke-dashoffset: -102;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar-wave-arc {
+      animation: none;
+      stroke-dasharray: none;
+      opacity: 0.35;
+    }
+  }
 }
 
 body {
   background-color: var(--kelmon-bg-primary);
   color: var(--kelmon-text-primary);
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+@keyframes landing-kenburns {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes landing-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.landing-kenburns {
+  animation: landing-kenburns 18s ease-in-out infinite alternate;
+}
+
+.landing-fade {
+  opacity: 0;
+  animation: landing-fade-up 0.7s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-kenburns,
+  .landing-fade {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
 }

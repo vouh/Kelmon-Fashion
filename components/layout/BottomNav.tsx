@@ -1,12 +1,12 @@
 import Link from "next/link";
 import type { NavItem } from "@/lib/products";
 
+/** Primary mobile destinations only — unfinished features live elsewhere. */
 const navItems: { href: string; label: string; icon: string; key: NavItem }[] = [
   { href: "/", label: "Home", icon: "home", key: "home" },
   { href: "/shop", label: "Shop", icon: "storefront", key: "shop" },
-  { href: "/salon", label: "Salon", icon: "content_cut", key: "salon" },
   { href: "/cart", label: "Cart", icon: "shopping_cart", key: "cart" },
-  { href: "/profile", label: "Profile", icon: "person", key: "profile" },
+  { href: "/profile", label: "Me", icon: "person", key: "profile" },
 ];
 
 interface BottomNavProps {
@@ -16,14 +16,17 @@ interface BottomNavProps {
 
 export default function BottomNav({ active, cartCount = 0 }: BottomNavProps) {
   return (
-    <nav className="md:hidden fixed bottom-3 left-3 right-3 z-50 flex justify-around items-center px-4 py-3 rounded-2xl glass-panel shadow-nav border border-[var(--kelmon-border-subtle)]">
+    <nav
+      className="md:hidden fixed bottom-3 left-3 right-3 z-50 flex justify-around items-center px-4 py-3 rounded-2xl glass-panel shadow-nav border border-[var(--kelmon-border-subtle)]"
+      aria-label="Primary"
+    >
       {navItems.map(({ href, label, icon, key }) => {
-        const isActive = active === key;
+        const isActive = active === key || (key === "profile" && active === "orders");
         return (
           <Link
             key={key}
             href={href}
-            className={`flex flex-col items-center justify-center transition-transform ${
+            className={`flex flex-col items-center justify-center min-w-[48px] min-h-[44px] transition-transform ${
               isActive ? "text-secondary scale-110" : "text-on-surface-variant hover:text-primary active:scale-90"
             }`}
           >
@@ -33,7 +36,7 @@ export default function BottomNav({ active, cartCount = 0 }: BottomNavProps) {
             >
               {icon}
               {key === "cart" && cartCount > 0 && (
-                <span className="absolute -top-1 -right-2 bg-primary-container text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-2 bg-primary-container text-white text-[10px] min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center">
                   {cartCount}
                 </span>
               )}

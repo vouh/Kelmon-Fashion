@@ -1,12 +1,16 @@
-import AppShell from "@/components/layout/AppShell";
+import { Suspense } from "react";
+import OrdersClient from "@/components/orders/OrdersClient";
 
 export default function OrdersPage() {
   return (
-    <AppShell activeNav="orders">
-      <main className="flex-1 px-margin-mobile md:px-margin-desktop py-lg">
-        <h1 className="font-display-md text-display-md text-on-surface mb-4">My Orders</h1>
-        <p className="font-body-lg text-body-lg text-on-surface-variant">Order history — coming soon.</p>
-      </main>
-    </AppShell>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-on-surface-variant font-body-md">
+          Loading orders…
+        </div>
+      }
+    >
+      <OrdersClient />
+    </Suspense>
   );
 }

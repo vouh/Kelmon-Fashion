@@ -108,7 +108,7 @@ export const shopProducts: Product[] = [
   },
 ];
 
-export const categories = ["Bags", "Perfumes", "Fashion", "Nails", "Salon"];
+export const categories = ["Bags", "Perfumes", "Fashion", "Nails"];
 
 export function formatKes(amount: number): string {
   return `KES ${amount.toLocaleString("en-KE")}`;

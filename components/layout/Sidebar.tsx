@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { useSidebar } from "@/components/providers/SidebarProvider";
 import logo from "@/lib/logo";
 import type { NavItem } from "@/lib/products";
 
-const navLinks: { href: string; label: string; icon: string; key: NavItem }[] = [
+const SIDEBAR_WIDTH = 280;
+
+const primaryLinks: { href: string; label: string; icon: string; key: NavItem }[] = [
   { href: "/", label: "Home", icon: "home", key: "home" },
   { href: "/shop", label: "Shop", icon: "storefront", key: "shop" },
-  { href: "/salon", label: "Salon", icon: "content_cut", key: "salon" },
-  { href: "/orders", label: "My Orders", icon: "receipt_long", key: "orders" },
+  { href: "/orders", label: "Orders", icon: "receipt_long", key: "orders" },
   { href: "/profile", label: "Profile", icon: "person", key: "profile" },
 ];
 
@@ -19,93 +21,100 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ active }: SidebarProps) {
-  const { isOpen, isCollapsed, close } = useSidebar();
+  const { isOpen, close } = useSidebar();
+  const pathname = usePathname();
 
   return (
     <>
-      {/* Mobile overlay */}
       {isOpen && (
         <div
-          className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+          className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]"
           onClick={close}
           aria-hidden="true"
         />
       )}
 
       <nav
-        className={`fixed left-0 top-0 h-full z-40 bg-surface-container-high border-r border-secondary/20 shadow-2xl flex flex-col transition-all duration-300 ease-in-out ${
-          isOpen
-            ? isCollapsed
-              ? "w-[72px] translate-x-0"
-              : "w-[260px] translate-x-0"
-            : "-translate-x-full w-[260px]"
-        } md:translate-x-0 ${!isOpen ? "md:-translate-x-full" : ""}`}
+        aria-label="Sidebar"
+        aria-hidden={!isOpen}
+        style={{ width: SIDEBAR_WIDTH }}
+        className={`fixed left-0 top-0 h-full z-40 flex flex-col transition-transform duration-300 ease-out bg-[var(--theme-surface-container-lowest)] border-r border-white/[0.06] ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
       >
         {/* Brand */}
-        <div className={`pt-20 pb-6 px-4 flex flex-col items-center ${isCollapsed ? "px-2" : "px-6"}`}>
-          <Link href="/" className="flex flex-col items-center gap-2">
-            <Image
-              src={logo}
-              alt="Kelmon"
-              width={isCollapsed ? 40 : 64}
-              height={isCollapsed ? 40 : 64}
-              className={`object-contain drop-shadow-[0_0_15px_rgba(236,178,255,0.4)] ${isCollapsed ? "w-10 h-10" : "w-16 h-16"}`}
-            />
-            {!isCollapsed && (
-              <>
-                <span className="font-display-md text-display-md text-primary drop-shadow-[0_0_15px_rgba(236,178,255,0.6)]">
-                  Kelmon
-                </span>
-                <span className="font-label-caps text-label-caps text-secondary tracking-widest uppercase text-center">
-                  BEAUTY • FASHION • GLAMOUR
-                </span>
-              </>
-            )}
+        <div className="px-5 pt-[4.75rem] pb-6 border-b border-white/[0.06]">
+          <Link
+            href="/"
+            onClick={() => window.innerWidth < 768 && close()}
+            className="flex items-center gap-3 group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-primary-container/15 border border-primary-container/25 flex items-center justify-center shrink-0">
+              <Image src={logo} alt="" width={28} height={28} className="w-7 h-7 object-contain" />
+            </div>
+            <div className="min-w-0">
+              <span className="block font-display-md text-lg text-on-surface leading-tight">Kelmon</span>
+              <span className="block text-[11px] text-on-surface-variant tracking-wide truncate">
+                Campus fashion & beauty
+              </span>
+            </div>
           </Link>
         </div>
 
-        {/* Nav links */}
-        <ul className={`flex flex-col gap-1 flex-grow px-2 ${isCollapsed ? "px-2" : "px-4"}`}>
-          {navLinks.map(({ href, label, icon, key }) => {
-            const isActive = active === key;
+        {/* Nav */}
+        <ul className="flex flex-col gap-1 p-3 flex-grow">
+          {primaryLinks.map(({ href, label, icon, key }) => {
+            const isActive = active === key || (key !== "home" && pathname.startsWith(href) && href !== "/");
             return (
               <li key={key}>
                 <Link
                   href={href}
-                  title={isCollapsed ? label : undefined}
-                  onClick={() => {
-                    if (window.innerWidth < 768) close();
-                  }}
-                  className={`flex items-center gap-3 py-3 rounded-lg transition-colors ${
-                    isCollapsed ? "justify-center px-2" : "px-4"
-                  } ${
+                  onClick={() => window.innerWidth < 768 && close()}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                     isActive
-                      ? "text-secondary font-bold bg-surface-container-highest border-l-2 border-secondary"
-                      : "text-on-surface-variant hover:bg-surface-container-highest hover:text-primary"
+                      ? "bg-primary-container/15 text-primary border border-primary-container/20"
+                      : "text-on-surface-variant hover:text-on-surface hover:bg-white/[0.04]"
                   }`}
                 >
                   <span
-                    className="material-symbols-outlined shrink-0"
-                    style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                      isActive ? "bg-primary-container/25 text-primary" : "bg-white/[0.03] text-on-surface-variant"
+                    }`}
                   >
-                    {icon}
+                    <span
+                      className="material-symbols-outlined text-[20px]"
+                      style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
+                    >
+                      {icon}
+                    </span>
                   </span>
-                  {!isCollapsed && <span className="font-body-lg text-body-lg truncate">{label}</span>}
+                  <span className="truncate">{label}</span>
                 </Link>
               </li>
             );
           })}
         </ul>
 
-        {/* Footer tagline when collapsed */}
-        {isCollapsed && (
-          <div className="pb-6 flex justify-center">
-            <span className="material-symbols-outlined text-secondary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-              diamond
-            </span>
+        {/* Footer card */}
+        <div className="p-4 border-t border-white/[0.06]">
+          <div className="rounded-xl p-4 bg-gradient-to-br from-primary-container/10 to-transparent border border-primary-container/15">
+            <p className="text-sm font-semibold text-on-surface mb-1">Salon booking</p>
+            <p className="text-xs text-on-surface-variant mb-3 leading-relaxed">
+              On-campus glam — opening soon.
+            </p>
+            <Link
+              href="/salon"
+              onClick={() => window.innerWidth < 768 && close()}
+              className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors inline-flex items-center gap-1"
+            >
+              Get notified
+              <span className="material-symbols-outlined text-[14px]" aria-hidden="true">arrow_forward</span>
+            </Link>
           </div>
-        )}
+        </div>
       </nav>
     </>
   );
 }
+
+export { SIDEBAR_WIDTH };

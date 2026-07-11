@@ -110,47 +110,53 @@
 }
 
 .light {
-  --kelmon-bg-primary: #faf8fc;
+  /* Soft light-purple surfaces */
+  --kelmon-bg-primary: #f6f0fb;
   --kelmon-bg-elevated: #ffffff;
-  --kelmon-bg-surface: #f3f0f6;
-  --kelmon-bg-glass: rgba(255, 255, 255, 0.88);
-  --kelmon-bg-overlay: rgba(0, 0, 0, 0.35);
-  --kelmon-white-glow: rgba(142, 68, 173, 0.06);
+  --kelmon-bg-surface: #efe6f7;
+  --kelmon-bg-glass: rgba(255, 255, 255, 0.9);
+  --kelmon-bg-overlay: rgba(74, 36, 96, 0.28);
+  --kelmon-white-glow: rgba(168, 112, 204, 0.08);
 
-  --kelmon-purple-muted: rgba(142, 68, 173, 0.1);
-  --kelmon-purple-glow: rgba(142, 68, 173, 0.15);
+  --kelmon-purple-deep: #7a3d9e;
+  --kelmon-purple-brand: #9b59b6;
+  --kelmon-purple-light: #c9a0e0;
+  --kelmon-purple-muted: rgba(155, 89, 182, 0.12);
+  --kelmon-purple-glow: rgba(155, 89, 182, 0.22);
 
-  --kelmon-text-primary: #1a1220;
-  --kelmon-text-secondary: #6b6075;
-  --kelmon-text-disabled: #a89db0;
+  --kelmon-text-primary: #2a1a36;
+  --kelmon-text-secondary: #6e5a7c;
+  --kelmon-text-disabled: #a896b5;
   --kelmon-text-inverse: #fdfdfd;
 
-  --kelmon-border-subtle: rgba(197, 160, 40, 0.35);
-  --kelmon-border-default: rgba(0, 0, 0, 0.08);
+  --kelmon-border-subtle: rgba(155, 89, 182, 0.22);
+  --kelmon-border-default: rgba(106, 43, 142, 0.1);
+  --kelmon-border-focus: #9b59b6;
 
-  --theme-bg: #faf8fc;
+  --theme-bg: #f6f0fb;
   --theme-surface: #ffffff;
-  --theme-surface-dim: #f5f2f8;
-  --theme-surface-container: #f0ecf4;
-  --theme-surface-container-high: #e8e2ee;
-  --theme-surface-container-highest: #ddd5e6;
+  --theme-surface-dim: #f0e8f7;
+  --theme-surface-container: #ebe0f4;
+  --theme-surface-container-high: #e2d4ef;
+  --theme-surface-container-highest: #d6c4e6;
   --theme-surface-container-lowest: #ffffff;
-  --theme-on-surface: #1a1220;
-  --theme-on-surface-variant: #6b6075;
-  --theme-on-background: #1a1220;
-  --theme-primary: #8e44ad;
-  --theme-primary-container: #8e44ad;
+  --theme-on-surface: #2a1a36;
+  --theme-on-surface-variant: #6e5a7c;
+  --theme-on-background: #2a1a36;
+  --theme-primary: #9b59b6;
+  --theme-primary-container: #9b59b6;
   --theme-on-primary: #ffffff;
-  --theme-secondary: #c5a028;
+  --theme-secondary: #b8942e;
   --theme-inverse-primary: #6a2b8e;
   --theme-outline: #9a8c9b;
   --theme-error: #dc2626;
 
-  --kelmon-gradient-hero-glow: radial-gradient(ellipse at center, rgba(142, 68, 173, 0.12) 0%, rgba(250, 248, 252, 0) 70%);
-  --kelmon-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --kelmon-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
-  --kelmon-shadow-glow-purple: 0 0 24px rgba(142, 68, 173, 0.2);
-  --kelmon-nav-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  --kelmon-gradient-purple: linear-gradient(135deg, #9b59b6 0%, #b07cc9 50%, #c9a0e0 100%);
+  --kelmon-gradient-hero-glow: radial-gradient(ellipse at center, rgba(155, 89, 182, 0.18) 0%, rgba(246, 240, 251, 0) 70%);
+  --kelmon-shadow-sm: 0 1px 3px rgba(106, 43, 142, 0.08);
+  --kelmon-shadow-md: 0 4px 16px rgba(106, 43, 142, 0.1);
+  --kelmon-shadow-glow-purple: 0 0 24px rgba(155, 89, 182, 0.28);
+  --kelmon-nav-shadow: 0 8px 32px rgba(106, 43, 142, 0.1);
 }
 
 .kelmon-theme {
