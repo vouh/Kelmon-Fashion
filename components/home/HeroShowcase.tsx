@@ -43,7 +43,7 @@ export default function HeroShowcase({
 
   return (
     <section
-      className="relative overflow-hidden bg-white"
+      className="relative overflow-hidden bg-surface-dim"
       aria-roledescription="carousel"
       aria-label="Featured products"
       onMouseEnter={() => setPaused(true)}

@@ -203,6 +203,41 @@ body {
   box-shadow: 0 20px 50px rgba(142, 68, 173, 0.18);
 }
 
+@keyframes search-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes search-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.search-overlay-backdrop {
+  animation: search-backdrop-in 0.25s ease-out;
+}
+
+.search-overlay-panel {
+  animation: search-panel-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-overlay-backdrop,
+  .search-overlay-panel {
+    animation: none;
+  }
+}
+
 .product-slider-slide.slide-from-right {
   animation: slide-from-right 0.45s ease-out;
 }

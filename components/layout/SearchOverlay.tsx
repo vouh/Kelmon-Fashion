@@ -59,7 +59,7 @@ export default function SearchOverlay({ open, onClose }: SearchOverlayProps) {
       />
 
       <div className="relative z-10 w-full max-w-xl search-overlay-panel">
-        <div className="flex items-center gap-3 bg-white rounded-2xl shadow-[0_20px_60px_rgba(142,68,173,0.25)] border-2 border-primary/30 px-4 py-3">
+        <div className="flex items-center gap-3 bg-surface rounded-2xl shadow-[0_20px_60px_rgba(142,68,173,0.25)] border-2 border-primary px-4 py-3">
           <span className="material-symbols-outlined text-primary text-[28px]" aria-hidden="true">
             search
           </span>
@@ -84,7 +84,7 @@ export default function SearchOverlay({ open, onClose }: SearchOverlayProps) {
           </button>
         </div>
 
-        <div className="mt-3 max-h-[50vh] overflow-y-auto rounded-2xl bg-white border border-primary/20 shadow-[0_16px_40px_rgba(142,68,173,0.2)]">
+        <div className="mt-3 max-h-[50vh] overflow-y-auto rounded-2xl bg-surface border border-primary/30 shadow-[0_16px_40px_rgba(142,68,173,0.2)]">
           {!query.trim() && (
             <p className="px-5 py-6 font-body-md text-body-md text-on-surface-variant text-center">
               Start typing to find products

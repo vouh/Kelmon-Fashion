@@ -59,9 +59,9 @@ export default function ShopClient({ initialQuery = "", initialCategory = "All" 
         <div className="px-margin-mobile md:px-margin-desktop pt-lg pb-md bg-surface border-b border-white/5 sticky top-0 z-30">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8">
             <div>
-              <h1 className="font-display-lg text-display-lg text-on-surface mb-2 tracking-tight">Shop</h1>
+              <h1 className="font-display-lg text-display-lg text-on-surface mb-2 tracking-tight">Products</h1>
               <p className="font-body-md text-body-md text-on-surface-variant">
-                Curated premium essentials for campus.
+                Bags, perfumes, fashion &amp; nails for campus.
               </p>
             </div>
             <form onSubmit={onSearch} className="w-full md:w-96 relative" role="search">
