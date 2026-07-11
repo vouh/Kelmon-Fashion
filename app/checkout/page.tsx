@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
 import { useCart } from "@/components/providers/CartProvider";
@@ -15,6 +16,9 @@ const DROP_POINTS = [
   "UoN Kikuyu Campus",
   "UoN Chiromo Campus",
 ];
+
+const inputClass =
+  "w-full h-11 px-3.5 rounded-xl bg-[#faf6fc] dark:bg-surface-container border border-primary/15 text-sm text-on-surface outline-none focus:border-primary transition-colors";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -117,41 +121,56 @@ export default function CheckoutPage() {
 
   return (
     <AppShell activeNav="cart" hideBottomNav>
-      <main className="flex-1 px-margin-mobile md:px-margin-desktop py-lg max-w-3xl mx-auto w-full pb-32 md:pb-12">
-        <Link href="/cart" className="inline-flex items-center gap-1 text-on-surface-variant hover:text-primary mb-6 font-body-md text-body-md">
-          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>
+      <main className="flex-1 px-margin-mobile md:px-margin-desktop py-8 md:py-10 max-w-5xl mx-auto w-full pb-28 md:pb-12">
+        <Link
+          href="/cart"
+          className="inline-flex items-center gap-1 text-sm text-on-surface-variant hover:text-primary mb-5"
+        >
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+            arrow_back
+          </span>
           Back to cart
         </Link>
 
-        <h1 className="font-display-md text-display-md text-on-surface mb-2">Checkout</h1>
-        <p className="font-body-md text-body-md text-on-surface-variant mb-8">
+        <h1 className="font-display-lg text-xl md:text-2xl text-on-surface tracking-tight mb-1">
+          Checkout
+        </h1>
+        <p className="text-sm text-on-surface-variant mb-7">
           Campus delivery — {itemCount} item{itemCount === 1 ? "" : "s"}
         </p>
 
         {isEmpty ? (
-          <div className="space-y-4">
-            <p className="font-body-lg text-body-lg text-on-surface-variant">Nothing to check out yet.</p>
-            <Link href="/shop" className="inline-flex h-12 px-8 rounded-lg btn-primary text-white font-button-text text-button-text items-center">
+          <div className="rounded-2xl bg-white dark:bg-surface border border-primary/15 p-10 text-center space-y-4">
+            <p className="text-sm text-on-surface-variant">Nothing to check out yet.</p>
+            <Link
+              href="/shop"
+              className="inline-flex h-11 px-7 rounded-full bg-primary text-white text-[11px] font-semibold uppercase tracking-wider items-center"
+            >
               Continue shopping
             </Link>
           </div>
         ) : (
-          <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-8">
-            <div className="md:col-span-3 space-y-6">
-              <fieldset className="space-y-4">
-                <legend className="font-title-lg text-title-lg text-on-surface mb-2">Delivery details</legend>
-                <label className="block space-y-2">
-                  <span className="font-body-md text-body-md text-on-surface-variant">Full name</span>
+          <form
+            onSubmit={onSubmit}
+            className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 lg:gap-8"
+          >
+            <div className="space-y-4">
+              <fieldset className="rounded-2xl bg-white dark:bg-surface border border-primary/15 p-5 space-y-4 shadow-[0_6px_20px_rgba(142,68,173,0.06)]">
+                <legend className="text-sm font-semibold text-on-surface px-1">
+                  Delivery details
+                </legend>
+                <label className="block space-y-1.5">
+                  <span className="text-xs text-on-surface-variant">Full name</span>
                   <input
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="kelmon-input w-full h-12 px-4 rounded-lg bg-surface-container border border-white/10 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container/50"
+                    className={inputClass}
                     autoComplete="name"
                   />
                 </label>
-                <label className="block space-y-2">
-                  <span className="font-body-md text-body-md text-on-surface-variant">Phone (M-Pesa)</span>
+                <label className="block space-y-1.5">
+                  <span className="text-xs text-on-surface-variant">Phone (M-Pesa)</span>
                   <input
                     required
                     type="tel"
@@ -159,16 +178,16 @@ export default function CheckoutPage() {
                     placeholder="07XX XXX XXX"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="kelmon-input w-full h-12 px-4 rounded-lg bg-surface-container border border-white/10 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container/50"
+                    className={inputClass}
                     autoComplete="tel"
                   />
                 </label>
-                <label className="block space-y-2">
-                  <span className="font-body-md text-body-md text-on-surface-variant">Campus drop point</span>
+                <label className="block space-y-1.5">
+                  <span className="text-xs text-on-surface-variant">Campus drop point</span>
                   <select
                     value={dropPoint}
                     onChange={(e) => setDropPoint(e.target.value)}
-                    className="w-full h-12 px-4 rounded-lg bg-surface-container border border-white/10 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container/50"
+                    className={inputClass}
                   >
                     {DROP_POINTS.map((p) => (
                       <option key={p} value={p}>
@@ -177,46 +196,58 @@ export default function CheckoutPage() {
                     ))}
                   </select>
                 </label>
-                <label className="block space-y-2">
-                  <span className="font-body-md text-body-md text-on-surface-variant">Notes (optional)</span>
+                <label className="block space-y-1.5">
+                  <span className="text-xs text-on-surface-variant">Notes (optional)</span>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     rows={2}
-                    className="w-full px-4 py-3 rounded-lg bg-surface-container border border-white/10 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container/50 resize-y"
+                    className={`${inputClass} h-auto py-2.5 resize-y`}
                     placeholder="Landmark, preferred time…"
                   />
                 </label>
               </fieldset>
 
-              <fieldset className="space-y-3">
-                <legend className="font-title-lg text-title-lg text-on-surface mb-2">Payment</legend>
-                <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer ${payment === "mpesa" ? "border-secondary bg-secondary/10" : "border-white/10"}`}>
+              <fieldset className="rounded-2xl bg-white dark:bg-surface border border-primary/15 p-5 space-y-3 shadow-[0_6px_20px_rgba(142,68,173,0.06)]">
+                <legend className="text-sm font-semibold text-on-surface px-1">Payment</legend>
+                <label
+                  className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-colors ${
+                    payment === "mpesa"
+                      ? "border-primary bg-primary/5"
+                      : "border-primary/10 hover:border-primary/30"
+                  }`}
+                >
                   <input
                     type="radio"
                     name="payment"
                     checked={payment === "mpesa"}
                     onChange={() => setPayment("mpesa")}
-                    className="accent-[var(--theme-secondary)]"
+                    className="mt-0.5 accent-[#8E44AD]"
                   />
                   <span>
-                    <span className="block font-button-text text-button-text text-on-surface">M-Pesa STK Push</span>
-                    <span className="block font-body-md text-body-md text-on-surface-variant">
-                      Pay instantly — we’ll send a prompt to your phone.
+                    <span className="block text-sm font-medium text-on-surface">M-Pesa STK Push</span>
+                    <span className="block text-xs text-on-surface-variant mt-0.5">
+                      Pay instantly — we&apos;ll send a prompt to your phone.
                     </span>
                   </span>
                 </label>
-                <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer ${payment === "cod" ? "border-secondary bg-secondary/10" : "border-white/10"}`}>
+                <label
+                  className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-colors ${
+                    payment === "cod"
+                      ? "border-primary bg-primary/5"
+                      : "border-primary/10 hover:border-primary/30"
+                  }`}
+                >
                   <input
                     type="radio"
                     name="payment"
                     checked={payment === "cod"}
                     onChange={() => setPayment("cod")}
-                    className="accent-[var(--theme-secondary)]"
+                    className="mt-0.5 accent-[#8E44AD]"
                   />
                   <span>
-                    <span className="block font-button-text text-button-text text-on-surface">Pay on delivery</span>
-                    <span className="block font-body-md text-body-md text-on-surface-variant">
+                    <span className="block text-sm font-medium text-on-surface">Pay on delivery</span>
+                    <span className="block text-xs text-on-surface-variant mt-0.5">
                       Cash or M-Pesa when we meet at your drop point.
                     </span>
                   </span>
@@ -224,56 +255,83 @@ export default function CheckoutPage() {
               </fieldset>
 
               {error && (
-                <p role="alert" className="text-error font-body-md text-body-md">
+                <p role="alert" className="text-sm text-error">
                   {error}
                 </p>
               )}
               {mpesaMessage && (
-                <p role="status" className="text-secondary font-body-md text-body-md">
+                <p role="status" className="text-sm text-[#C5A059]">
                   {mpesaMessage}
                 </p>
               )}
             </div>
 
-            <div className="md:col-span-2">
-              <div className="glass-panel p-6 rounded-xl sticky top-24 space-y-4">
-                <h2 className="font-title-lg text-title-lg text-on-surface">Summary</h2>
-                <ul className="space-y-3 max-h-48 overflow-y-auto">
+            <aside>
+              <div className="rounded-2xl bg-white dark:bg-surface border border-primary/15 p-5 sticky top-24 space-y-4 shadow-[0_8px_28px_rgba(142,68,173,0.08)]">
+                <h2 className="text-sm font-semibold text-on-surface">Summary</h2>
+                <ul className="space-y-3 max-h-52 overflow-y-auto">
                   {lines.map((l) => (
-                    <li key={`${l.productId}-${l.variant}`} className="flex justify-between gap-2 font-body-md text-body-md">
-                      <span className="text-on-surface-variant truncate">
-                        {l.name} × {l.quantity}
+                    <li
+                      key={`${l.productId}-${l.variant}`}
+                      className="flex gap-2.5 items-center"
+                    >
+                      <div className="relative w-11 h-11 rounded-lg overflow-hidden bg-[#faf6fc] dark:bg-surface-container shrink-0">
+                        <Image
+                          src={l.image}
+                          alt={l.name}
+                          fill
+                          unoptimized
+                          className="object-cover"
+                          sizes="44px"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-on-surface truncate">{l.name}</p>
+                        <p className="text-[11px] text-on-surface-variant">× {l.quantity}</p>
+                      </div>
+                      <span className="text-xs font-medium text-on-surface shrink-0">
+                        {formatKes(l.price * l.quantity)}
                       </span>
-                      <span className="text-on-surface shrink-0">{formatKes(l.price * l.quantity)}</span>
                     </li>
                   ))}
                 </ul>
-                <div className="flex justify-between font-body-md text-body-md">
-                  <span className="text-on-surface-variant">Subtotal</span>
-                  <span>{formatKes(subtotal)}</span>
+
+                <div className="space-y-2 text-sm pt-1 border-t border-primary/10">
+                  <div className="flex justify-between">
+                    <span className="text-on-surface-variant">Subtotal</span>
+                    <span className="font-medium">{formatKes(subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-on-surface-variant">Delivery</span>
+                    <span className="font-medium">
+                      {deliveryFee === 0 ? "Free" : formatKes(deliveryFee)}
+                    </span>
+                  </div>
+                  {deliveryFee > 0 && (
+                    <p className="text-[11px] text-on-surface-variant">
+                      Free over {formatKes(FREE_DELIVERY_THRESHOLD)} to UoN campuses.
+                    </p>
+                  )}
                 </div>
-                <div className="flex justify-between font-body-md text-body-md">
-                  <span className="text-on-surface-variant">Delivery</span>
-                  <span>{deliveryFee === 0 ? "Free" : formatKes(deliveryFee)}</span>
+
+                <div className="flex justify-between items-baseline pt-2 border-t border-primary/10">
+                  <span className="text-sm text-on-surface">Total</span>
+                  <span className="text-lg font-semibold text-on-surface">{formatKes(total)}</span>
                 </div>
-                {deliveryFee > 0 && (
-                  <p className="text-xs text-on-surface-variant">
-                    Free over {formatKes(FREE_DELIVERY_THRESHOLD)} to UoN campuses.
-                  </p>
-                )}
-                <div className="flex justify-between font-headline-sm text-lg text-on-surface pt-2 border-t border-white/10">
-                  <span>Total</span>
-                  <span>{formatKes(total)}</span>
-                </div>
+
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full h-12 rounded-lg btn-primary text-white font-button-text text-button-text disabled:opacity-60"
+                  className="w-full h-11 rounded-full bg-primary hover:bg-[#7a3a96] text-white text-[11px] font-semibold uppercase tracking-[0.12em] disabled:opacity-60 transition-colors"
                 >
-                  {submitting ? "Processing…" : payment === "mpesa" ? "Pay with M-Pesa" : "Place order"}
+                  {submitting
+                    ? "Processing…"
+                    : payment === "mpesa"
+                      ? "Pay with M-Pesa"
+                      : "Place order"}
                 </button>
               </div>
-            </div>
+            </aside>
           </form>
         )}
       </main>

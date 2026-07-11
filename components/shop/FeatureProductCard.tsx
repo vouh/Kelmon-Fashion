@@ -13,62 +13,48 @@ export default function FeatureProductCard({ product }: FeatureProductCardProps)
   const stars = Math.round(product.rating);
 
   return (
-    <article className="group w-full">
-      {/* Image tile — sharp white square, exactly like reference */}
-      <div className="relative w-full aspect-square bg-white overflow-hidden shadow-none">
+    <article className="group w-full overflow-hidden rounded-2xl bg-white dark:bg-surface border border-primary/15 shadow-[0_8px_24px_rgba(142,68,173,0.08)] hover:bg-primary hover:border-primary hover:shadow-[0_16px_40px_rgba(142,68,173,0.28)] hover:scale-[1.04] transition-all duration-300 origin-center">
+      <div className="relative w-full aspect-square bg-[#faf6fc] dark:bg-surface-container overflow-hidden">
         {product.badge && (
-          <span className="absolute top-3.5 left-3.5 z-20 inline-flex items-center h-6 px-3 rounded-full bg-primary text-white text-[10px] font-semibold uppercase tracking-[0.08em]">
+          <span className="absolute top-3 left-3 z-20 inline-flex items-center h-6 px-2.5 rounded-full bg-primary text-white text-[10px] font-semibold uppercase tracking-[0.08em] group-hover:bg-white group-hover:text-primary transition-colors">
             {product.badge}
           </span>
         )}
 
-        <div className="absolute top-3.5 right-3.5 z-20 flex flex-col items-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
+        <div className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
           <Link
             href={`/product/${product.id}`}
-            className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-primary text-white text-[10px] font-semibold uppercase tracking-[0.06em]"
+            className="inline-flex items-center h-7 px-3 rounded-full bg-white text-primary text-[10px] font-semibold uppercase tracking-[0.08em]"
           >
-            <span className="material-symbols-outlined text-[14px]" aria-hidden="true">
-              visibility
-            </span>
-            Quick view
+            Learn more
           </Link>
-          <button
-            type="button"
-            aria-label="Wishlist"
-            className="w-7 h-7 rounded-full bg-white text-primary flex items-center justify-center shadow-sm hover:bg-primary hover:text-white transition-colors"
-          >
-            <span className="material-symbols-outlined text-[15px]" aria-hidden="true">
-              favorite
-            </span>
-          </button>
         </div>
 
-        <Link href={`/product/${product.id}`} className="absolute inset-0 block bg-white" tabIndex={-1}>
+        <Link href={`/product/${product.id}`} className="absolute inset-0 block" tabIndex={-1}>
           <Image
             src={product.image}
             alt={product.name}
             fill
             unoptimized
-            className="object-cover"
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
             sizes="(max-width: 768px) 50vw, 25vw"
           />
         </Link>
       </div>
 
-      {/* Meta — centered under tile, no card chrome */}
-      <div className="pt-5 text-center">
+      <div className="px-3 py-3.5 text-center bg-primary/[0.06] dark:bg-primary/10 border-t border-primary/10 group-hover:bg-primary group-hover:border-primary/20 transition-colors duration-300">
         <Link href={`/product/${product.id}`}>
-          <h3 className="text-[13px] md:text-sm text-[#2a1a36] dark:text-on-surface leading-snug px-1 hover:text-primary transition-colors">
+          <h3 className="text-[12px] md:text-[13px] font-medium text-on-surface leading-snug line-clamp-2 group-hover:text-white transition-colors">
             {product.name}
           </h3>
         </Link>
 
-        <div className="mt-2 flex justify-center gap-0.5" aria-label={`${product.rating} out of 5 stars`}>
+        <div className="mt-1.5 flex justify-center gap-0" aria-label={`${product.rating} out of 5 stars`}>
           {Array.from({ length: 5 }).map((_, i) => (
             <span
               key={i}
-              className={`material-symbols-outlined text-[15px] ${
-                i < stars ? "text-primary" : "text-primary/25"
+              className={`material-symbols-outlined text-[13px] ${
+                i < stars ? "text-[#C5A059]" : "text-[#C5A059]/30 group-hover:text-white/35"
               }`}
               style={i < stars ? { fontVariationSettings: "'FILL' 1" } : undefined}
               aria-hidden="true"
@@ -78,13 +64,15 @@ export default function FeatureProductCard({ product }: FeatureProductCardProps)
           ))}
         </div>
 
-        <p className="mt-2 text-sm md:text-[15px] font-semibold text-[#2a1a36] dark:text-on-surface">
+        <p className="mt-1.5 text-[13px] font-semibold text-on-surface group-hover:text-white transition-colors">
           {product.originalPrice != null && (
-            <span className="text-[#9a8aa8] line-through font-normal mr-2 text-[13px]">
+            <span className="text-on-surface-variant/60 group-hover:text-white/55 line-through font-normal mr-1.5 text-[11px]">
               {formatKes(product.originalPrice)}
             </span>
           )}
-          {formatKes(product.price)}
+          <span className="text-primary group-hover:text-[#C5A059] transition-colors">
+            {formatKes(product.price)}
+          </span>
         </p>
       </div>
     </article>

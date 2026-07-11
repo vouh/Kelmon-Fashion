@@ -2,17 +2,11 @@ interface StarRatingProps {
   rating: number;
   reviewCount?: number;
   size?: "sm" | "md";
-  tone?: "secondary" | "primary";
 }
 
-export default function StarRating({
-  rating,
-  reviewCount,
-  size = "sm",
-  tone = "secondary",
-}: StarRatingProps) {
-  const iconSize = size === "sm" ? "text-sm" : "text-base";
-  const filledClass = tone === "primary" ? "text-primary" : "text-secondary";
+/** Stars always use Kelmon gold (#C5A059). */
+export default function StarRating({ rating, reviewCount, size = "sm" }: StarRatingProps) {
+  const iconSize = size === "sm" ? "text-[15px]" : "text-base";
 
   return (
     <div className="flex items-center gap-0.5" aria-label={`${rating} out of 5 stars`}>
@@ -21,7 +15,9 @@ export default function StarRating({
         return (
           <span
             key={i}
-            className={`material-symbols-outlined ${iconSize} ${filled ? filledClass : "text-on-surface-variant/30"}`}
+            className={`material-symbols-outlined ${iconSize} ${
+              filled ? "text-[#C5A059]" : "text-[#C5A059]/30"
+            }`}
             style={filled ? { fontVariationSettings: "'FILL' 1" } : undefined}
             aria-hidden="true"
           >
