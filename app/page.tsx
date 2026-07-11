@@ -66,7 +66,7 @@ export default function HomePage() {
         </section>
 
         <Reveal>
-          <SalonServicesSection services={salonServices.slice(0, 5)} />
+          <SalonServicesSection services={salonServices.slice(0, 3)} />
         </Reveal>
       </main>
     </AppShell>
