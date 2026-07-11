@@ -22,7 +22,7 @@ const cormorant = Cormorant_Garamond({
 
 export const metadata: Metadata = {
   title: "Kelmon — Beauty • Fashion • Glamour",
-  description: "Premium fashion & beauty marketplace for campus students in Kenya",
+  description: "Premium fashion & beauty for Gen Z youth in Kenya",
 };
 
 const themeScript = `

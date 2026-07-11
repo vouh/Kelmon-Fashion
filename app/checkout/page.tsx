@@ -136,7 +136,7 @@ export default function CheckoutPage() {
           Checkout
         </h1>
         <p className="text-sm text-on-surface-variant mb-7">
-          Campus delivery — {itemCount} item{itemCount === 1 ? "" : "s"}
+          Delivery — {itemCount} item{itemCount === 1 ? "" : "s"}
         </p>
 
         {isEmpty ? (
@@ -183,7 +183,7 @@ export default function CheckoutPage() {
                   />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-xs text-on-surface-variant">Campus drop point</span>
+                  <span className="text-xs text-on-surface-variant">Drop point</span>
                   <select
                     value={dropPoint}
                     onChange={(e) => setDropPoint(e.target.value)}
@@ -309,7 +309,7 @@ export default function CheckoutPage() {
                   </div>
                   {deliveryFee > 0 && (
                     <p className="text-[11px] text-on-surface-variant">
-                      Free over {formatKes(FREE_DELIVERY_THRESHOLD)} to UoN campuses.
+                      Free over {formatKes(FREE_DELIVERY_THRESHOLD)}.
                     </p>
                   )}
                 </div>

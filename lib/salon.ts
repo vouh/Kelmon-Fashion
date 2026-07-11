@@ -12,7 +12,7 @@ export const salonServices: SalonService[] = [
   {
     id: "gel-manicure",
     name: "Gel manicure",
-    description: "Long-wear gel polish, shape, and cuticle care — campus glam that lasts.",
+    description: "Long-wear gel polish, shape, and cuticle care — a glow-up that lasts.",
     price: 1500,
     duration: "45 min",
     icon: "brush",
@@ -72,7 +72,7 @@ export const salonServices: SalonService[] = [
   {
     id: "glam-makeup",
     name: "Glam makeup",
-    description: "Full face for events, shoots, or nights out on campus.",
+    description: "Full face for events, shoots, or nights that need main-character energy.",
     price: 3500,
     duration: "60 min",
     icon: "brush",
@@ -82,7 +82,7 @@ export const salonServices: SalonService[] = [
   {
     id: "soft-glam",
     name: "Soft glam makeup",
-    description: "Natural glow makeup for lectures, dates, and daytime events.",
+    description: "Natural glow makeup for dates, day plans, and soft moments.",
     price: 2500,
     duration: "45 min",
     icon: "favorite",

@@ -17,7 +17,7 @@ export default function Footer() {
               unoptimized
             />
             <p className="font-body-md text-body-md text-white/80 max-w-xs">
-              Premium fashion & beauty for UoN campus — shop, salon, delivery.
+              Beauty · Fashion · Glam — for youth who show up and get it dropped.
             </p>
           </div>
 
@@ -111,7 +111,7 @@ export default function Footer() {
             © 2026 Kelmon · Beauty · Fashion · Glamour
           </p>
           <p className="font-body-md text-body-md text-secondary">
-            Free campus delivery over KES 3,000
+            Free delivery over KES 3,000
           </p>
         </div>
       </div>

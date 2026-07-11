@@ -109,7 +109,7 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
             </div>
 
             <p className="text-sm text-on-surface-variant leading-relaxed mb-5">
-              Free UoN campus delivery on orders over {formatKes(3000)}.
+              Free delivery on orders over {formatKes(3000)}.
             </p>
 
             {variantConfig && (
@@ -152,7 +152,7 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                     {variantConfig?.label}: {selectedVariant}
                   </li>
                 )}
-                <li>In stock · Campus delivery available</li>
+                <li>In stock · Fast delivery available</li>
               </ul>
             </div>
 

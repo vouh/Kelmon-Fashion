@@ -13,39 +13,33 @@ interface HeroShowcaseProps {
 
 const slideCopy: Record<string, { headline: string; description: string; notes: string }> = {
   "chanel-no5-mini": {
-    headline: "Scent Of Campus",
-    description:
-      "A timeless mini fragrance for lectures, late nights, and every moment in between.",
+    headline: "Clock this scent",
+    description: "Mini fragrance that eats — day fits, late nights, every soft launch.",
     notes: "Floral, Soft Musk",
   },
   "lv-speedy-bag": {
-    headline: "Carry The Look",
-    description:
-      "Statement bags that turn hostel corridors into a runway — delivered to your door.",
+    headline: "It's giving runway",
+    description: "Statement bag energy. Serve the look, we handle the drop.",
     notes: "Leather, Everyday Glam",
   },
   "gel-manicure-kit": {
-    headline: "Nails That Last",
-    description:
-      "Salon-ready gel kits for chip-free shine that survives campus life.",
+    headline: "Nails that ate",
+    description: "Chip-free gel shine that keeps up with your whole week.",
     notes: "Gel, Long Wear",
   },
   "dior-sauvage": {
-    headline: "Bold & Fresh",
-    description:
-      "A signature scent with edge — made for nights out and big days on campus.",
+    headline: "No notes, just vibes",
+    description: "Signature scent with edge — built for nights that go crazy.",
     notes: "Citrus, Spice",
   },
   "crossbody-mini-bag": {
-    headline: "Light & Luxe",
-    description:
-      "Compact crossbodies for class-to-cafe days without compromising style.",
+    headline: "Hands-free era",
+    description: "Compact crossbody for on-the-go days without killing the fit.",
     notes: "Compact, Hands-Free",
   },
   "gold-hoop-earrings": {
-    headline: "Gold Glow Up",
-    description:
-      "Everyday hoops that catch the light — simple, bold, and always on trend.",
+    headline: "Gold that hits",
+    description: "Hoops that catch the light — simple, bold, always serving.",
     notes: "Gold Tone, Classic",
   },
 };
@@ -53,9 +47,8 @@ const slideCopy: Record<string, { headline: string; description: string; notes: 
 function getCopy(product: Product) {
   return (
     slideCopy[product.id] ?? {
-      headline: "Glam Of Campus",
-      description:
-        "Designer bags, signature scents, nails, and fashion — curated for UoN.",
+      headline: "It's giving glam",
+      description: "Bags, scents, nails, fashion — curated for youth who show up.",
       notes: product.category,
     }
   );

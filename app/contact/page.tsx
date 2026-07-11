@@ -4,8 +4,8 @@ import ContactForm from "@/components/contact/ContactForm";
 const contactDetails = [
   {
     icon: "location_on",
-    label: "Campus",
-    value: "University of Nairobi · Main campus pickup points",
+    label: "Pickup",
+    value: "Nairobi · flexible drop & pickup points",
   },
   {
     icon: "call",
@@ -38,7 +38,7 @@ export default function ContactPage() {
             Get in touch
           </h1>
           <p className="font-body-lg text-body-lg text-on-surface-variant max-w-xl mb-12">
-            Orders, salon bookings, or campus delivery questions — we&apos;re here to help.
+            Orders, salon bookings, or delivery questions — we&apos;re here for it.
           </p>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-start">

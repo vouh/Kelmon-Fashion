@@ -5,10 +5,10 @@ import FaqSection from "@/components/home/FaqSection";
 import { shopProducts, formatKes } from "@/lib/products";
 
 const whyPoints = [
-  "Authentic products that stay with you all day.",
-  "Curated from trusted designers and suppliers.",
-  "Every order is checked and packaged with care.",
-  "Delivery that fits your campus timetable.",
+  "Looks that stay with you all day — no mid-fit flop.",
+  "Curated from brands that actually serve.",
+  "Every order checked and packed with care.",
+  "Delivery that matches your schedule, not the other way around.",
 ];
 
 export default function AboutPage() {
@@ -25,10 +25,10 @@ export default function AboutPage() {
             About Kelmon
           </p>
           <h1 className="font-display-lg text-display-md md:text-display-lg text-on-surface mb-4 max-w-2xl">
-            Premium glam built for UoN
+            Your glam era starts here
           </h1>
           <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mb-10">
-            Beauty · Fashion · Glamour — curated for campus and delivered to your door.
+            Beauty · Fashion · Glamour — for youth who show up and get it delivered.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center mb-xl">
@@ -45,13 +45,13 @@ export default function AboutPage() {
             </div>
             <div className="space-y-4">
               <p className="font-body-lg text-body-lg text-on-surface-variant">
-                At Kelmon, we believe glam is more than a look — it&apos;s identity,
-                confidence, and expression. We source authentic fashion and beauty so
-                campus life feels elevated, from lecture halls to nights out.
+                At Kelmon, glam isn&apos;t just a look — it&apos;s identity, confidence, and
+                how you walk into the room. We source real fashion and beauty so your
+                vibe stays elevated from day plans to nights out.
               </p>
               <p className="font-body-md text-body-md text-on-surface-variant">
-                Shop bags, perfumes, nails, and fashion, then get everything delivered
-                straight to your hostel. Free over {formatKes(3000)}.
+                Shop bags, perfumes, nails, and fashion — then get it dropped at your door.
+                Free over {formatKes(3000)}.
               </p>
               <ul className="space-y-3 pt-2">
                 {whyPoints.map((point) => (

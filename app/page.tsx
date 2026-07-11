@@ -40,7 +40,7 @@ export default function HomePage() {
         <section className="px-6 md:px-12 lg:px-16 py-16 md:py-20 bg-[#f5f0f8] dark:bg-surface-dim">
           <Reveal>
             <h2 className="font-display-lg text-[1.75rem] md:text-[2.15rem] text-on-surface text-center tracking-tight mb-12 md:mb-14">
-              Our Features
+              Our picks
             </h2>
           </Reveal>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-12 md:gap-x-7 md:gap-y-14 max-w-[1100px] mx-auto">
@@ -56,9 +56,9 @@ export default function HomePage() {
                 href="/shop"
                 className="inline-flex h-11 px-9 rounded-full bg-primary text-white text-[11px] font-semibold uppercase tracking-[0.18em] items-center gap-2 hover:bg-[#7a3a96] transition-colors"
               >
-                Load more
+                Shop the fits
                 <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
-                  refresh
+                  arrow_forward
                 </span>
               </Link>
             </div>

@@ -27,7 +27,7 @@ export default function ContactForm() {
         </span>
         <h3 className="font-display-lg text-xl text-on-surface mb-2">Message sent</h3>
         <p className="font-body-md text-body-md text-on-surface-variant">
-          Thanks for reaching out. We&apos;ll get back to you within one campus day.
+          Thanks for reaching out. We&apos;ll get back to you within a day.
         </p>
         <button
           type="button"

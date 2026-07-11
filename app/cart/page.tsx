@@ -36,7 +36,7 @@ export default function CartPage() {
             </span>
             <p className="text-base font-medium text-on-surface">Your cart is empty</p>
             <p className="text-sm text-on-surface-variant">
-              Browse campus picks and add something you love.
+              Browse the drops and add something you love.
             </p>
             <Link
               href="/shop"
@@ -148,13 +148,13 @@ export default function CartPage() {
 
                 {deliveryFee > 0 && (
                   <p className="mt-3 text-xs text-on-surface-variant">
-                    Add {formatKes(FREE_DELIVERY_THRESHOLD - subtotal)} more for free UoN campus
+                    Add {formatKes(FREE_DELIVERY_THRESHOLD - subtotal)} more for free
                     delivery.
                   </p>
                 )}
                 {deliveryFee === 0 && (
                   <p className="mt-3 text-xs text-[#C5A059]">
-                    Free delivery to UoN Main Campus unlocked.
+                    Free delivery unlocked — you&apos;re good.
                   </p>
                 )}
 

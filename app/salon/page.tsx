@@ -30,11 +30,10 @@ export default function SalonPage() {
             Salon services
           </p>
           <h1 className="font-display-lg text-display-md md:text-display-lg text-on-surface mb-3">
-            Beauty on campus
+            Beauty that ate
           </h1>
           <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mb-8">
-            Bookable glam for UoN — nails, lashes, brows, and makeup. Slots open soon;
-            browse services below and join the waitlist.
+            Nails, lashes, brows, makeup — clock a service, join the waitlist, soft-launch the look.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-xl">
@@ -81,7 +80,7 @@ export default function SalonPage() {
               Get notified when booking opens
             </h2>
             <p className="font-body-md text-body-md text-white/80 mb-6">
-              Leave your number and we&apos;ll text you when salon slots go live on campus.
+              Leave your number and we&apos;ll text you when booking goes live.
             </p>
             {joined ? (
               <p className="font-body-md text-body-md text-secondary" role="status">
