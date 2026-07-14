@@ -10,36 +10,37 @@
 
 :root,
 .dark {
-  --kelmon-bg-primary: #120816;
-  --kelmon-bg-elevated: #1a0f22;
-  --kelmon-bg-surface: #22142c;
-  --kelmon-bg-glass: rgba(26, 15, 34, 0.92);
-  --kelmon-bg-overlay: rgba(0, 0, 0, 0.55);
+  /* Dark plum — purple night, not black */
+  --kelmon-bg-primary: #1e0f2e;
+  --kelmon-bg-elevated: #2a1740;
+  --kelmon-bg-surface: #32204a;
+  --kelmon-bg-glass: rgba(42, 23, 64, 0.92);
+  --kelmon-bg-overlay: rgba(30, 15, 46, 0.65);
   --kelmon-white-glow: transparent;
 
   /* Purple — solid logo match */
   --kelmon-purple-deep: #8e44ad;
   --kelmon-purple-brand: #8e44ad;
-  --kelmon-purple-light: #8e44ad;
-  --kelmon-purple-muted: rgba(142, 68, 173, 0.15);
+  --kelmon-purple-light: #c084fc;
+  --kelmon-purple-muted: rgba(192, 132, 252, 0.16);
   --kelmon-purple-glow: transparent;
 
   /* Gold — solid logo match */
   --kelmon-gold-primary: #c5a059;
-  --kelmon-gold-light: #c5a059;
+  --kelmon-gold-light: #e9c349;
   --kelmon-gold-muted: #c5a059;
-  --kelmon-text-gold: #c5a059;
+  --kelmon-text-gold: #e9c349;
 
   /* Text */
-  --kelmon-text-primary: #fdfdfd;
-  --kelmon-text-secondary: #a3a3a3;
-  --kelmon-text-disabled: #6b6b6b;
-  --kelmon-text-inverse: #000000;
+  --kelmon-text-primary: #f7f0fb;
+  --kelmon-text-secondary: #c9b5d8;
+  --kelmon-text-disabled: #7d6a8c;
+  --kelmon-text-inverse: #1e0f2e;
 
   /* Borders */
   --kelmon-border-subtle: rgba(197, 160, 89, 0.35);
-  --kelmon-border-default: rgba(255, 255, 255, 0.1);
-  --kelmon-border-focus: #8e44ad;
+  --kelmon-border-default: rgba(192, 132, 252, 0.22);
+  --kelmon-border-focus: #c084fc;
 
   /* Semantic */
   --kelmon-success: #22c55e;
@@ -50,36 +51,41 @@
   --kelmon-warning-muted: rgba(245, 158, 11, 0.15);
   --kelmon-info: #3b82f6;
 
-  /* Semantic surfaces — dark purple-black */
-  --theme-bg: #120816;
-  --theme-surface: #1a0f22;
-  --theme-surface-dim: #0e0812;
-  --theme-surface-container: #22142c;
-  --theme-surface-container-high: #2c1a38;
-  --theme-surface-container-highest: #3a2248;
-  --theme-surface-container-lowest: #0a060e;
-  --theme-on-surface: #f5eef8;
-  --theme-on-surface-variant: #c9b8d4;
-  --theme-on-background: #f5eef8;
+  /* Semantic surfaces — dark purple */
+  --theme-bg: #1e0f2e;
+  --theme-surface: #2a1740;
+  --theme-surface-dim: #180c26;
+  --theme-surface-container: #35204d;
+  --theme-surface-container-high: #42285c;
+  --theme-surface-container-highest: #533470;
+  --theme-surface-container-lowest: #160a22;
+  --theme-on-surface: #f7f0fb;
+  --theme-on-surface-variant: #c9b5d8;
+  --theme-on-background: #f7f0fb;
   --theme-primary: #c084fc;
   --theme-primary-container: #8e44ad;
-  --theme-on-primary: #1a0f22;
+  --theme-on-primary: #1e0f2e;
   --theme-secondary: #e9c349;
   --theme-inverse-primary: #8e44ad;
-  --theme-outline: #8e44ad;
+  --theme-outline: #c084fc;
   --theme-error: #ffb4ab;
+
+  /* Footer — deep brand plum in dark mode */
+  --theme-footer-bg: #3b1a55;
+  --theme-footer-fg: #f7f0fb;
+  --theme-footer-muted: rgba(247, 240, 251, 0.72);
 
   /* Solid fills only — no gradients */
   --kelmon-gradient-purple: #8e44ad;
   --kelmon-gradient-gold: #c5a059;
   --kelmon-gradient-hero-glow: transparent;
 
-  /* Shadows — flat, no glow */
-  --kelmon-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
-  --kelmon-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.55);
+  /* Shadows — soft purple depth */
+  --kelmon-shadow-sm: 0 1px 3px rgba(30, 15, 46, 0.45);
+  --kelmon-shadow-md: 0 8px 28px rgba(30, 15, 46, 0.5);
   --kelmon-shadow-glow-purple: none;
   --kelmon-shadow-glow-gold: none;
-  --kelmon-nav-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --kelmon-nav-shadow: 0 8px 28px rgba(88, 40, 130, 0.35);
 
   /* Typography */
   --kelmon-font-display: "Playfair Display", Georgia, serif;
@@ -154,6 +160,10 @@
   --theme-inverse-primary: #7030a0;
   --theme-outline: #8e44ad;
   --theme-error: #dc2626;
+
+  --theme-footer-bg: #8e44ad;
+  --theme-footer-fg: #ffffff;
+  --theme-footer-muted: rgba(255, 255, 255, 0.8);
 
   --kelmon-gradient-purple: #8e44ad;
   --kelmon-gradient-gold: #c5a059;

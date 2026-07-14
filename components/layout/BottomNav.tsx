@@ -17,7 +17,7 @@ interface BottomNavProps {
 export default function BottomNav({ active, cartCount = 0 }: BottomNavProps) {
   return (
     <nav
-      className="md:hidden fixed bottom-3 left-3 right-3 z-50 flex justify-around items-center px-4 py-3 rounded-full bg-white/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(142,68,173,0.15)] border border-primary/15"
+      className="md:hidden fixed bottom-3 left-3 right-3 z-50 flex justify-around items-center px-4 py-3 rounded-full bg-white/95 dark:bg-surface/95 backdrop-blur-xl shadow-nav border border-primary/15"
       aria-label="Primary"
     >
       {navItems.map(({ href, label, icon, key }) => {

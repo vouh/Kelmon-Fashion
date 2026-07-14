@@ -4,7 +4,7 @@ import { logoOnDark } from "@/lib/logo";
 
 export default function Footer() {
   return (
-    <footer className="w-full mt-auto bg-primary text-white">
+    <footer className="w-full mt-auto bg-[#8E44AD] dark:bg-[#3b1a55] text-white">
       <div className="px-margin-mobile md:px-margin-desktop pt-16 md:pt-20 pb-12 md:pb-14">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 md:gap-8">
           <div className="sm:col-span-2 md:col-span-1 space-y-4">

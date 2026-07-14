@@ -285,6 +285,26 @@ body {
   transform: scale(0.96);
 }
 
+/* Profile CTA */
+.profile-cta-btn {
+  background: #8e44ad;
+}
+
+.profile-cta-btn:hover {
+  background: #7a3a96;
+}
+
+@keyframes profile-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .landing-fade,
   .hero-slide-in-right,

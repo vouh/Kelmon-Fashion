@@ -27,6 +27,7 @@ const config: Config = {
         "inverse-primary": "var(--theme-inverse-primary)",
         error: "var(--theme-error)",
         outline: "var(--theme-outline)",
+        footer: "var(--theme-footer-bg)",
       },
       spacing: {
         sm: "16px",

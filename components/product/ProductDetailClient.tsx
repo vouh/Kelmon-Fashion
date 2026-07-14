@@ -205,7 +205,7 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
       </main>
 
       {/* Mobile sticky bar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-4 py-3 bg-white/95 dark:bg-[#1a0f22]/95 backdrop-blur-xl border-t border-primary/15 flex items-center gap-2.5">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-4 py-3 bg-white/95 dark:bg-surface/95 backdrop-blur-xl border-t border-primary/15 flex items-center gap-2.5">
         <div className="inline-flex items-center rounded-full bg-[#faf6fc] dark:bg-surface-container border border-primary/15 h-10 px-1 shrink-0">
           <button
             type="button"

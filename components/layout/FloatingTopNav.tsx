@@ -27,7 +27,7 @@ export default function FloatingTopNav({ activeNav, cartCount = 0 }: FloatingTop
   return (
     <>
       <header className="fixed top-3 md:top-4 left-3 right-3 z-50">
-        <div className="max-w-content mx-auto h-16 md:h-[4.5rem] pl-2 pr-2 md:pl-3 md:pr-4 flex items-center justify-between gap-3 rounded-full bg-white/90 dark:bg-[#1a0f22]/90 backdrop-blur-xl border border-primary/20 shadow-[0_8px_32px_rgba(142,68,173,0.15)]">
+        <div className="max-w-content mx-auto h-16 md:h-[4.5rem] pl-2 pr-2 md:pl-3 md:pr-4 flex items-center justify-between gap-3 rounded-full bg-white/90 dark:bg-surface/90 backdrop-blur-xl border border-primary/20 shadow-nav">
           <Link href="/" className="shrink-0 flex items-center overflow-visible" aria-label="Kelmon home">
             <Image
               src={logo}
