@@ -5,7 +5,7 @@ and trigger, with the reasoning where a choice is not obvious.
 
 Source of truth: [`supabase/migrations/0001_init.sql`](../supabase/migrations/0001_init.sql).
 TypeScript mirror: [`lib/supabase/types.ts`](../lib/supabase/types.ts).
-Access rules: [row-level-security.md](row-level-security.md).
+Access rules: [security.md](security.md#row-level-security).
 
 If you change the SQL, change the types too — they are hand-written, not
 generated. To regenerate instead:
@@ -68,7 +68,7 @@ trigger on signup.
 
 `role` and `loyalty_points` cannot be changed by the account holder — the RLS
 update policy re-reads the stored row and requires both to be unchanged. See
-[row-level-security.md](row-level-security.md).
+[security.md](security.md#row-level-security).
 
 ### `products`
 
@@ -212,8 +212,115 @@ if not found then raise exception 'Not enough points.'; end if;
 One public bucket, `product-images`: public read, admin-only write. Paths are
 `<product-slug>/<timestamp>-<random>.<ext>`.
 
+---
+
+## Migrations
+
+```
+supabase/
+  migrations/0001_init.sql   schema, functions, triggers, RLS, storage bucket
+  seed.sql                   sample catalogue + first admin grant
+```
+
+### Applying
+
+**Dashboard** — paste `0001_init.sql` into the SQL Editor and run, then `seed.sql`.
+
+**CLI**
+
+```bash
+npx supabase link --project-ref <your-project-ref>
+npx supabase db push
+psql "$DATABASE_URL" -f supabase/seed.sql
+```
+
+**Local stack**
+
+```bash
+npx supabase start
+npx supabase db reset   # applies migrations, then seed.sql
+```
+
+`db reset` **drops and recreates** the database. Never point it at production.
+
+### Writing a new migration
+
+Name files `NNNN_short_description.sql`, sequentially. Migrations are
+**append-only** — never edit an applied file, because environments that already ran
+it will not re-run it and will silently diverge.
+
+- [ ] `alter table … enable row level security` on every new table. Without it,
+      the anon key can read everything.
+- [ ] Policies for each access pattern. No policy means no access — the safe
+      default, but it breaks the feature, so be explicit.
+- [ ] `create trigger … execute function touch_updated_at()` if the table has
+      `updated_at`.
+- [ ] Update `lib/supabase/types.ts` to match.
+- [ ] `npm run typecheck` — the hand-written types are how schema drift is caught.
+- [ ] Update this document.
+
+### The TypeScript mirror
+
+`lib/supabase/types.ts` is hand-written and must be kept in step. Two traps, both
+of which cause **every query on the table to infer as `never`** rather than a clear
+error:
+
+**1. Row types must be `type` aliases, not `interface`s.**
+
+```ts
+export type ProductRow = { id: string; /* … */ };   // correct
+export interface ProductRow { id: string; }         // breaks inference
+```
+
+`postgrest-js` constrains rows to `Record<string, unknown>`. TypeScript gives object
+*type aliases* an implicit index signature but does not give one to interfaces, so
+an interface is not assignable.
+
+**2. `Relationships` must declare foreign keys used by embedded selects.**
+
+`select("*, order_items(*)")` needs the relationship present in the type, or the
+embed resolves to a `SelectQueryError`:
+
+```ts
+type OrderItemsRelationships = [
+  {
+    foreignKeyName: "order_items_order_id_fkey";
+    columns: ["order_id"];
+    isOneToOne: false;
+    referencedRelation: "orders";
+    referencedColumns: ["id"];
+  },
+];
+```
+
+An empty `Relationships: []` is fine for tables with no embeds.
+
+**Generating instead** avoids both traps:
+
+```bash
+npx supabase gen types typescript --project-id <ref> > lib/supabase/types.ts
+```
+
+The file is hand-written here only so the repo typechecks without network access.
+
+### Version compatibility
+
+`@supabase/ssr` must match the installed `@supabase/supabase-js`. Version 0.5.x
+imports `GenericSchema` from a deep path
+(`@supabase/supabase-js/dist/module/lib/types`) that no longer exists in
+supabase-js 2.117+. The symptom is identical to trap 1 — every query types as
+`never`, with nothing pointing at the version mismatch.
+
+Check the deep path exists before debugging your own types:
+
+```bash
+test -e node_modules/@supabase/supabase-js/dist/module/lib/types.d.ts \
+  && echo present || echo "missing — upgrade @supabase/ssr"
+```
+
+---
+
 ## See also
 
-- [row-level-security.md](row-level-security.md) — who can read and write each table
-- [migrations.md](migrations.md) — applying changes, and keeping the TypeScript mirror in step
+- [security.md](security.md#row-level-security) — who can read and write each table
 - [architecture.md](architecture.md#2-single-store-catalogue-not-multi-vendor) — why single-store, and the migration path to multi-vendor

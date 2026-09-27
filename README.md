@@ -7,7 +7,7 @@ Kelmon sells bags, perfumes, fashion accessories and nail products to university
 students, delivered to campus drop points and paid for with M-Pesa. It also
 lists salon services — nails, lashes, brows, makeup.
 
-📚 **Technical documentation: [`docs/`](docs/README.md)**
+📚 **Documentation:** [architecture](docs/architecture.md) · [data model](docs/data-model.md) · [security](docs/security.md) · [design](design.md)
 
 ---
 
@@ -147,7 +147,7 @@ The anon key is public by design — it ships to the browser and RLS is what
 protects data. **The service-role key bypasses RLS and must never carry a
 `NEXT_PUBLIC_` prefix.**
 
-Full variable list: [docs/environment.md](docs/environment.md).
+Full variable list: [docs/architecture.md](docs/architecture.md#environment-variables).
 
 ### 5. Enable Google sign-in
 
@@ -159,7 +159,7 @@ Full variable list: [docs/environment.md](docs/environment.md).
 3. **Supabase → Authentication → URL Configuration → Redirect URLs** → add
    `http://localhost:3000/auth/callback` and your production equivalent.
 
-Details: [docs/google-oauth.md](docs/google-oauth.md).
+Details: [docs/architecture.md](docs/architecture.md#google-oauth).
 
 ### 6. Seed, then grant yourself admin
 
@@ -187,7 +187,7 @@ npx ngrok http 3000
 Leave `MPESA_TILL_NUMBER` blank for Paybill; set it to collect on a till, which
 switches `PartyB` to the till and the transaction type to
 `CustomerBuyGoodsOnline`. Without M-Pesa credentials, STK Push returns 503 and
-cash on delivery still works. See [docs/mpesa.md](docs/mpesa.md).
+cash on delivery still works. See [docs/architecture.md](docs/architecture.md#m-pesa).
 
 ---
 
@@ -233,10 +233,17 @@ lib/
   dev-auth.ts       development-only login fallback
   dev-fixtures.ts   development-only sample data
 middleware.ts       session refresh + /admin gate
+styles/design.css   design tokens
 supabase/
   migrations/0001_init.sql
   seed.sql
 docs/
+  architecture.md   front end, back end, API, integrations, decisions
+  data-model.md     tables, functions, migrations
+  security.md       RLS, trust boundaries, known issues
+  formal/           reserved
+design.md           colours, fonts, components
+README.md           this file
 ```
 
 ---
@@ -285,8 +292,7 @@ Full flows and all design decisions: [docs/architecture.md](docs/architecture.md
   Verified against a real production build: the endpoint 404s and the cookie is
   ignored.
 
-Trust boundaries and the full model: [docs/security-model.md](docs/security-model.md).
-Open risks: [docs/known-issues.md](docs/known-issues.md).
+Trust boundaries, RLS policies and open risks: [docs/security.md](docs/security.md).
 
 ---
 
@@ -294,21 +300,10 @@ Open risks: [docs/known-issues.md](docs/known-issues.md).
 
 | Document | Covers |
 |---|---|
-| [docs/architecture.md](docs/architecture.md) | **The whole architecture design** and all five design decisions |
-| [docs/data-model.md](docs/data-model.md) | Every table, column, function and trigger |
-| [docs/row-level-security.md](docs/row-level-security.md) | RLS policies table by table |
-| [docs/api-reference.md](docs/api-reference.md) | Route handlers and status codes |
-| [docs/server-actions.md](docs/server-actions.md) | Admin mutations |
-| [docs/migrations.md](docs/migrations.md) | Applying and writing migrations |
-| [docs/mpesa.md](docs/mpesa.md) | STK Push, callbacks, troubleshooting |
-| [docs/google-oauth.md](docs/google-oauth.md) | Google sign-in setup |
-| [docs/environment.md](docs/environment.md) | Every environment variable |
-| [docs/local-development.md](docs/local-development.md) | Running locally, gotchas |
-| [docs/deployment.md](docs/deployment.md) | Production checklist |
-| [docs/security-model.md](docs/security-model.md) | Trust boundaries |
-| [docs/known-issues.md](docs/known-issues.md) | Open risks with fixes |
-| [docs/admin-panel.md](docs/admin-panel.md) | Operator guide |
-| [docs/managing-products.md](docs/managing-products.md) | Catalogue guide |
+| [docs/architecture.md](docs/architecture.md) | **Everything about the front end and back end** — routes, components, providers, styling, middleware, data layer, full API reference, Server Actions, M-Pesa, Google OAuth, environment, local setup, deployment, and all five design decisions |
+| [docs/data-model.md](docs/data-model.md) | Every table, column, constraint, function and trigger; migrations and the TypeScript mirror |
+| [docs/security.md](docs/security.md) | Trust boundaries, authorisation layers, RLS policies table by table, and 11 open risks with fixes |
+| [design.md](design.md) | Colours, typography, spacing, components, theming |
 
 ---
 
@@ -363,4 +358,4 @@ Not finished:
   real photography.
 
 All eleven open items, with severity and suggested fixes, are in
-[docs/known-issues.md](docs/known-issues.md).
+[docs/security.md](docs/security.md#known-issues-and-accepted-risks).
