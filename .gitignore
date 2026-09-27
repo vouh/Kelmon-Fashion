@@ -1,34 +1,32 @@
 # ── Environment / Secrets ──────────────────────────────────────────────────
+# Ignore every .env variant (.env, .env.local, .env.production …) but keep the
+# committed template. The previous patterns (.env / *.env) matched neither
+# ".env.local" nor ".env.production", which is where the service-role key lives.
 .env
-*.env
+.env.*
+!.env.example
 
-# ── Firebase ───────────────────────────────────────────────────────────────
-# Local Firebase CLI cache (generated on deploy/serve)
-.firebase/
-
-# Debug & emulator logs
-firebase-debug.log
-firestore-debug.log
-ui-debug.log
-database-debug.log
-pubsub-debug.log
-
-# Local Cloud Functions runtime secrets (contains real API keys when set via
-# `firebase functions:config:get > .runtimeconfig.json`)
-.runtimeconfig.json
-
-# Firebase service-account key files (NEVER commit these)
+# Service-account / key files
 *service-account*.json
 serviceAccount*.json
 
-# Firestore config — contains admin email(s), so gitignored.
-# Copy *.example versions and fill in your real values.
-firestore.rules
-firestore.indexes.json
-
 # ── Dependencies & Build ───────────────────────────────────────────────────
 node_modules/
+.next/
+out/
 dist/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# ── Deployment ─────────────────────────────────────────────────────────────
+.vercel
+
+# ── Supabase CLI ───────────────────────────────────────────────────────────
+# Local stack state. Migrations and seed.sql ARE tracked.
+supabase/.branches/
+supabase/.temp/
+supabase/logs/
 
 # ── OS & Editor ───────────────────────────────────────────────────────────
 .DS_Store

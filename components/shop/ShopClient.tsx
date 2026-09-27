@@ -5,18 +5,26 @@ import { useRouter } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
 import FeatureProductCard from "@/components/shop/FeatureProductCard";
 import FilterBoard from "@/components/shop/FilterBoard";
-import { shopProducts, categories as productCategories } from "@/lib/products";
-
-const FILTERS = ["All", ...productCategories];
+import type { Product } from "@/lib/products";
 
 interface ShopClientProps {
+  /** Fetched server-side from Supabase by app/shop/page.tsx. */
+  products: Product[];
+  categories: string[];
   initialQuery?: string;
   initialCategory?: string;
 }
 
-export default function ShopClient({ initialQuery = "", initialCategory = "All" }: ShopClientProps) {
+export default function ShopClient({
+  products: shopProducts,
+  categories,
+  initialQuery = "",
+  initialCategory = "All",
+}: ShopClientProps) {
   const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
+
+  const FILTERS = useMemo(() => ["All", ...categories], [categories]);
   const activeCategory = FILTERS.includes(initialCategory) ? initialCategory : "All";
 
   useEffect(() => {
@@ -33,7 +41,7 @@ export default function ShopClient({ initialQuery = "", initialCategory = "All" 
         p.category.toLowerCase().includes(q);
       return catOk && qOk;
     });
-  }, [query, activeCategory]);
+  }, [query, activeCategory, shopProducts]);
 
   const setCategory = (cat: string) => {
     const params = new URLSearchParams();

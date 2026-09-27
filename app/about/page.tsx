@@ -2,7 +2,8 @@ import Link from "next/link";
 import Image from "next/image";
 import AppShell from "@/components/layout/AppShell";
 import FaqSection from "@/components/home/FaqSection";
-import { shopProducts, formatKes } from "@/lib/products";
+import { formatKes } from "@/lib/products";
+import { getProducts } from "@/lib/supabase/products";
 
 const whyPoints = [
   "Looks that stay with you all day — no mid-fit flop.",
@@ -11,11 +12,19 @@ const whyPoints = [
   "Delivery that matches your schedule, not the other way around.",
 ];
 
-export default function AboutPage() {
+const FALLBACK_IMAGE = "/logo.png";
+
+export default async function AboutPage() {
+  const shopProducts = await getProducts();
+
   const aboutImage =
-    shopProducts.find((p) => p.category === "Perfumes")?.image ?? shopProducts[0].image;
+    shopProducts.find((p) => p.category === "Perfumes")?.image ??
+    shopProducts[0]?.image ??
+    FALLBACK_IMAGE;
   const faqImage =
-    shopProducts.find((p) => p.category === "Fashion")?.image ?? shopProducts[0].image;
+    shopProducts.find((p) => p.category === "Fashion")?.image ??
+    shopProducts[0]?.image ??
+    FALLBACK_IMAGE;
 
   return (
     <AppShell activeNav="about">

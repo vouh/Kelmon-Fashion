@@ -2,17 +2,17 @@
 
 import { ThemeProvider } from "./ThemeProvider";
 import { CartProvider } from "./CartProvider";
-import { FirebaseProvider } from "./FirebaseProvider";
+import { AuthProvider } from "./AuthProvider";
 import { ToastProvider } from "@/components/ui/Toast";
 
 export default function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
-      <FirebaseProvider>
+      <AuthProvider>
         <CartProvider>
           <ToastProvider>{children}</ToastProvider>
         </CartProvider>
-      </FirebaseProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

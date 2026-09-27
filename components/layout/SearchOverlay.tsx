@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { shopProducts, formatKes, type Product } from "@/lib/products";
+import { formatKes, productFromRow, type Product } from "@/lib/products";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 interface SearchOverlayProps {
   open: boolean;
@@ -12,17 +13,46 @@ interface SearchOverlayProps {
 
 export default function SearchOverlay({ open, onClose }: SearchOverlayProps) {
   const [query, setQuery] = useState("");
+  const [catalogue, setCatalogue] = useState<Product[] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * The overlay lives inside AppShell on every page, so it loads its own
+   * catalogue the first time it opens rather than having products threaded
+   * down through the shell. One fetch per page load, only if used.
+   */
+  useEffect(() => {
+    if (!open || catalogue !== null || !isSupabaseConfigured()) return;
+
+    let active = true;
+    void createClient()
+      .from("products")
+      .select("*")
+      .eq("active", true)
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          console.error("[search] load catalogue:", error.message);
+          setCatalogue([]);
+          return;
+        }
+        setCatalogue((data ?? []).map(productFromRow));
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [open, catalogue]);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return [] as Product[];
-    return shopProducts.filter(
+    if (!q || !catalogue) return [] as Product[];
+    return catalogue.filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
         p.category.toLowerCase().includes(q)
     );
-  }, [query]);
+  }, [query, catalogue]);
 
   useEffect(() => {
     if (!open) {

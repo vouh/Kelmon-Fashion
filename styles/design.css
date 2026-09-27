@@ -5,7 +5,7 @@
  * Import in Next.js root layout:
  *   import "@/styles/design.css";
  *
- * Use .env for secrets (Firebase, M-Pesa keys) — not for colors or fonts.
+ * Use .env for secrets (Supabase, M-Pesa keys) — not for colors or fonts.
  */
 
 :root,

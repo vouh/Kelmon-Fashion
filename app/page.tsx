@@ -5,12 +5,17 @@ import HeroShowcase from "@/components/home/HeroShowcase";
 import CircleCollection from "@/components/home/CircleCollection";
 import SalonServicesSection from "@/components/home/SalonServicesSection";
 import FeatureProductCard from "@/components/shop/FeatureProductCard";
-import { shopProducts } from "@/lib/products";
-import { salonServices } from "@/lib/salon";
+import { getProducts } from "@/lib/supabase/products";
+import { getSalonServices } from "@/lib/supabase/salon";
 
 const brandStrip = ["Chanel", "Dior", "Louis Vuitton", "Gucci", "YSL", "Prada", "Armani"];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const [shopProducts, salonServices] = await Promise.all([
+    getProducts(),
+    getSalonServices(),
+  ]);
+
   const gridProducts = shopProducts.slice(0, 8);
 
   return (

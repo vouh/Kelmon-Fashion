@@ -8,7 +8,6 @@ import AppShell from "@/components/layout/AppShell";
 import { useCart } from "@/components/providers/CartProvider";
 import { FREE_DELIVERY_THRESHOLD } from "@/lib/cart";
 import { formatKes } from "@/lib/products";
-import type { OrderRecord } from "@/lib/orders";
 
 const DROP_POINTS = [
   "UoN Main Campus — Gate A",
@@ -76,21 +75,21 @@ export default function CheckoutPage() {
         }),
       });
 
-      const orderData = (await orderRes.json()) as { order?: OrderRecord; error?: string };
-      if (!orderRes.ok || !orderData.order) {
+      const orderData = (await orderRes.json()) as { orderId?: string; error?: string };
+      if (!orderRes.ok || !orderData.orderId) {
         throw new Error(orderData.error ?? "Could not create order");
       }
 
-      const order = orderData.order;
+      const orderId = orderData.orderId;
 
       if (payment === "mpesa") {
+        // The amount is read from the order row server-side, so it isn't sent.
         const stkRes = await fetch("/api/mpesa/stk-push", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            orderId: order.id,
+            orderId,
             phone: phone.trim(),
-            amount: total,
           }),
         });
 
@@ -103,16 +102,10 @@ export default function CheckoutPage() {
         setMpesaMessage(stkData.message ?? "Check your phone for the M-Pesa prompt.");
       }
 
-      try {
-        const prev = localStorage.getItem("kelmon-orders");
-        const list = prev ? (JSON.parse(prev) as OrderRecord[]) : [];
-        localStorage.setItem("kelmon-orders", JSON.stringify([order, ...list].slice(0, 20)));
-      } catch {
-        /* ignore */
-      }
-
+      // Orders now live in Supabase, so /orders reads them from there rather
+      // than from a localStorage mirror.
       clearCart();
-      router.push(`/orders?placed=${encodeURIComponent(order.id)}`);
+      router.push(`/orders?placed=${encodeURIComponent(orderId)}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed");
       setSubmitting(false);
