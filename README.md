@@ -9,6 +9,11 @@ HTML/Firebase food-delivery app). EzyBite's storefront was removed; its admin
 panel and backend were ported to Next.js + Supabase and re-skinned for Kelmon.
 See [Provenance](#provenance) for the mapping.
 
+📚 **Full technical documentation is in [`docs/`](docs/README.md)** — architecture
+and decision records, database schema and RLS, API reference, M-Pesa and Google
+OAuth setup, deployment checklist, security model, and operator guides for the
+admin panel.
+
 ---
 
 ## Stack
