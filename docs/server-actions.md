@@ -1,7 +1,7 @@
 # Server Actions
 
 All admin mutations live in
-[`app/admin/actions.ts`](../../app/admin/actions.ts). They replace the write half
+[`app/admin/actions.ts`](../app/admin/actions.ts). They replace the write half
 of EzyBite's `window.fb_*` layer.
 
 ## Why Server Actions rather than route handlers
@@ -120,4 +120,4 @@ revalidated data.
 Actions are not rate-limited. An authenticated admin could issue writes in a
 loop. Given that the actor is already trusted with full data access, this is
 accepted rather than mitigated — see
-[security/known-issues.md](../security/known-issues.md).
+[security/known-issues.md](known-issues.md).

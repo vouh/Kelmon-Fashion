@@ -42,10 +42,10 @@ Checklist:
       safe default but breaks the feature — so be explicit.
 - [ ] `create trigger … execute function touch_updated_at()` if the table has
       `updated_at`.
-- [ ] Update [`lib/supabase/types.ts`](../../lib/supabase/types.ts) to match.
+- [ ] Update [`lib/supabase/types.ts`](../lib/supabase/types.ts) to match.
 - [ ] `npm run typecheck` — the hand-written types are how schema drift gets
       caught.
-- [ ] Update [schema.md](schema.md).
+- [ ] Update [schema.md](data-model.md).
 
 ## The TypeScript mirror
 

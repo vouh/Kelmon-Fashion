@@ -34,7 +34,7 @@ Creates an order for the signed-in user.
 **Money is not accepted from the client.** Any `price`, `subtotal`,
 `deliveryFee` or `total` in the payload is ignored. Each line is re-priced
 against the `products` table and the delivery fee recomputed by
-`deliveryFeeFor()`. See [ADR-0004](../architecture/decisions/0004-server-side-repricing.md).
+`deliveryFeeFor()`. See [ADR-0004](architecture.md#4-orders-re-priced-server-side).
 
 `quantity` is floored with a minimum of 1. Only `productId`, `quantity` and
 `variant` are honoured from each line.
@@ -108,7 +108,7 @@ Safaricom means the access token was rejected, usually wrong
 ## `POST /api/mpesa/callback`
 
 Called by Safaricom, not by the app. See
-[integrations/mpesa.md](../integrations/mpesa.md).
+[integrations/mpesa.md](mpesa.md).
 
 **Always returns HTTP 200 with `ResultCode: 0`** — including on internal errors.
 Any other response makes Safaricom retry the callback repeatedly.
@@ -180,7 +180,7 @@ https://<your-domain>/auth/callback
 
 **Development only.** Returns **404** when disabled, which is whenever
 `NODE_ENV === "production"` or Supabase is configured. See
-[ADR-0005](../architecture/decisions/0005-dev-auth-fallback.md).
+[ADR-0005](architecture.md#5-development-only-auth-fallback).
 
 `POST { "email": "admin@gmail.com", "name": "Test Admin" }` sets an `httpOnly`
 session cookie. The role is derived from the email server-side and never read

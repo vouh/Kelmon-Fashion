@@ -1,8 +1,8 @@
 # M-Pesa (Safaricom Daraja)
 
-Implementation: [`lib/mpesa.ts`](../../lib/mpesa.ts),
-[`app/api/mpesa/stk-push/route.ts`](../../app/api/mpesa/stk-push/route.ts),
-[`app/api/mpesa/callback/route.ts`](../../app/api/mpesa/callback/route.ts).
+Implementation: [`lib/mpesa.ts`](../lib/mpesa.ts),
+[`app/api/mpesa/stk-push/route.ts`](../app/api/mpesa/stk-push/route.ts),
+[`app/api/mpesa/callback/route.ts`](../app/api/mpesa/callback/route.ts).
 
 This code is a merge of two implementations that both existed in this repo:
 Kelmon's TypeScript structure, plus the production hardening from EzyBite's
@@ -160,6 +160,6 @@ Both routes log with a `[stk-push]` / `[mpesa-callback]` prefix, including the
 - Callbacks are **not authenticated**. Safaricom does not sign them, so anyone
   who learns a `CheckoutRequestID` could POST a forged success. The ids are
   unguessable and never exposed to the client, which is mitigation, not a fix.
-  See [security/known-issues.md](../security/known-issues.md).
+  See [security/known-issues.md](known-issues.md).
 - The callback uses the service-role key, which bypasses RLS. It is one of only
   two places that does.

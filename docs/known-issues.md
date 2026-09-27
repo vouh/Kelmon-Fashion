@@ -33,7 +33,7 @@ Revisit before scaling.
 
 `/api/orders` re-prices every line from the catalogue and ignores the client's
 figures — correct for preventing tampering
-([ADR-0004](../architecture/decisions/0004-server-side-repricing.md)), but it
+([ADR-0004](architecture.md#4-orders-re-priced-server-side)), but it
 means a customer who loaded the page before a price rise is charged the higher
 amount with no warning.
 
@@ -126,7 +126,7 @@ but worth confirming against the Daraja spec for the live shortcode.
 
 There is no test suite. Verification so far has been manual: typecheck, build,
 route smoke tests, and the dev-auth guard checks in
-[ADR-0005](../architecture/decisions/0005-dev-auth-fallback.md).
+[ADR-0005](architecture.md#5-development-only-auth-fallback).
 
 **Highest-value first tests**, in order:
 

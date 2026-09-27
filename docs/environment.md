@@ -1,6 +1,6 @@
 # Environment Variables
 
-Template: [`.env.example`](../../.env.example). Copy to `.env.local`.
+Template: [`.env.example`](../.env.example). Copy to `.env.local`.
 
 ```bash
 cp .env.example .env.local
@@ -37,7 +37,7 @@ Both from **Project Settings → API**.
 
 The anon key being public is fine: it is a *routing* credential, not an
 authorisation one. RLS decides what it can read. See
-[row-level-security.md](../database/row-level-security.md).
+[row-level-security.md](row-level-security.md).
 
 **The service-role key must never carry a `NEXT_PUBLIC_` prefix.** That prefix
 inlines the value into the client bundle, which would hand every visitor
@@ -58,7 +58,7 @@ runs with no user session.
 | `MPESA_ACCOUNT_REFERENCE` | no | Default `Kelmon`. Max 12 chars |
 
 Credentials are environment-specific — a production key with
-`MPESA_ENV=sandbox` fails. See [integrations/mpesa.md](../integrations/mpesa.md).
+`MPESA_ENV=sandbox` fails. See [integrations/mpesa.md](mpesa.md).
 
 Missing values are reported by the API rather than guessed at:
 
@@ -78,7 +78,7 @@ advertise the wrong origin.
 ## Google OAuth
 
 No variables. Configured in the Supabase dashboard —
-[integrations/google-oauth.md](../integrations/google-oauth.md).
+[integrations/google-oauth.md](google-oauth.md).
 
 ## Degraded modes
 

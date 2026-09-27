@@ -40,7 +40,7 @@ Layers 1–3 are redundant by design. Layer 4 is what actually protects the data
 
 This replaced EzyBite's single client-side check, which shipped the admin HTML to
 everyone and hid it behind an overlay while Firebase resolved — see
-[ADR-0003](../architecture/decisions/0003-admin-panel-in-nextjs.md).
+[ADR-0003](architecture.md#3-admin-panel-rewritten-in-nextjs).
 
 ## Privilege escalation is blocked in the schema
 
@@ -59,12 +59,12 @@ So `update profiles set role = 'admin' where id = auth.uid()` from the browser
 affects zero rows. Same for `loyalty_points`, which is otherwise spendable
 currency.
 
-The trade-off is the [admin bootstrap](../operations/environment.md#first-admin):
+The trade-off is the [admin bootstrap](environment.md#first-admin):
 the first admin must be granted with the service role.
 
 ## Money
 
-Established in [ADR-0004](../architecture/decisions/0004-server-side-repricing.md).
+Established in [ADR-0004](architecture.md#4-orders-re-priced-server-side).
 
 - `/api/orders` ignores all client-supplied prices and totals, re-pricing every
   line against `products` and recomputing the delivery fee.
@@ -133,7 +133,7 @@ the email server-side, so a forged cookie grants nothing.
 
 Verified against a real production build: the endpoint 404s and the cookie is
 ignored. Details and the removal procedure in
-[ADR-0005](../architecture/decisions/0005-dev-auth-fallback.md).
+[ADR-0005](architecture.md#5-development-only-auth-fallback).
 
 ## Not implemented
 

@@ -3,7 +3,7 @@
 Google OAuth is handled by Supabase Auth. **No environment variables are needed
 in this app** — the client ID and secret live in the Supabase dashboard.
 
-See [ADR-0001](../architecture/decisions/0001-supabase-auth-over-firebase.md) for
+See [ADR-0001](architecture.md#1-supabase-auth-over-firebase-auth) for
 why Supabase Auth rather than Firebase.
 
 ## Setup
@@ -47,12 +47,12 @@ Also set **Site URL** to your production origin.
 ## How it works in the app
 
 1. `signInWithGoogle()` in
-   [`AuthProvider.tsx`](../../components/providers/AuthProvider.tsx) calls
+   [`AuthProvider.tsx`](../components/providers/AuthProvider.tsx) calls
    `signInWithOAuth({ provider: "google" })` with
    `redirectTo: ${origin}/auth/callback?next=<path>`.
 2. Google authenticates and returns to Supabase, which redirects to
    `/auth/callback` with a one-time `code`.
-3. [`app/auth/callback/route.ts`](../../app/auth/callback/route.ts) exchanges the
+3. [`app/auth/callback/route.ts`](../app/auth/callback/route.ts) exchanges the
    code for a session and sets cookies.
 4. The `handle_new_user` trigger has already created the `profiles` row, pulling
    `full_name` and `avatar_url` from the OAuth metadata.
@@ -74,7 +74,7 @@ protocol-relative URL that browsers treat as absolute.
 ## Avatars
 
 Google avatar URLs are on `*.googleusercontent.com`, which is allow-listed in
-[`next.config.ts`](../../next.config.ts) so `next/image` will serve them. A new
+[`next.config.ts`](../next.config.ts) so `next/image` will serve them. A new
 image host must be added there or images silently fail to render.
 
 ## Troubleshooting

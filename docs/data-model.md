@@ -1,7 +1,11 @@
-# Database Schema
+# Data Model
 
-Source of truth: [`supabase/migrations/0001_init.sql`](../../supabase/migrations/0001_init.sql).
-TypeScript mirror: [`lib/supabase/types.ts`](../../lib/supabase/types.ts).
+The complete data model: every table, column, relationship, constraint, function
+and trigger, with the reasoning where a choice is not obvious.
+
+Source of truth: [`supabase/migrations/0001_init.sql`](../supabase/migrations/0001_init.sql).
+TypeScript mirror: [`lib/supabase/types.ts`](../lib/supabase/types.ts).
+Access rules: [row-level-security.md](row-level-security.md).
 
 If you change the SQL, change the types too — they are hand-written, not
 generated. To regenerate instead:
@@ -210,5 +214,6 @@ One public bucket, `product-images`: public read, admin-only write. Paths are
 
 ## See also
 
-- [row-level-security.md](row-level-security.md)
-- [migrations.md](migrations.md)
+- [row-level-security.md](row-level-security.md) — who can read and write each table
+- [migrations.md](migrations.md) — applying changes, and keeping the TypeScript mirror in step
+- [architecture.md](architecture.md#2-single-store-catalogue-not-multi-vendor) — why single-store, and the migration path to multi-vendor

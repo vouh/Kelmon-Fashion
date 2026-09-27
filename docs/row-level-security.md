@@ -4,7 +4,7 @@ RLS is enabled on **every** table in `public`. With RLS on and no matching
 policy, the default is deny — so a table added without policies is inaccessible
 rather than open. That is the intended failure direction.
 
-Source: [`supabase/migrations/0001_init.sql`](../../supabase/migrations/0001_init.sql).
+Source: [`supabase/migrations/0001_init.sql`](../supabase/migrations/0001_init.sql).
 
 ## Why this matters more than usual here
 
@@ -75,7 +75,7 @@ from the browser a no-op. Verify it after any change to this table:
 update profiles set role = 'admin' where id = auth.uid();
 ```
 
-The consequence is the [admin bootstrap problem](../operations/environment.md#first-admin):
+The consequence is the [admin bootstrap problem](environment.md#first-admin):
 the first admin must be granted with the service role.
 
 ### `products`

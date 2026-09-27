@@ -15,7 +15,7 @@ needlessly permissive.
 - [ ] `supabase/migrations/0001_init.sql` applied to the production project
 - [ ] `supabase/seed.sql` run (or a real catalogue loaded)
 - [ ] RLS verified against the checklist in
-      [row-level-security.md](../database/row-level-security.md) — in particular
+      [row-level-security.md](row-level-security.md) — in particular
       that a normal user cannot update their own `role`
 - [ ] First admin granted
 

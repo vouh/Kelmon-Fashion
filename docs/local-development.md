@@ -23,7 +23,7 @@ you can reach the admin panel with a test login. Nothing is saved.
 
 Run `typecheck` before committing. The Supabase types are hand-written, so it is
 what catches schema drift — see
-[database/migrations.md](../database/migrations.md).
+[database/migrations.md](migrations.md).
 
 ## Test login (no database needed)
 
@@ -37,7 +37,7 @@ Go to **`/signin`**:
 Then open **`/admin`**. The sign-in screen has a link that fills the email in.
 
 Any other email signs in as a customer and is **refused** at `/admin`. The admin
-list is in `DEV_ADMIN_EMAILS` in [`lib/dev-auth.ts`](../../lib/dev-auth.ts).
+list is in `DEV_ADMIN_EMAILS` in [`lib/dev-auth.ts`](../lib/dev-auth.ts).
 
 ### Why a cookie and not localStorage
 
@@ -55,11 +55,11 @@ Gated on two independent conditions, either of which disables it:
 
 `npm run build && npm start` fails condition 1. Adding real keys fails condition
 2. Verified: `/api/dev-auth` returns 404 in production and the cookie is ignored.
-Full detail in [ADR-0005](../architecture/decisions/0005-dev-auth-fallback.md).
+Full detail in [ADR-0005](architecture.md#5-development-only-auth-fallback).
 
 ## Sample data
 
-[`lib/dev-fixtures.ts`](../../lib/dev-fixtures.ts) supplies, on the same gate:
+[`lib/dev-fixtures.ts`](../lib/dev-fixtures.ts) supplies, on the same gate:
 
 - **8 orders** spread over the last 5 days, deliberately covering every state —
   paid, unpaid, failed, cancelled, awaiting M-Pesa, and one `admin_direct` road
@@ -124,10 +124,10 @@ Components`. `BarChart` takes `valueFormat="kes"` instead of a formatter for
 exactly this reason.
 
 **Every query types as `never`.** Two causes, both in
-[database/migrations.md](../database/migrations.md): a row declared as
+[database/migrations.md](migrations.md): a row declared as
 `interface` instead of `type`, or an `@supabase/ssr` version mismatch.
 
 **New image host.** Remote images must be allow-listed in
-[`next.config.ts`](../../next.config.ts) or `next/image` refuses them.
+[`next.config.ts`](../next.config.ts) or `next/image` refuses them.
 
 **Env changes need a restart.** `NEXT_PUBLIC_*` values are inlined at build time.

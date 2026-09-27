@@ -136,4 +136,4 @@ change one.
 ## See also
 
 - [managing-products.md](managing-products.md)
-- [integrations/mpesa.md](../integrations/mpesa.md) — when payments misbehave
+- [integrations/mpesa.md](mpesa.md) — when payments misbehave

@@ -104,7 +104,7 @@ it. You are tracking inventory by hand.
 
 That means the number customers see drifts from reality until you update it, and
 nothing prevents overselling. It is item 5 in
-[security/known-issues.md](../security/known-issues.md) and needs a code change
+[security/known-issues.md](known-issues.md) and needs a code change
 to fix properly.
 
 Until then: update stock manually as you pack, or leave it high and treat it as
