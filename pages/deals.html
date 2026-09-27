@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Deals &amp; Offers | EzyBite Embu — Best Campus Snack Deals, UoEM</title>
+    <link rel="icon" type="image/png" href="../assets/images/logo.png">
+    <!-- SEO -->
+    <meta name="description" content="Get the best deals on campus snacks at EzyBite Embu. Exclusive discounts and combo offers for University of Embu (UoEM) students. EzyBite Kenya.">
+    <meta name="keywords" content="ezybite deals, ezybite embu deals, ezybite uoem offers, ezybite kenya deals, campus snack deals embu, university of embu food deals, ezybite discounts, cheap snacks embu">
+    <meta name="author" content="EzyBite">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://ezy-bite.netlify.app/pages/deals.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EzyBite">
+    <meta property="og:title" content="Deals &amp; Offers | EzyBite Embu — Best Campus Snack Deals, UoEM">
+    <meta property="og:description" content="Exclusive discounts and combo offers on campus snacks for University of Embu (UoEM) students. EzyBite Embu, Kenya.">
+    <meta property="og:url" content="https://ezy-bite.netlify.app/pages/deals.html">
+    <meta property="og:image" content="https://ezy-bite.netlify.app/assets/images/logo.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Deals &amp; Offers | EzyBite Embu — Best Campus Snack Deals, UoEM">
+    <meta name="twitter:description" content="Exclusive snack deals and combos for University of Embu students. EzyBite Embu, Kenya.">
+    <meta name="twitter:image" content="https://ezy-bite.netlify.app/assets/images/logo.png">
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ec4913",
+                        "background-light": "#f8f6f6",
+                        "background-dark": "#181311",
+                    },
+                    fontFamily: { "display": ["Be Vietnam Pro"] }
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Be Vietnam Pro', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .filled-icon { font-variation-settings: 'FILL' 1; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-[#181311] dark:text-white min-h-screen">
+    <div id="header-placeholder"></div>
+
+    <main class="max-w-[1440px] mx-auto px-4 lg:px-10 py-6">
+        <div class="mb-6">
+            <h2 class="text-2xl font-black dark:text-white">Active Deals</h2>
+            <p class="text-primary/50 text-xs font-medium mt-1">Exclusive offers & discounts</p>
+        </div>
+
+        <!-- Loading Skeleton -->
+        <div id="deals-skeleton" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="p-5 bg-white dark:bg-zinc-900 rounded-2xl border border-primary/5 animate-pulse h-48 flex flex-col gap-3">
+                <div class="w-full h-24 bg-primary/10 rounded-xl"></div>
+                <div class="h-4 bg-primary/10 rounded-full w-3/4"></div>
+                <div class="h-3 bg-primary/5 rounded-full w-1/2"></div>
+            </div>
+            <div class="p-5 bg-white dark:bg-zinc-900 rounded-2xl border border-primary/5 animate-pulse h-48 flex flex-col gap-3">
+                <div class="w-full h-24 bg-primary/10 rounded-xl"></div>
+                <div class="h-4 bg-primary/10 rounded-full w-2/3"></div>
+                <div class="h-3 bg-primary/5 rounded-full w-2/5"></div>
+            </div>
+            <div class="p-5 bg-white dark:bg-zinc-900 rounded-2xl border border-primary/5 animate-pulse h-48 flex flex-col gap-3">
+                <div class="w-full h-24 bg-primary/10 rounded-xl"></div>
+                <div class="h-4 bg-primary/10 rounded-full w-4/5"></div>
+                <div class="h-3 bg-primary/5 rounded-full w-1/3"></div>
+            </div>
+        </div>
+
+        <!-- Deals Grid -->
+        <div id="deals-grid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+        <!-- Empty State -->
+        <div id="deals-empty" class="hidden py-24 text-center opacity-40">
+            <span class="material-symbols-outlined text-5xl block mb-3">local_offer</span>
+            <p class="text-base font-bold uppercase tracking-widest">No active deals right now</p>
+            <p class="text-xs mt-1 font-medium">Check back soon for exclusive offers!</p>
+        </div>
+    </main>
+
+    <div id="footer-placeholder"></div>
+    <div id="modals-placeholder"></div>
+
+    <script type="module" src="../js/firebase-service.js"></script>
+    <script src="../js/ui-components.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/app.js"></script>
+    <script>
+        async function loadDeals() {
+            try {
+                const deals = await window.fb_getDeals();
+                const skeleton = document.getElementById('deals-skeleton');
+                const grid = document.getElementById('deals-grid');
+                const empty = document.getElementById('deals-empty');
+
+                if (skeleton) skeleton.remove();
+
+                if (!deals || deals.length === 0) {
+                    if (empty) { empty.classList.remove('hidden'); }
+                    return;
+                }
+
+                if (grid) {
+                    grid.classList.remove('hidden');
+                    grid.innerHTML = deals.map(deal => `
+                        <div class="bg-white dark:bg-zinc-900 rounded-2xl border border-primary/10 shadow-sm hover:shadow-md hover:border-primary/30 transition-all overflow-hidden group">
+                            ${deal.imageUrl ? `
+                                <div class="w-full h-36 overflow-hidden">
+                                    <img src="${deal.imageUrl}" alt="${deal.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
+                                </div>` : `
+                                <div class="w-full h-36 bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                                    <span class="material-symbols-outlined text-4xl text-primary/40">local_offer</span>
+                                </div>`}
+                            <div class="p-4">
+                                ${deal.badge ? `<span class="inline-block px-2 py-0.5 text-[9px] font-black uppercase tracking-widest rounded-full bg-primary/10 text-primary mb-2">${deal.badge}</span>` : ''}
+                                <h3 class="text-sm font-black dark:text-white mb-1">${deal.title}</h3>
+                                <p class="text-xs text-primary/60 dark:text-zinc-400 font-medium leading-relaxed">${deal.description || ''}</p>
+                                ${deal.code ? `<div class="mt-3 px-3 py-1.5 bg-primary/5 dark:bg-zinc-800 rounded-lg text-xs font-black text-primary tracking-widest uppercase text-center">CODE: ${deal.code}</div>` : ''}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (err) {
+                console.error('Failed to load deals:', err);
+                const skeleton = document.getElementById('deals-skeleton');
+                if (skeleton) skeleton.remove();
+                const empty = document.getElementById('deals-empty');
+                if (empty) empty.classList.remove('hidden');
+            }
+        }
+
+        // Wait for firebase-service.js to expose fb_getDeals
+        document.addEventListener('auth-changed', () => {
+            if (typeof window.fb_getDeals === 'function') {
+                loadDeals();
+            }
+        });
+        // Also try on DOMContentLoaded after a short delay in case firebase loads fast
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (typeof window.fb_getDeals === 'function' && !document.getElementById('deals-grid')?.children.length) {
+                    loadDeals();
+                }
+            }, 800);
+        });
+    </script>
+</body>
+</html>
+
+

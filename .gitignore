@@ -1,0 +1,40 @@
+# ── Environment / Secrets ──────────────────────────────────────────────────
+.env
+*.env
+
+# ── Firebase ───────────────────────────────────────────────────────────────
+# Local Firebase CLI cache (generated on deploy/serve)
+.firebase/
+
+# Debug & emulator logs
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+database-debug.log
+pubsub-debug.log
+
+# Local Cloud Functions runtime secrets (contains real API keys when set via
+# `firebase functions:config:get > .runtimeconfig.json`)
+.runtimeconfig.json
+
+# Firebase service-account key files (NEVER commit these)
+*service-account*.json
+serviceAccount*.json
+
+# Firestore config — contains admin email(s), so gitignored.
+# Copy *.example versions and fill in your real values.
+firestore.rules
+firestore.indexes.json
+
+# ── Dependencies & Build ───────────────────────────────────────────────────
+node_modules/
+dist/
+
+# ── OS & Editor ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.log
+
+# ── Project-specific ignores ──────────────────────────────────────────────
+backup_code.html
+screen.png

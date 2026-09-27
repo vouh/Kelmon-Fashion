@@ -1,0 +1,331 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .glass-panel {
+    background: var(--kelmon-bg-glass);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--kelmon-border-default);
+    box-shadow: var(--kelmon-nav-shadow);
+  }
+
+  .glass-card {
+    background: var(--kelmon-bg-glass);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    box-shadow: var(--kelmon-shadow-md);
+  }
+
+  .elevated-dark {
+    background-color: var(--kelmon-bg-elevated);
+  }
+
+  .hairline-gold {
+    border: 1px solid var(--kelmon-border-subtle);
+  }
+
+  .primary-gradient-btn {
+    background: #8e44ad;
+    transition: background-color 0.2s ease;
+  }
+
+  .primary-gradient-btn:hover {
+    background: #7a3a96;
+  }
+
+  .radial-glow-hero {
+    background: transparent;
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .product-card {
+    background: var(--kelmon-bg-elevated);
+    border: 1px solid var(--kelmon-border-subtle);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .product-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--kelmon-shadow-md);
+    border-color: var(--kelmon-gold-primary);
+  }
+
+  .chip {
+    background: rgba(233, 195, 73, 0.1);
+    border: 0.5px solid var(--theme-secondary);
+    color: var(--theme-secondary);
+  }
+
+  .chip.active {
+    background: var(--theme-secondary);
+    color: var(--kelmon-text-inverse);
+  }
+
+  .btn-primary {
+    background: #8e44ad;
+    transition: background-color 0.2s ease;
+  }
+
+  .btn-primary:hover {
+    background: #7a3a96;
+  }
+
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--theme-secondary);
+    color: var(--theme-secondary);
+    transition: all 0.3s ease;
+  }
+
+  .btn-secondary:hover {
+    background: rgba(233, 195, 73, 0.1);
+  }
+
+  .input-dark {
+    background: var(--kelmon-bg-surface);
+    border: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.3s ease;
+    color: var(--kelmon-text-primary);
+  }
+
+  .input-dark:focus {
+    outline: none;
+    border-bottom-color: var(--theme-secondary);
+    box-shadow: none;
+  }
+
+}
+
+body {
+  background-color: var(--kelmon-bg-primary);
+  color: var(--kelmon-text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+@keyframes landing-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.landing-fade {
+  opacity: 0;
+  animation: landing-fade-up 0.7s ease-out forwards;
+}
+
+.hero-slide-in-right {
+  animation: slide-from-right 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.hero-slide-in-left {
+  animation: slide-from-left 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes hero-zoom {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.06);
+  }
+}
+
+.hero-zoom {
+  animation: hero-zoom 16s ease-in-out infinite alternate;
+}
+
+@keyframes marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-track {
+  animation: marquee-scroll 28s linear infinite;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+}
+
+.reveal-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.hover-lift {
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--kelmon-shadow-md);
+}
+
+/* Soft arch frame for hero product — Eloréa-style window */
+.hero-arch {
+  border-radius: 9999px 9999px 1.75rem 1.75rem;
+  box-shadow: 0 28px 64px rgba(142, 68, 173, 0.18);
+}
+
+/* Solid arch backdrop — product sits on top, not clipped into photo */
+.hero-arch-solid {
+  border-radius: 9999px 9999px 2.5rem 2.5rem;
+}
+
+.hero-arch-backdrop {
+  border-radius: 9999px 9999px 2rem 2rem;
+}
+
+@keyframes search-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes search-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.search-overlay-backdrop {
+  animation: search-backdrop-in 0.25s ease-out;
+}
+
+.search-overlay-panel {
+  animation: search-panel-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-overlay-backdrop,
+  .search-overlay-panel {
+    animation: none;
+  }
+}
+
+.product-slider-slide.slide-from-right {
+  animation: slide-from-right 0.45s ease-out;
+}
+
+.product-slider-slide.slide-from-left {
+  animation: slide-from-left 0.45s ease-out;
+}
+
+.slider-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: #8e44ad;
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.slider-arrow:hover {
+  background: #7a3a96;
+  transform: scale(1.05);
+}
+
+.slider-arrow:active {
+  transform: scale(0.96);
+}
+
+/* Profile CTA */
+.profile-cta-btn {
+  background: #8e44ad;
+}
+
+.profile-cta-btn:hover {
+  background: #7a3a96;
+}
+
+@keyframes profile-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-fade,
+  .hero-slide-in-right,
+  .hero-slide-in-left,
+  .product-slider-slide.slide-from-right,
+  .product-slider-slide.slide-from-left,
+  .hero-zoom,
+  .marquee-track {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .hover-lift,
+  .hover-lift:hover {
+    transform: none;
+  }
+}

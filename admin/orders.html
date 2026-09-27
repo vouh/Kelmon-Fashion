@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <title>EzyBite | All Orders</title>
+    <link rel="icon" type="image/png" href="../assets/images/logo.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { colors: { primary: '#ec4913' }, fontFamily: { sans: ['Be Vietnam Pro', 'sans-serif'] } } }
+        }
+    </script>
+    <style>
+        body { font-family: 'Be Vietnam Pro', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .filled-icon { font-variation-settings: 'FILL' 1; }
+    </style>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen">
+<div id="admin-sidebar-placeholder"></div>
+
+<div class="md:pl-44 pt-11 md:pt-0 min-h-screen flex flex-col">
+
+    <!-- Topbar -->
+    <div class="hidden md:flex items-center justify-between px-6 py-3 border-b border-white/5 bg-zinc-950 sticky top-0 z-20">
+        <div>
+            <h1 class="text-base font-black text-white">All Orders</h1>
+            <p class="text-[10px] font-bold uppercase tracking-widest text-white/30">Manage and update order statuses</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <select id="status-filter" onchange="loadPageData()" class="px-3 py-1.5 bg-zinc-900 border border-white/10 rounded-lg text-white text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary/40">
+                <option value="all">All</option>
+                <option value="pending">Pending</option>
+                <option value="paid">Paid</option>
+                <option value="delivered">Delivered</option>
+                <option value="payment-failed">Failed</option>
+                <option value="cancelled">Cancelled</option>
+            </select>
+            <button onclick="loadPageData()" class="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-white/60 hover:text-white text-xs font-bold transition-all">
+                <span class="material-symbols-outlined text-sm">refresh</span>
+            </button>
+        </div>
+    </div>
+
+    <main class="flex-1 p-4 md:p-6 space-y-3">
+        <!-- Mobile filter -->
+        <div class="md:hidden">
+            <select id="status-filter-mobile" onchange="document.getElementById('status-filter').value=this.value; loadPageData()"
+                class="w-full px-3 py-2 bg-zinc-900 border border-white/10 rounded-xl text-white text-sm font-bold focus:outline-none">
+                <option value="all">All Orders</option>
+                <option value="pending">Pending</option>
+                <option value="paid">Paid</option>
+                <option value="delivered">Delivered</option>
+                <option value="payment-failed">Failed</option>
+                <option value="cancelled">Cancelled</option>
+            </select>
+        </div>
+
+        <!-- Bulk Delete Toolbar -->
+        <div id="bulk-toolbar" class="hidden items-center justify-between px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-xl">
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="select-all-orders" onchange="toggleSelectAll(this.checked)" class="accent-primary w-4 h-4 cursor-pointer">
+                <span id="selected-count" class="text-xs font-black text-red-400">0 selected</span>
+            </div>
+            <button onclick="bulkDeleteOrders()" class="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-black hover:bg-red-600 active:scale-95 transition-all">
+                <span class="material-symbols-outlined text-sm">delete</span>
+                Delete Selected
+            </button>
+        </div>
+
+        <div id="orders-list" class="space-y-2">
+            <div class="p-6 text-center text-white/20 text-xs font-bold uppercase tracking-widest">Loading orders…</div>
+        </div>
+    </main>
+</div>
+
+<!-- Order Detail Modal -->
+<div id="detail-modal" class="fixed inset-0 z-[70] hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div class="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-sm overflow-y-auto max-h-[90vh]">
+        <div class="flex items-center justify-between px-5 py-3.5 border-b border-white/5 sticky top-0 bg-zinc-900 z-10">
+            <div>
+                <h3 class="text-sm font-black text-white leading-none">Order Details</h3>
+                <p id="detail-order-id" class="text-[9px] font-bold text-white/30 mt-0.5"></p>
+            </div>
+            <button onclick="document.getElementById('detail-modal').classList.replace('flex','hidden')"
+                class="w-7 h-7 flex items-center justify-center bg-white/5 rounded-full text-white/40 hover:text-white">
+                <span class="material-symbols-outlined text-sm">close</span>
+            </button>
+        </div>
+        <div class="px-5 py-4 space-y-3" id="detail-body"></div>
+    </div>
+</div>
+
+<!-- Status Update Modal -->
+<div id="update-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div class="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-sm p-5">
+        <h3 class="text-sm font-black text-white mb-1">Update Order Status</h3>
+        <p id="modal-order-name" class="text-xs text-white/40 font-bold mb-4 truncate"></p>
+        <div class="grid grid-cols-2 gap-2" id="status-btns"></div>
+        <button onclick="document.getElementById('update-modal').classList.replace('flex','hidden')"
+            class="mt-3 w-full py-2 rounded-xl bg-white/5 text-white/40 text-xs font-bold hover:bg-white/10 transition-all">Cancel</button>
+    </div>
+</div>
+
+<!-- Admin STK Push Modal -->
+<div id="admin-stk-modal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div class="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-xs p-5">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-9 h-9 bg-primary/20 rounded-xl flex items-center justify-center">
+                <span class="material-symbols-outlined text-primary text-lg filled-icon">send_to_mobile</span>
+            </div>
+            <div>
+                <h3 class="text-sm font-black text-white leading-none">Request Payment</h3>
+                <p class="text-[10px] text-white/30 font-bold mt-0.5">Send STK push to customer</p>
+            </div>
+        </div>
+        <p class="text-[10px] text-white/30 font-bold mb-1 uppercase tracking-widest">Amount</p>
+        <p id="stk-amount-display" class="text-xl font-black text-primary mb-4">Ksh 0</p>
+        <label class="text-[10px] font-black uppercase text-white/30 tracking-widest block mb-1">Customer Phone</label>
+        <div class="flex items-center gap-2 bg-zinc-800 border border-white/10 rounded-xl px-3 py-2.5 mb-4">
+            <span class="text-xs font-black text-white/40">🇰🇪 +254</span>
+            <input id="stk-phone" type="tel" placeholder="7XXXXXXXX" maxlength="12"
+                   class="flex-1 bg-transparent outline-none font-bold text-sm text-white placeholder:text-white/20 tracking-widest"
+                   oninput="this.classList.remove('ring-2','ring-red-400')"/>
+        </div>
+        <p class="text-[10px] text-white/30 font-medium mb-4">Format: 07XXXXXXXX or 2547XXXXXXXX</p>
+        <button onclick="sendAdminStkPush()" id="stk-send-btn"
+                class="w-full bg-primary text-white py-2.5 rounded-xl font-black text-sm hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/30 flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-base">send_to_mobile</span> Send STK Push
+        </button>
+        <button onclick="closeAdminStkModal()"
+                class="w-full mt-2 text-xs font-bold text-white/30 hover:text-white py-1.5 transition-colors">
+            Cancel
+        </button>
+        <p id="stk-result" class="text-xs text-center mt-3 font-bold hidden"></p>
+    </div>
+</div>
+
+<script type="module" src="../js/firebase-service.js"></script>
+<script src="../js/auth.js"></script>
+<script src="admin-auth.js"></script>
+<script src="admin-shell.js"></script>
+<script>
+const STATUSES = ['accepted','delivered','rejected','paid'];
+const VERCEL_URL = 'https://ezy-bite.vercel.app';
+const badgeClass = { paid:'bg-green-500/10 text-green-400', delivered:'bg-green-500/20 text-green-300', accepted:'bg-blue-500/20 text-blue-300', pending:'bg-yellow-500/10 text-yellow-400', 'payment-failed':'bg-orange-500/10 text-orange-400', unpaid:'bg-orange-500/10 text-orange-400', rejected:'bg-red-500/20 text-red-500' };
+
+let _editId = '';
+let _stkOrderId = null;
+let _stkAmount = 0;
+let _ordersMap = {}; // Store orders by ID for detail view
+
+function openDetailModal(id) {
+    const o = _ordersMap[id];
+    if (!o) return;
+    document.getElementById('detail-order-id').textContent = `#${id.slice(-8).toUpperCase()}`;
+    const date = o.createdAt ? new Date(o.createdAt.seconds * 1000) : new Date();
+    const isUnpaid = o.paymentStatus === 'unpaid' || (!o.paymentStatus && o.status === 'pending') || o.status === 'payment-failed';
+    const statusKey = isUnpaid ? 'unpaid' : o.status;
+    const adminDisplayLabel = { pending:'Pending', accepted:'Accepted', delivered:'Delivered', rejected:'Rejected', paid:'Paid', 'payment-failed':'Unpaid' };
+    const displayStatus = isUnpaid ? 'Unpaid' : (adminDisplayLabel[o.status] || o.status || '—');
+    const badge = badgeClass[statusKey] || 'bg-white/5 text-white/40';
+    const row = (icon, label, val, color='text-white') => val
+        ? `<div class="flex items-start gap-3 py-2 border-b border-white/5">
+            <span class="material-symbols-outlined text-sm text-white/30 mt-0.5 shrink-0">${icon}</span>
+            <div class="min-w-0">
+                <p class="text-[9px] font-black uppercase tracking-widest text-white/30">${label}</p>
+                <p class="text-xs font-bold ${color} mt-0.5 break-words">${val}</p>
+            </div>
+           </div>` : '';
+
+    document.getElementById('detail-body').innerHTML = `
+        <div class="flex items-center gap-2 pb-2 border-b border-white/5">
+            <span class="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${badge}">${displayStatus}</span>
+            ${o.paymentStatus ? `<span class="text-[9px] text-white/30 font-bold">payment: ${o.paymentStatus}</span>` : ''}
+        </div>
+        ${row('receipt_long', 'Items / Type', o.type)}
+        ${row('shopping_cart', 'Quantity', o.quantity)}
+        ${row('payments', 'Total', o.total ? `Ksh ${Math.round(o.total)}` : '—', 'text-primary')}
+        ${row('delivery_dining', 'Delivery Location', o.location || o.deliveryLocation || o.address || '—', o.location ? 'text-white' : 'text-white/30')}
+        ${row('phone_iphone', 'Phone Number', o.phone || o.paymentDetails?.phoneNumber || o.customerPhone || '—')}
+        ${row('badge', 'Customer Name', o.customerName || '—')}
+        ${row('person', 'Customer', o.isGuest ? 'Guest User' : `Member · #${(o.userId||'').slice(-8)}`)}
+        ${row('check_circle', 'M-Pesa Receipt', o.paymentDetails?.mpesaReceiptNumber || '—', 'text-green-400')}
+        ${row('notes', 'Notes', o.notes || '—')}
+        ${row('schedule', 'Placed At', `${date.toLocaleDateString()} at ${date.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`)}
+        <div class="pt-2 flex gap-2">
+            <button onclick="openUpdateModal('${o.id}','${(o.type||'').replace(/'/g,"\\'")}','${o.status||'pending'}'); document.getElementById('detail-modal').classList.replace('flex','hidden')"
+                class="flex-1 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-black transition-all flex items-center justify-center gap-1.5">
+                <span class="material-symbols-outlined text-sm">edit</span> Update Status
+            </button>
+            <button onclick="openAdminStkModal('${o.id}', ${Math.round(o.total||0)}, '${o.phone||o.paymentDetails?.phoneNumber||''}'); document.getElementById('detail-modal').classList.replace('flex','hidden')"
+                class="flex-1 py-2 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-white text-xs font-black transition-all flex items-center justify-center gap-1.5">
+                <span class="material-symbols-outlined text-sm">send_to_mobile</span> Request Pay
+            </button>
+        </div>`;
+    document.getElementById('detail-modal').classList.replace('hidden','flex');
+}
+
+function openUpdateModal(id, name, currentStatus) {
+    _editId = id;
+    document.getElementById('modal-order-name').textContent = name;
+    document.getElementById('status-btns').innerHTML = STATUSES.map(s => `
+        <button onclick="applyStatus('${s}')"
+            class="py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
+                   ${s === currentStatus ? 'ring-2 ring-white/30 ' : ''}${badgeClass[s] || 'bg-white/5 text-white/40'}">
+            ${s}
+        </button>`).join('');
+    document.getElementById('update-modal').classList.replace('hidden','flex');
+}
+
+async function applyStatus(status) {
+    document.getElementById('update-modal').classList.replace('flex','hidden');
+    try {
+        await window.fb_updateOrderStatus(_editId, status);
+        loadPageData();
+    } catch(e) { alert('Update failed: ' + e.message); }
+}
+
+function openAdminStkModal(orderId, amount, phone) {
+    _stkOrderId = orderId;
+    _stkAmount = amount;
+    document.getElementById('stk-amount-display').textContent = `Ksh ${amount}`;
+    const phoneInput = document.getElementById('stk-phone');
+    if (phoneInput) phoneInput.value = phone || '';
+    const resultEl = document.getElementById('stk-result');
+    if (resultEl) resultEl.classList.add('hidden');
+    document.getElementById('admin-stk-modal').classList.replace('hidden','flex');
+}
+
+function closeAdminStkModal() {
+    document.getElementById('admin-stk-modal').classList.replace('flex','hidden');
+}
+
+async function sendAdminStkPush() {
+    const phoneInput = document.getElementById('stk-phone');
+    const phone = phoneInput?.value.trim();
+    if (!phone) { phoneInput?.classList.add('ring-2','ring-red-400'); return; }
+    phoneInput.classList.remove('ring-2','ring-red-400');
+
+    const btn = document.getElementById('stk-send-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="animate-spin material-symbols-outlined text-base">sync</span> Sending…';
+
+    const resultEl = document.getElementById('stk-result');
+    try {
+        const res = await fetch(`${VERCEL_URL}/api/stkpush`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: Math.max(1, Math.round(_stkAmount)), phoneNumber: phone, orderId: _stkOrderId })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.details?.errorMessage || data.error || 'STK push failed');
+
+        resultEl.textContent = '✓ STK push sent! Waiting for customer to enter PIN.';
+        resultEl.className = 'text-xs text-center mt-3 font-bold text-green-400';
+        resultEl.classList.remove('hidden');
+        setTimeout(closeAdminStkModal, 3000);
+    } catch(err) {
+        resultEl.textContent = '✗ ' + err.message;
+        resultEl.className = 'text-xs text-center mt-3 font-bold text-red-400';
+        resultEl.classList.remove('hidden');
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-outlined text-base">send_to_mobile</span> Send STK Push';
+}
+
+async function loadPageData() {
+    const filter = document.getElementById('status-filter')?.value || 'all';
+    const listEl = document.getElementById('orders-list');
+    listEl.innerHTML = '<div class="p-6 text-center text-white/20 text-xs font-bold uppercase tracking-widest animate-pulse">Loading…</div>';
+    try {
+        let orders = await window.fb_getAllOrders();
+        // Cache orders for detail view
+        _ordersMap = {};
+        orders.forEach(o => { _ordersMap[o.id] = o; });
+
+        if (filter !== 'all') orders = orders.filter(o => o.status === filter);
+
+        listEl.innerHTML = orders.length ? orders.map(o => {
+            const isUnpaid = o.paymentStatus === 'unpaid' || (!o.paymentStatus && o.status === 'pending') || o.status === 'payment-failed';
+            const statusKey = isUnpaid ? 'unpaid' : o.status;
+            const badge = badgeClass[statusKey] || 'bg-white/5 text-white/40';
+            const adminListLabel = { pending:'Pending', accepted:'Accepted', delivered:'Delivered', rejected:'Rejected', paid:'Paid', 'payment-failed':'Unpaid' };
+            const displayStatus = isUnpaid ? 'Unpaid' : (adminListLabel[o.status] || o.status);
+            const date  = new Date(o.createdAt.seconds * 1000);
+            const receipt = o.paymentDetails?.mpesaReceiptNumber;
+            const phone = o.phone || o.paymentDetails?.phoneNumber || '';
+            const location = o.location || o.deliveryLocation || '';
+            const customerName = o.customerName || '';
+            const total = Math.round(o.total || 0);
+            const stkBtn = `
+                <button onclick="openAdminStkModal('${o.id}', ${total}, '${phone}')"
+                    title="Request Payment"
+                    class="shrink-0 w-7 h-7 bg-primary/10 hover:bg-primary rounded-lg flex items-center justify-center text-primary hover:text-white transition-all">
+                    <span class="material-symbols-outlined text-xs">send_to_mobile</span>
+                </button>`;
+            return `
+            <div class="bg-zinc-900 rounded-xl border border-white/5 px-3 py-2.5 flex items-center gap-2 hover:border-white/10 transition-all">
+                <input type="checkbox" class="order-checkbox accent-primary w-4 h-4 cursor-pointer shrink-0" data-id="${o.id}" onchange="onOrderCheckboxChange()">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <p class="font-black text-white text-xs truncate">${o.type}</p>
+                        <span class="px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${badge}">${displayStatus}</span>
+                    </div>
+                    <p class="text-[9px] text-white/30 font-bold mt-0.5">
+                        x${o.quantity} • Ksh ${total} • ${date.toLocaleDateString()} ${date.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+                        ${receipt ? ' • <span class="text-green-400">'+receipt+'</span>' : ''}
+                    </p>
+                    <p class="text-[9px] text-white/20 font-bold">
+                        ${customerName ? '<span class="text-white/40">' + customerName + '</span> • ' : ''}${o.isGuest ? 'Guest' : 'Member'}${phone ? ' • ' + phone : ''}${location ? ' • 📍' + location : ''}
+                    </p>
+                </div>
+                <div class="flex items-center gap-1 shrink-0">
+                    <button onclick="openDetailModal('${o.id}')"
+                        title="View Details"
+                        class="w-7 h-7 bg-white/5 hover:bg-blue-500/20 rounded-lg flex items-center justify-center text-white/40 hover:text-blue-400 transition-all">
+                        <span class="material-symbols-outlined text-xs">visibility</span>
+                    </button>
+                    ${stkBtn}
+                    <button onclick="openUpdateModal('${o.id}','${(o.type||'').replace(/'/g,"\\'")}','${o.status||'pending'}')"
+                        title="Update Status"
+                        class="w-7 h-7 bg-white/5 hover:bg-white/10 rounded-lg flex items-center justify-center text-white/40 hover:text-white transition-all">
+                        <span class="material-symbols-outlined text-xs">edit</span>
+                    </button>
+                    <button onclick="deleteOrder('${o.id}')"
+                        title="Delete Order"
+                        class="w-7 h-7 bg-red-500/10 hover:bg-red-500/30 rounded-lg flex items-center justify-center text-red-400 transition-all">
+                        <span class="material-symbols-outlined text-xs">delete</span>
+                    </button>
+                </div>
+            </div>`;
+        }).join('') : '<div class="p-8 text-center text-white/20 text-xs font-bold uppercase">No orders match this filter</div>';
+    } catch(e) { listEl.innerHTML = `<div class="p-6 text-center text-red-400 text-xs font-bold">${e.message}</div>`; }
+}
+
+document.addEventListener('auth-changed', loadPageData);
+setTimeout(loadPageData, 1500);
+
+// ── Individual Delete ──────────────────────────────────────────────────────
+async function deleteOrder(id) {
+    if (!confirm('Delete this order? This cannot be undone.')) return;
+    try { await window.fb_deleteOrder(id); loadPageData(); }
+    catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+// ── Bulk Delete ──────────────────────────────────────────────────────────────
+let _selectedOrders = new Set();
+
+function onOrderCheckboxChange() {
+    _selectedOrders.clear();
+    document.querySelectorAll('.order-checkbox:checked').forEach(cb => _selectedOrders.add(cb.dataset.id));
+    const toolbar = document.getElementById('bulk-toolbar');
+    const countEl = document.getElementById('selected-count');
+    const selectAll = document.getElementById('select-all-orders');
+    if (_selectedOrders.size > 0) { toolbar.classList.remove('hidden'); toolbar.classList.add('flex'); }
+    else { toolbar.classList.remove('flex'); toolbar.classList.add('hidden'); }
+    countEl.textContent = `${_selectedOrders.size} selected`;
+    const all = document.querySelectorAll('.order-checkbox');
+    selectAll.checked = all.length > 0 && _selectedOrders.size === all.length;
+    selectAll.indeterminate = _selectedOrders.size > 0 && _selectedOrders.size < all.length;
+}
+
+function toggleSelectAll(checked) {
+    document.querySelectorAll('.order-checkbox').forEach(cb => { cb.checked = checked; });
+    onOrderCheckboxChange();
+}
+
+async function bulkDeleteOrders() {
+    const ids = [..._selectedOrders];
+    if (ids.length === 0) return;
+    if (!confirm(`Delete ${ids.length} order(s)? This cannot be undone.`)) return;
+    const toolbar = document.getElementById('bulk-toolbar');
+    toolbar.innerHTML = '<span class="text-xs text-red-400 font-bold animate-pulse mx-auto">Deleting\u2026</span>';
+    for (const id of ids) {
+        try { await window.fb_deleteOrder(id); } catch(e) { console.error('Delete failed:', id, e); }
+    }
+    _selectedOrders.clear();
+    loadPageData();
+}
+</script>
+</body>
+</html>

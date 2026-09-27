@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Student Reviews | EzyBite Embu — What UoEM Students Say</title>
+    <link rel="icon" type="image/png" href="../assets/images/logo.png">
+    <!-- SEO -->
+    <meta name="description" content="See what University of Embu (UoEM) students say about EzyBite. Real reviews and ratings from satisfied customers. EzyBite Embu, Kenya.">
+    <meta name="keywords" content="ezybite reviews, ezybite embu reviews, ezybite uoem ratings, ezybite kenya feedback, university of embu food reviews, campus snack reviews embu">
+    <meta name="author" content="EzyBite">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://ezy-bite.netlify.app/pages/reviews.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EzyBite">
+    <meta property="og:title" content="Student Reviews | EzyBite Embu — What UoEM Students Say">
+    <meta property="og:description" content="Real reviews and ratings from University of Embu (UoEM) students who ordered from EzyBite Embu.">
+    <meta property="og:url" content="https://ezy-bite.netlify.app/pages/reviews.html">
+    <meta property="og:image" content="https://ezy-bite.netlify.app/assets/images/logo.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Student Reviews | EzyBite Embu — What UoEM Students Say">
+    <meta name="twitter:description" content="Real reviews from University of Embu students. EzyBite Embu, Kenya.">
+    <meta name="twitter:image" content="https://ezy-bite.netlify.app/assets/images/logo.png">
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ec4913",
+                        "background-light": "#f8f6f6",
+                        "background-dark": "#181311",
+                    },
+                    fontFamily: { "display": ["Be Vietnam Pro"] }
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Be Vietnam Pro', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .filled-icon { font-variation-settings: 'FILL' 1; }
+
+        /* Star rating interactive styles */
+        .star-btn { cursor: pointer; transition: transform 0.1s, color 0.15s; }
+        .star-btn:hover { transform: scale(1.2); }
+        .star-btn.active { color: #f59e0b; font-variation-settings: 'FILL' 1; }
+        .star-btn.hovered { color: #fbbf24; font-variation-settings: 'FILL' 1; }
+
+        /* Review card animation */
+        .review-card { animation: fadeUp 0.3s ease both; }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Static star display */
+        .star-display { font-variation-settings: 'FILL' 1; color: #f59e0b; }
+        .star-display.empty { font-variation-settings: 'FILL' 0; color: #d1d5db; }
+        .dark .star-display.empty { color: #3f3f46; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-[#181311] dark:text-white min-h-screen flex flex-col">
+    <div id="header-placeholder"></div>
+
+    <div class="flex-1 max-w-[1280px] mx-auto w-full px-4 lg:px-10 py-6 flex gap-6">
+
+        <!-- Left Nav Sidebar -->
+        <aside class="w-44 shrink-0 hidden lg:block sticky top-20 h-fit">
+            <h3 class="text-[9px] font-black uppercase tracking-[0.2em] text-primary/40 mb-2 px-2">Pages</h3>
+            <div class="space-y-0.5">
+                <a href="index.html" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-primary/80 dark:text-white/60 font-bold hover:bg-primary/5 dark:hover:bg-white/5 text-sm">
+                    <span class="material-symbols-outlined text-base">restaurant_menu</span>
+                    <span>Menu</span>
+                </a>
+                <a href="orders.html" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-primary/80 dark:text-white/60 font-bold hover:bg-primary/5 dark:hover:bg-white/5 text-sm">
+                    <span class="material-symbols-outlined text-base">receipt_long</span>
+                    <span>My Orders</span>
+                </a>
+                <a href="cart.html" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-primary/80 dark:text-white/60 font-bold hover:bg-primary/5 dark:hover:bg-white/5 text-sm">
+                    <span class="material-symbols-outlined text-base">shopping_bag</span>
+                    <span>Cart</span>
+                </a>
+                <a href="deals.html" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-primary/80 dark:text-white/60 font-bold hover:bg-primary/5 dark:hover:bg-white/5 text-sm">
+                    <span class="material-symbols-outlined text-base">local_offer</span>
+                    <span>Deals</span>
+                </a>
+                <a href="reviews.html" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-primary text-white font-bold shadow-md shadow-primary/30 transition-all text-sm">
+                    <span class="material-symbols-outlined text-base filled-icon">star</span>
+                    <span>Reviews</span>
+                </a>
+                <a href="updates.html" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-primary/80 dark:text-white/60 font-bold hover:bg-primary/5 dark:hover:bg-white/5 text-sm">
+                    <span class="material-symbols-outlined text-base">notifications</span>
+                    <span>Updates</span>
+                </a>
+                <a href="about.html" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-primary/80 dark:text-white/60 font-bold hover:bg-primary/5 dark:hover:bg-white/5 text-sm">
+                    <span class="material-symbols-outlined text-base">info</span>
+                    <span>About</span>
+                </a>
+            </div>
+        </aside>
+
+        <main class="flex-1 min-w-0">
+
+        <!-- Page Hero -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-14 h-14 bg-yellow-400/10 rounded-2xl mb-3">
+                <span class="material-symbols-outlined text-3xl text-yellow-400 filled-icon">star</span>
+            </div>
+            <h1 class="text-2xl font-black dark:text-white">Customer Reviews</h1>
+            <p class="text-primary/50 dark:text-white/40 text-xs font-medium mt-1">What our customers say about EzyBite</p>
+        </div>
+
+        <!-- Summary Bar -->
+        <div id="rating-summary" class="bg-white dark:bg-zinc-900 rounded-2xl border border-primary/8 dark:border-white/5 p-4 mb-6 flex items-center gap-5 shadow-sm">
+            <div class="text-center shrink-0">
+                <div id="avg-rating-display" class="text-4xl font-black text-yellow-400">—</div>
+                <div id="avg-stars-display" class="flex gap-0.5 justify-center mt-1"></div>
+                <p id="avg-count-display" class="text-[10px] font-bold text-primary/40 dark:text-white/30 mt-1">0 reviews</p>
+            </div>
+            <div class="flex-1 space-y-1.5" id="rating-bars">
+                <!-- Filled by JS -->
+            </div>
+        </div>
+
+        <!-- Submit Review Form -->
+        <div class="bg-white dark:bg-zinc-900 rounded-2xl border border-primary/8 dark:border-white/5 p-5 mb-6 shadow-sm">
+            <h2 class="text-sm font-black dark:text-white mb-4 flex items-center gap-2">
+                <span class="material-symbols-outlined text-base text-primary filled-icon">rate_review</span>
+                Leave a Review
+            </h2>
+
+            <form id="review-form" onsubmit="submitReview(event)" class="space-y-4" novalidate>
+
+                <!-- Star Rating Selector -->
+                <div>
+                    <label class="text-[10px] font-black uppercase tracking-widest text-primary/40 dark:text-white/30 block mb-2">Your Rating <span class="text-red-400">*</span></label>
+                    <div class="flex gap-1.5" id="star-selector" role="group" aria-label="Rate EzyBite">
+                        <span class="material-symbols-outlined text-3xl star-btn text-gray-300 dark:text-zinc-600" data-value="1" onclick="setRating(1)" onmouseenter="hoverRating(1)" onmouseleave="clearHover()">star</span>
+                        <span class="material-symbols-outlined text-3xl star-btn text-gray-300 dark:text-zinc-600" data-value="2" onclick="setRating(2)" onmouseenter="hoverRating(2)" onmouseleave="clearHover()">star</span>
+                        <span class="material-symbols-outlined text-3xl star-btn text-gray-300 dark:text-zinc-600" data-value="3" onclick="setRating(3)" onmouseenter="hoverRating(3)" onmouseleave="clearHover()">star</span>
+                        <span class="material-symbols-outlined text-3xl star-btn text-gray-300 dark:text-zinc-600" data-value="4" onclick="setRating(4)" onmouseenter="hoverRating(4)" onmouseleave="clearHover()">star</span>
+                        <span class="material-symbols-outlined text-3xl star-btn text-gray-300 dark:text-zinc-600" data-value="5" onclick="setRating(5)" onmouseenter="hoverRating(5)" onmouseleave="clearHover()">star</span>
+                    </div>
+                    <p id="rating-label" class="text-[11px] text-primary/40 dark:text-white/30 font-medium mt-1 h-4"></p>
+                </div>
+
+                <!-- Name / Anonymous -->
+                <div>
+                    <label class="text-[10px] font-black uppercase tracking-widest text-primary/40 dark:text-white/30 block mb-2">Your Name</label>
+                    <div class="flex gap-2 items-center flex-wrap">
+                        <div class="flex items-center gap-2 bg-primary/5 dark:bg-zinc-800 rounded-xl px-3 py-2.5 flex-1 min-w-0 focus-within:ring-2 focus-within:ring-primary/30 transition-all">
+                            <span class="material-symbols-outlined text-sm text-primary/40 shrink-0">person</span>
+                            <input id="review-name" type="text" placeholder="e.g. John D."
+                                   class="flex-1 bg-transparent outline-none font-bold text-sm dark:text-white placeholder:text-primary/20 min-w-0"/>
+                        </div>
+                        <label class="flex items-center gap-1.5 cursor-pointer shrink-0 select-none">
+                            <input type="checkbox" id="review-anon" onchange="toggleAnonymous(this)" class="w-3.5 h-3.5 rounded border-primary/30 text-primary focus:ring-primary/30">
+                            <span class="text-xs font-bold text-primary/60 dark:text-white/40">Post anonymously</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Comment -->
+                <div>
+                    <label class="text-[10px] font-black uppercase tracking-widest text-primary/40 dark:text-white/30 block mb-2">Comment <span class="text-primary/30">(optional)</span></label>
+                    <div class="bg-primary/5 dark:bg-zinc-800 rounded-xl px-3 py-2.5 focus-within:ring-2 focus-within:ring-primary/30 transition-all">
+                        <textarea id="review-comment" rows="3" placeholder="Tell us about your experience…"
+                                  class="w-full bg-transparent outline-none font-bold text-sm dark:text-white placeholder:text-primary/20 resize-none leading-relaxed"></textarea>
+                    </div>
+                </div>
+
+                <!-- Error message -->
+                <div id="review-error" class="hidden flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-xl text-xs font-bold text-red-400">
+                    <span class="material-symbols-outlined text-sm shrink-0 filled-icon">error</span>
+                    <span id="review-error-msg"></span>
+                </div>
+
+                <button type="submit" id="review-submit-btn"
+                        class="flex items-center gap-2 px-5 py-2.5 bg-primary text-white font-black text-sm rounded-xl hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20">
+                    <span class="material-symbols-outlined text-base filled-icon">send</span>
+                    Submit Review
+                </button>
+            </form>
+        </div>
+
+        <!-- Reviews List -->
+        <div>
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-sm font-black dark:text-white flex items-center gap-2">
+                    <span class="material-symbols-outlined text-base text-primary filled-icon">forum</span>
+                    All Reviews
+                </h2>
+                <div class="flex items-center gap-1.5">
+                    <label class="text-[10px] font-bold text-primary/40 dark:text-white/30">Filter:</label>
+                    <select id="filter-stars" onchange="filterReviews()"
+                            class="text-[10px] font-black bg-primary/5 dark:bg-zinc-800 text-[#181311] dark:text-white rounded-lg px-2 py-1 border-0 outline-none">
+                        <option value="0">All Stars</option>
+                        <option value="5">5 ★</option>
+                        <option value="4">4 ★</option>
+                        <option value="3">3 ★</option>
+                        <option value="2">2 ★</option>
+                        <option value="1">1 ★</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Loading skeleton -->
+            <div id="reviews-skeleton" class="space-y-3">
+                <div class="h-20 bg-white dark:bg-zinc-900 rounded-2xl animate-pulse border border-primary/5"></div>
+                <div class="h-20 bg-white dark:bg-zinc-900 rounded-2xl animate-pulse border border-primary/5"></div>
+                <div class="h-20 bg-white dark:bg-zinc-900 rounded-2xl animate-pulse border border-primary/5"></div>
+            </div>
+
+            <!-- Reviews list -->
+            <div id="reviews-list" class="hidden space-y-3"></div>
+
+            <!-- Empty state -->
+            <div id="reviews-empty" class="hidden py-16 text-center">
+                <span class="material-symbols-outlined text-5xl block mb-2 text-primary/20">reviews</span>
+                <p class="text-sm font-bold text-primary/40 dark:text-white/30">No reviews yet. Be the first!</p>
+            </div>
+        </div>
+
+        </main>
+    </div>
+
+    <div id="footer-placeholder"></div>
+    <div id="modals-placeholder"></div>
+
+    <script type="module" src="../js/firebase-service.js"></script>
+    <script src="../js/ui-components.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/app.js"></script>
+    <script>
+        let selectedRating = 0;
+        let allReviews = [];
+
+        const ratingLabels = { 1: 'Poor', 2: 'Fair', 3: 'Good', 4: 'Very Good', 5: 'Excellent!' };
+
+        function setRating(val) {
+            selectedRating = val;
+            renderStars(val);
+            const lbl = document.getElementById('rating-label');
+            if (lbl) lbl.textContent = ratingLabels[val] || '';
+        }
+
+        function hoverRating(val) { renderStars(val, true); }
+        function clearHover() { renderStars(selectedRating); }
+
+        function renderStars(val, isHover = false) {
+            document.querySelectorAll('#star-selector .star-btn').forEach(s => {
+                const sv = parseInt(s.dataset.value);
+                s.classList.remove('active', 'hovered');
+                s.style.color = '';
+                s.style.fontVariationSettings = '';
+                if (sv <= val) {
+                    s.style.color = isHover ? '#fbbf24' : '#f59e0b';
+                    s.style.fontVariationSettings = "'FILL' 1";
+                } else {
+                    s.style.color = '';
+                    s.style.fontVariationSettings = '';
+                }
+            });
+        }
+
+        function toggleAnonymous(cb) {
+            const nameInput = document.getElementById('review-name');
+            if (cb.checked) {
+                nameInput.value = '';
+                nameInput.disabled = true;
+                nameInput.placeholder = 'Anonymous';
+                nameInput.classList.add('opacity-40');
+            } else {
+                nameInput.disabled = false;
+                nameInput.placeholder = 'e.g. John D.';
+                nameInput.classList.remove('opacity-40');
+            }
+        }
+
+        async function submitReview(e) {
+            e.preventDefault();
+            const errEl = document.getElementById('review-error');
+            const errMsg = document.getElementById('review-error-msg');
+            errEl.classList.add('hidden');
+
+            if (selectedRating === 0) {
+                errMsg.textContent = 'Please select a star rating.';
+                errEl.classList.remove('hidden');
+                return;
+            }
+
+            const isAnon = document.getElementById('review-anon').checked;
+            const name = (document.getElementById('review-name').value || '').trim();
+            const comment = (document.getElementById('review-comment').value || '').trim();
+
+            const reviewData = {
+                rating: selectedRating,
+                name: isAnon ? 'Anonymous' : (name || 'Anonymous'),
+                comment: comment,
+                anonymous: isAnon || !name
+            };
+
+            const btn = document.getElementById('review-submit-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="animate-spin material-symbols-outlined text-base">sync</span> Submitting…';
+
+            try {
+                await window.fb_addReview(reviewData);
+                // Reset form
+                selectedRating = 0;
+                renderStars(0);
+                document.getElementById('review-form').reset();
+                document.getElementById('review-name').disabled = false;
+                document.getElementById('review-name').classList.remove('opacity-40');
+                document.getElementById('rating-label').textContent = '';
+                if (typeof showToast === 'function') showToast('Review submitted. Thank you! 🌟', 'success');
+                // Remove pending rating from localStorage
+                localStorage.removeItem('ezybite_pending_rating');
+                // Reload reviews
+                await loadReviews();
+            } catch (err) {
+                errMsg.textContent = err.message || 'Failed to submit review. Try again.';
+                errEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined text-base filled-icon">send</span> Submit Review';
+            }
+        }
+
+        function filterReviews() {
+            const val = parseInt(document.getElementById('filter-stars').value);
+            const filtered = val === 0 ? allReviews : allReviews.filter(r => r.rating === val);
+            renderReviewsList(filtered);
+        }
+
+        function renderReviewsList(reviews) {
+            const listEl = document.getElementById('reviews-list');
+            const emptyEl = document.getElementById('reviews-empty');
+            if (!reviews.length) {
+                listEl.classList.add('hidden');
+                emptyEl.classList.remove('hidden');
+                return;
+            }
+            emptyEl.classList.add('hidden');
+            listEl.classList.remove('hidden');
+            listEl.innerHTML = reviews.map((r, i) => {
+                const stars = [1,2,3,4,5].map(s =>
+                    `<span class="material-symbols-outlined text-sm ${s <= r.rating ? 'star-display' : 'star-display empty'}">star</span>`
+                ).join('');
+                const date = r.createdAt?.seconds
+                    ? new Date(r.createdAt.seconds * 1000).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })
+                    : 'Just now';
+                const initial = (r.name || 'A').charAt(0).toUpperCase();
+                const avatarColors = ['bg-primary', 'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-yellow-500'];
+                const ac = avatarColors[initial.charCodeAt(0) % avatarColors.length];
+                return `
+                <div class="review-card bg-white dark:bg-zinc-900 rounded-2xl border border-primary/5 dark:border-white/5 p-4 shadow-sm"
+                     style="animation-delay:${i * 40}ms">
+                    <div class="flex items-start gap-3">
+                        <div class="w-9 h-9 rounded-full ${ac} flex items-center justify-center text-white font-black text-sm shrink-0 shadow">
+                            ${r.anonymous ? '<span class="material-symbols-outlined text-base filled-icon">person</span>' : initial}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-2 flex-wrap">
+                                <div>
+                                    <span class="text-sm font-black dark:text-white">${r.name || 'Anonymous'}</span>
+                                    ${r.anonymous ? '<span class="ml-1.5 text-[9px] font-black uppercase tracking-widest bg-primary/10 text-primary/70 px-1.5 py-0.5 rounded-full">anon</span>' : ''}
+                                </div>
+                                <span class="text-[10px] text-primary/30 dark:text-white/20 font-bold shrink-0">${date}</span>
+                            </div>
+                            <div class="flex gap-0.5 mt-1">${stars}</div>
+                            ${r.comment ? `<p class="text-xs font-medium text-[#181311]/70 dark:text-white/60 mt-1.5 leading-relaxed">${r.comment}</p>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function renderSummary(reviews) {
+            const total = reviews.length;
+            const avgEl = document.getElementById('avg-rating-display');
+            const starsEl = document.getElementById('avg-stars-display');
+            const countEl = document.getElementById('avg-count-display');
+            const barsEl = document.getElementById('rating-bars');
+
+            if (total === 0) {
+                if (avgEl) avgEl.textContent = '—';
+                if (countEl) countEl.textContent = '0 reviews';
+                if (barsEl) barsEl.innerHTML = '<p class="text-xs text-primary/30 dark:text-white/20 font-bold">No ratings yet</p>';
+                return;
+            }
+
+            const sum = reviews.reduce((s, r) => s + r.rating, 0);
+            const avg = (sum / total).toFixed(1);
+            if (avgEl) avgEl.textContent = avg;
+            if (countEl) countEl.textContent = `${total} review${total !== 1 ? 's' : ''}`;
+
+            // Avg stars
+            if (starsEl) {
+                starsEl.innerHTML = [1,2,3,4,5].map(s => {
+                    if (s <= Math.floor(avg)) return `<span class="material-symbols-outlined text-sm star-display">star</span>`;
+                    if (s - 0.5 <= parseFloat(avg)) return `<span class="material-symbols-outlined text-sm star-display">star_half</span>`;
+                    return `<span class="material-symbols-outlined text-sm star-display empty">star</span>`;
+                }).join('');
+            }
+
+            // Distribution bars
+            if (barsEl) {
+                const dist = {1:0, 2:0, 3:0, 4:0, 5:0};
+                reviews.forEach(r => { if (r.rating >= 1 && r.rating <= 5) dist[r.rating]++; });
+                barsEl.innerHTML = [5,4,3,2,1].map(n => {
+                    const pct = total ? Math.round((dist[n] / total) * 100) : 0;
+                    return `
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-black text-primary/50 dark:text-white/30 w-3 shrink-0 text-right">${n}</span>
+                        <span class="material-symbols-outlined text-xs star-display shrink-0">star</span>
+                        <div class="flex-1 h-1.5 bg-primary/8 dark:bg-white/5 rounded-full overflow-hidden">
+                            <div class="h-full bg-yellow-400 rounded-full transition-all duration-700" style="width:${pct}%"></div>
+                        </div>
+                        <span class="text-[10px] font-bold text-primary/40 dark:text-white/20 w-6 shrink-0">${dist[n]}</span>
+                    </div>`;
+                }).join('');
+            }
+        }
+
+        async function loadReviews() {
+            try {
+                const reviews = await window.fb_getReviews();
+                allReviews = reviews;
+                document.getElementById('reviews-skeleton').classList.add('hidden');
+                renderSummary(reviews);
+                filterReviews();
+            } catch (err) {
+                document.getElementById('reviews-skeleton').classList.add('hidden');
+                document.getElementById('reviews-empty').classList.remove('hidden');
+                console.error('Failed to load reviews:', err);
+            }
+        }
+
+        // Check for pending rating from post-payment popup
+        function checkPendingRating() {
+            const pending = localStorage.getItem('ezybite_pending_rating');
+            if (pending) {
+                const val = parseInt(pending);
+                if (val >= 1 && val <= 5) {
+                    setRating(val);
+                    // Smooth scroll to form
+                    setTimeout(() => {
+                        document.getElementById('review-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 400);
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Wait for firebase to load
+            const tryLoad = () => {
+                if (typeof window.fb_getReviews === 'function') {
+                    loadReviews();
+                    checkPendingRating();
+                } else {
+                    setTimeout(tryLoad, 300);
+                }
+            };
+            tryLoad();
+        });
+
+        document.addEventListener('auth-changed', () => {
+            if (allReviews.length === 0 && typeof window.fb_getReviews === 'function') {
+                loadReviews();
+            }
+        });
+    </script>
+</body>
+</html>

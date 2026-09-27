@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <title>EzyBite | Admin Overview</title>
+    <link rel="icon" type="image/png" href="../assets/images/logo.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: { primary: '#ec4913' },
+                    fontFamily: { sans: ['Be Vietnam Pro', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Be Vietnam Pro', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .filled-icon { font-variation-settings: 'FILL' 1; }
+    </style>
+</head>
+<body class="bg-zinc-950 text-white min-h-screen">
+<div id="admin-sidebar-placeholder"></div>
+
+<!-- Page wrapper — offset for sidebar on md+ -->
+<div class="md:pl-44 pt-11 md:pt-0 min-h-screen flex flex-col">
+
+    <!-- Topbar (desktop) -->
+    <div class="hidden md:flex items-center justify-between px-6 py-3 border-b border-white/5 bg-zinc-950 sticky top-0 z-20">
+        <div>
+            <h1 class="text-base font-black text-white leading-none">Overview</h1>
+            <p class="text-[10px] font-bold uppercase tracking-widest text-white/30 mt-0.5">Dashboard summary</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="openRequestPaymentModal()" class="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-lg text-primary text-xs font-black transition-all">
+                <span class="material-symbols-outlined text-sm filled-icon">send_to_mobile</span> Request Payment
+            </button>
+            <button onclick="loadPageData()" class="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-white/60 hover:text-white text-xs font-bold transition-all">
+                <span class="material-symbols-outlined text-sm">refresh</span> Refresh
+            </button>
+        </div>
+    </div>
+
+    <main class="flex-1 p-4 md:p-6 space-y-6">
+
+        <!-- Stat Cards -->
+        <div class="grid grid-cols-3 gap-2">
+            <div class="bg-zinc-900 rounded-xl p-3 border border-white/5 flex flex-col gap-1.5">
+                <div class="flex items-center justify-between">
+                    <span class="text-[9px] font-black uppercase tracking-widest text-white/30">Total Orders</span>
+                    <span class="material-symbols-outlined filled-icon text-primary text-base">receipt_long</span>
+                </div>
+                <span id="stat-orders" class="text-2xl font-black text-white">—</span>
+                <span class="text-[9px] text-white/20 font-bold">All time</span>
+            </div>
+            <div class="bg-zinc-900 rounded-xl p-3 border border-white/5 flex flex-col gap-1.5">
+                <div class="flex items-center justify-between">
+                    <span class="text-[9px] font-black uppercase tracking-widest text-white/30">Revenue</span>
+                    <span class="material-symbols-outlined filled-icon text-green-400 text-base">payments</span>
+                </div>
+                <span id="stat-revenue" class="text-2xl font-black text-white">—</span>
+                <span class="text-[9px] text-white/20 font-bold">Paid only</span>
+            </div>
+            <div class="bg-zinc-900 rounded-xl p-3 border border-white/5 flex flex-col gap-1.5">
+                <div class="flex items-center justify-between">
+                    <span class="text-[9px] font-black uppercase tracking-widest text-white/30">Pending</span>
+                    <span class="material-symbols-outlined filled-icon text-yellow-400 text-base">hourglass_top</span>
+                </div>
+                <span id="stat-pending" class="text-2xl font-black text-white">—</span>
+                <span class="text-[9px] text-white/20 font-bold">Awaiting action</span>
+            </div>
+        </div>
+
+        <!-- Extra stats row -->
+        <div class="grid grid-cols-2 gap-2">
+            <div class="bg-zinc-900 rounded-xl p-3 border border-white/5 flex items-center gap-3">
+                <span class="material-symbols-outlined filled-icon text-green-400 text-base">check_circle</span>
+                <div>
+                    <span class="text-[9px] font-black uppercase tracking-widest text-white/30 block">Paid</span>
+                    <span id="stat-paid" class="text-lg font-black text-green-400">—</span>
+                </div>
+            </div>
+            <div class="bg-zinc-900 rounded-xl p-3 border border-white/5 flex items-center gap-3">
+                <span class="material-symbols-outlined filled-icon text-red-400 text-base">cancel</span>
+                <div>
+                    <span class="text-[9px] font-black uppercase tracking-widest text-white/30 block">Failed</span>
+                    <span id="stat-failed" class="text-lg font-black text-red-400">—</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="grid grid-cols-1 gap-2">
+            <button onclick="openRequestPaymentModal()"
+                    class="flex items-center gap-3 px-4 py-3 bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-xl text-left transition-all group">
+                <div class="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
+                    <span class="material-symbols-outlined text-primary text-lg filled-icon">send_to_mobile</span>
+                </div>
+                <div>
+                    <p class="text-xs font-black text-white">Request Payment</p>
+                    <p class="text-[9px] text-white/30 font-bold mt-0.5">Send STK push for a road sale</p>
+                </div>
+                <span class="material-symbols-outlined text-white/20 group-hover:text-white/50 ml-auto transition-colors">chevron_right</span>
+            </button>
+        </div>
+
+        <!-- Recent Orders -->
+        <div class="bg-zinc-900 rounded-xl border border-white/5 overflow-hidden">
+            <div class="px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
+                <div>
+                    <h3 class="text-xs font-black text-white">Recent Orders</h3>
+                    <p class="text-[9px] text-white/30 font-bold uppercase tracking-widest">Latest 10</p>
+                </div>
+                <a href="orders.html" class="text-[9px] font-black uppercase tracking-widest text-primary hover:text-white transition-colors">
+                    View All →
+                </a>
+            </div>
+
+            <!-- Desktop table -->
+            <div class="hidden md:block overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-white/5">
+                        <tr class="text-[9px] font-black uppercase tracking-widest text-white/30">
+                            <th class="px-3 py-2">Order</th>
+                            <th class="px-3 py-2">Value</th>
+                            <th class="px-3 py-2">Customer</th>
+                            <th class="px-3 py-2">Status</th>
+                            <th class="px-3 py-2">Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recent-orders-table" class="divide-y divide-white/5">
+                        <tr><td colspan="5" class="px-3 py-6 text-center text-white/20 text-xs font-bold uppercase tracking-widest animate-pulse">Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Mobile cards -->
+            <div id="recent-orders-cards" class="md:hidden divide-y divide-white/5"></div>
+        </div>
+
+    </main>
+</div>
+
+<script type="module" src="../js/firebase-service.js"></script>
+<script src="../js/auth.js"></script>
+<script src="admin-auth.js"></script>
+<script src="admin-shell.js"></script>
+
+<!-- ── Request Payment Modal ──────────────────────────────────────────────── -->
+<div id="req-payment-modal"
+     class="fixed inset-0 z-[200] hidden items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+     onclick="if(event.target===this) closeRequestPaymentModal()">
+    <div class="bg-zinc-900 w-full max-w-xs rounded-2xl border border-white/8 shadow-2xl overflow-hidden">
+        <!-- Header -->
+        <div class="bg-primary px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-white text-base filled-icon">send_to_mobile</span>
+                <div>
+                    <p class="text-white font-black text-xs leading-none">Request Payment</p>
+                    <p class="text-white/60 text-[9px] font-bold mt-0.5">Road Sale — STK Push</p>
+                </div>
+            </div>
+            <button onclick="closeRequestPaymentModal()" class="w-6 h-6 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-full text-white transition-all">
+                <span class="material-symbols-outlined text-xs">close</span>
+            </button>
+        </div>
+
+        <div class="p-4 space-y-3" id="rp-form-body">
+            <!-- Phone Number -->
+            <div>
+                <label class="text-[9px] font-black uppercase tracking-widest text-white/30 block mb-1">Phone Number <span class="text-red-400">*</span></label>
+                <div class="flex items-center gap-1.5 bg-zinc-800 rounded-lg px-2.5 py-2 focus-within:ring-1 focus-within:ring-primary/50 transition-all">
+                    <span class="text-[9px] font-black text-white/40 shrink-0">🇰🇪 +254</span>
+                    <input id="rp-phone" type="tel" placeholder="7XXXXXXXX" maxlength="12"
+                           class="flex-1 bg-transparent outline-none font-bold text-xs text-white placeholder:text-white/20 tracking-widest"/>
+                </div>
+                <p class="text-[9px] text-white/20 font-bold mt-0.5">07XXXXXXXX or 2547XXXXXXXX</p>
+            </div>
+
+            <!-- Items -->
+            <div>
+                <label class="text-[9px] font-black uppercase tracking-widest text-white/30 block mb-1.5">Order Items</label>
+                <div class="space-y-2">
+                    <!-- Beef Samosa -->
+                    <div class="flex items-center gap-2 bg-zinc-800 rounded-lg px-2.5 py-2">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-[10px] font-black text-white leading-none">Beef Samosa</p>
+                            <p class="text-[9px] text-primary font-bold mt-0.5">Ksh 20 each</p>
+                        </div>
+                        <div class="flex items-center gap-1 shrink-0">
+                            <button onclick="rpAdjust('beef',-1)" class="w-6 h-6 flex items-center justify-center bg-white/8 hover:bg-white/15 rounded-md text-white font-black text-sm transition-all">−</button>
+                            <span id="rp-qty-beef" class="w-6 text-center font-black text-white text-xs">0</span>
+                            <button onclick="rpAdjust('beef',1)" class="w-6 h-6 flex items-center justify-center bg-white/8 hover:bg-white/15 rounded-md text-white font-black text-sm transition-all">+</button>
+                        </div>
+                    </div>
+                    <!-- Ndengu Samosa -->
+                    <div class="flex items-center gap-2 bg-zinc-800 rounded-lg px-2.5 py-2">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-[10px] font-black text-white leading-none">Ndengu Samosa</p>
+                            <p class="text-[9px] text-green-400 font-bold mt-0.5">Ksh 10 each</p>
+                        </div>
+                        <div class="flex items-center gap-1 shrink-0">
+                            <button onclick="rpAdjust('ndengu',-1)" class="w-6 h-6 flex items-center justify-center bg-white/8 hover:bg-white/15 rounded-md text-white font-black text-sm transition-all">−</button>
+                            <span id="rp-qty-ndengu" class="w-6 text-center font-black text-white text-xs">0</span>
+                            <button onclick="rpAdjust('ndengu',1)" class="w-6 h-6 flex items-center justify-center bg-white/8 hover:bg-white/15 rounded-md text-white font-black text-sm transition-all">+</button>
+                        </div>
+                    </div>
+                    <!-- Potato Samosa -->
+                    <div class="flex items-center gap-2 bg-zinc-800 rounded-lg px-2.5 py-2">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-[10px] font-black text-white leading-none">Potato Samosa</p>
+                            <p class="text-[9px] text-orange-400 font-bold mt-0.5">Ksh 10 each</p>
+                        </div>
+                        <div class="flex items-center gap-1 shrink-0">
+                            <button onclick="rpAdjust('potato',-1)" class="w-6 h-6 flex items-center justify-center bg-white/8 hover:bg-white/15 rounded-md text-white font-black text-sm transition-all">−</button>
+                            <span id="rp-qty-potato" class="w-6 text-center font-black text-white text-xs">0</span>
+                            <button onclick="rpAdjust('potato',1)" class="w-6 h-6 flex items-center justify-center bg-white/8 hover:bg-white/15 rounded-md text-white font-black text-sm transition-all">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total -->
+            <div class="flex items-center justify-between bg-zinc-800/50 rounded-lg px-3 py-2 border border-white/5">
+                <span class="text-[10px] font-black uppercase tracking-widest text-white/40">Total</span>
+                <span id="rp-total" class="text-base font-black text-primary">Ksh 0</span>
+            </div>
+
+            <!-- Error -->
+            <div id="rp-error" class="hidden flex items-center gap-1.5 px-2.5 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-[10px] font-bold text-red-400">
+                <span class="material-symbols-outlined text-xs shrink-0 filled-icon">error</span>
+                <span id="rp-error-msg"></span>
+            </div>
+
+            <!-- Send Button -->
+            <button id="rp-send-btn" onclick="rpSendPayment()"
+                    class="w-full flex items-center justify-center gap-2 py-2.5 bg-primary hover:bg-primary/90 active:scale-95 text-white font-black text-xs rounded-xl transition-all shadow-lg shadow-primary/20">
+                <span class="material-symbols-outlined text-sm filled-icon">send_to_mobile</span>
+                Send STK Push
+            </button>
+        </div>
+
+        <!-- Success state -->
+        <div id="rp-success-body" class="hidden p-6 text-center">
+            <div class="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span class="material-symbols-outlined text-2xl text-green-400 filled-icon">check_circle</span>
+            </div>
+            <p class="text-sm font-black text-white mb-1">STK Push Sent!</p>
+            <p class="text-[11px] text-white/40 font-bold mb-4">Ask the customer to check their phone and enter their M-Pesa PIN.</p>
+            <button onclick="closeRequestPaymentModal()" class="px-5 py-2 bg-white/8 hover:bg-white/15 rounded-xl text-xs font-black text-white transition-all">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── Request Payment Modal ──────────────────────────────────────────────────
+const RP_PRICES = { beef: 20, ndengu: 10, potato: 10 };
+const RP_NAMES  = { beef: 'Beef Samosa', ndengu: 'Ndengu Samosa', potato: 'Potato Samosa' };
+let rpQty = { beef: 0, ndengu: 0, potato: 0 };
+
+function openRequestPaymentModal() {
+    rpQty = { beef: 0, ndengu: 0, potato: 0 };
+    rpRenderQtys();
+    document.getElementById('rp-phone').value = '';
+    document.getElementById('rp-error').classList.add('hidden');
+    document.getElementById('rp-form-body').classList.remove('hidden');
+    document.getElementById('rp-success-body').classList.add('hidden');
+    const btn = document.getElementById('rp-send-btn');
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-outlined text-sm filled-icon">send_to_mobile</span> Send STK Push';
+    const modal = document.getElementById('req-payment-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeRequestPaymentModal() {
+    const modal = document.getElementById('req-payment-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+function rpAdjust(type, delta) {
+    rpQty[type] = Math.max(0, Math.min(99, rpQty[type] + delta));
+    rpRenderQtys();
+}
+
+function rpRenderQtys() {
+    ['beef', 'ndengu', 'potato'].forEach(t => {
+        const el = document.getElementById(`rp-qty-${t}`);
+        if (el) el.textContent = rpQty[t];
+    });
+    const total = Object.entries(rpQty).reduce((s, [k, v]) => s + v * RP_PRICES[k], 0);
+    const totalEl = document.getElementById('rp-total');
+    if (totalEl) totalEl.textContent = `Ksh ${total}`;
+}
+
+async function rpSendPayment() {
+    const errEl = document.getElementById('rp-error');
+    const errMsg = document.getElementById('rp-error-msg');
+    errEl.classList.add('hidden');
+
+    // Validate phone
+    let phone = (document.getElementById('rp-phone').value || '').trim().replace(/\s+/g, '');
+    if (phone.startsWith('0')) phone = '254' + phone.slice(1);
+    if (!phone || !/^254\d{9}$/.test(phone)) {
+        errMsg.textContent = 'Enter a valid phone number (07XXXXXXXX).';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    // Validate items
+    const total = Object.entries(rpQty).reduce((s, [k, v]) => s + v * RP_PRICES[k], 0);
+    if (total === 0) {
+        errMsg.textContent = 'Add at least one item.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const btn = document.getElementById('rp-send-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="animate-spin material-symbols-outlined text-sm">sync</span> Sending…';
+
+    try {
+        // Build order description
+        const items = Object.entries(rpQty).filter(([,v]) => v > 0)
+            .map(([k, v]) => `${v}x ${RP_NAMES[k]}`);
+        const quantity = Object.values(rpQty).reduce((s, v) => s + v, 0);
+
+        // Create order in Firestore
+        const orderId = await window.fb_createDirectOrder({
+            type: items.join(', '),
+            quantity,
+            total,
+            phone,
+            items: Object.entries(rpQty).filter(([,v])=>v>0).map(([k,v])=>({ name: RP_NAMES[k], price: RP_PRICES[k], count: v })),
+        });
+
+        // Send STK push via Vercel API
+        const VERCEL_API_URL = 'https://ezy-bite.vercel.app';
+        const resp = await fetch(`${VERCEL_API_URL}/api/stkpush`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId, amount: total, phoneNumber: phone })
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'STK push failed');
+
+        // Show success
+        document.getElementById('rp-form-body').classList.add('hidden');
+        document.getElementById('rp-success-body').classList.remove('hidden');
+    } catch (err) {
+        errMsg.textContent = err.message || 'Failed to send payment. Try again.';
+        errEl.classList.remove('hidden');
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-symbols-outlined text-sm filled-icon">send_to_mobile</span> Send STK Push';
+    }
+}
+</script>
+<script>
+const statusBadge = (s, ps) => {
+    const status = (ps === 'unpaid' && s === 'pending') ? 'unpaid' : s;
+    const map = {
+        paid:            'bg-green-500/10 text-green-400',
+        delivered:       'bg-green-500/20 text-green-300',
+        pending:         'bg-yellow-500/10 text-yellow-400',
+        unpaid:          'bg-orange-500/10 text-orange-400',
+        'payment-failed':'bg-red-500/10 text-red-400',
+    };
+    return `<span class="px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${map[status] || 'bg-white/5 text-white/40'}">${status}</span>`;
+};
+
+async function loadPageData() {
+    // Wait until firebase functions are available
+    if (typeof window.fb_getAdminStats !== 'function') {
+        setTimeout(loadPageData, 400);
+        return;
+    }
+    try {
+        const [stats, orders] = await Promise.all([
+            window.fb_getAdminStats(),
+            window.fb_getAllOrders()
+        ]);
+
+        document.getElementById('stat-orders').textContent  = stats.totalOrders;
+        document.getElementById('stat-revenue').textContent = `Ksh ${Math.round(stats.totalRevenue).toLocaleString()}`;
+        document.getElementById('stat-pending').textContent = stats.pendingOrders;
+
+        const paid   = orders.filter(o => o.status === 'paid' || o.paymentStatus === 'paid').length;
+        const failed = orders.filter(o => o.status === 'payment-failed' || o.paymentStatus === 'failed').length;
+        document.getElementById('stat-paid').textContent   = paid;
+        document.getElementById('stat-failed').textContent = failed;
+
+        const top10 = orders.slice(0, 10);
+
+        // Desktop table
+        document.getElementById('recent-orders-table').innerHTML = top10.length
+            ? top10.map(o => `
+                <tr class="hover:bg-white/5 transition-colors">
+                    <td class="px-3 py-2 font-bold text-white text-xs">${o.type}<br><span class="text-[8px] text-white/20 font-bold">…${o.id.slice(-6)}</span></td>
+                    <td class="px-3 py-2 font-black text-primary text-xs">Ksh ${Math.round(o.total||0)}<br><span class="text-[8px] text-white/20 font-bold">x${o.quantity}</span></td>
+                    <td class="px-3 py-2 text-white/50 font-bold text-xs">${o.isGuest ? 'Guest' : 'Member'}</td>
+                    <td class="px-3 py-2">${statusBadge(o.status, o.paymentStatus)}</td>
+                    <td class="px-3 py-2 text-white/30 font-bold text-xs">${new Date(o.createdAt.seconds*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td>
+                </tr>`) .join('')
+            : '<tr><td colspan="5" class="px-4 py-8 text-center text-white/20 font-bold text-xs uppercase">No orders yet</td></tr>';
+
+        // Mobile cards
+        document.getElementById('recent-orders-cards').innerHTML = top10.length
+            ? top10.map(o => `
+                <div class="px-3 py-2.5 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="font-bold text-white text-xs truncate">${o.type}</p>
+                        <p class="text-[9px] text-white/30 font-bold">x${o.quantity} • ${new Date(o.createdAt.seconds*1000).toLocaleDateString()}</p>
+                    </div>
+                    <div class="flex flex-col items-end gap-1 shrink-0">
+                        <span class="text-primary font-black text-xs">Ksh ${Math.round(o.total||0)}</span>
+                        ${statusBadge(o.status, o.paymentStatus)}
+                    </div>
+                </div>`)
+            .join('')
+            : '<p class="p-6 text-center text-white/20 text-xs font-bold uppercase">No orders yet</p>';
+
+    } catch (err) {
+        console.error('Admin overview error:', err);
+        const msg = `<tr><td colspan="5" class="px-4 py-6 text-center text-red-400 text-xs font-bold">Load error: ${err.message || err}</td></tr>`;
+        const tbl = document.getElementById('recent-orders-table');
+        const cards = document.getElementById('recent-orders-cards');
+        if (tbl) tbl.innerHTML = msg;
+        if (cards) cards.innerHTML = `<p class="p-6 text-center text-red-400 text-xs font-bold">${err.message || err}</p>`;
+    }
+}
+
+document.addEventListener('auth-changed', loadPageData);
+setTimeout(loadPageData, 1500);
+</script>
+</body>
+</html>

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Updates | EzyBite Embu — Latest News, Menu Changes &amp; Announcements</title>
+    <link rel="icon" type="image/png" href="../assets/images/logo.png">
+    <!-- SEO -->
+    <meta name="description" content="Stay updated with EzyBite Embu&apos;s latest news, menu changes, availability updates and announcements. EzyBite University of Embu, Kenya.">
+    <meta name="keywords" content="ezybite updates, ezybite embu news, ezybite uoem announcements, ezybite kenya menu changes, university of embu snacks updates">
+    <meta name="author" content="EzyBite">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://ezy-bite.netlify.app/pages/updates.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="EzyBite">
+    <meta property="og:title" content="Updates | EzyBite Embu — Latest News &amp; Announcements">
+    <meta property="og:description" content="Latest news, menu changes and availability updates from EzyBite at University of Embu (UoEM), Kenya.">
+    <meta property="og:url" content="https://ezy-bite.netlify.app/pages/updates.html">
+    <meta property="og:image" content="https://ezy-bite.netlify.app/assets/images/logo.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Updates | EzyBite Embu — Latest News &amp; Announcements">
+    <meta name="twitter:description" content="Latest updates from EzyBite at University of Embu (UoEM), Kenya.">
+    <meta name="twitter:image" content="https://ezy-bite.netlify.app/assets/images/logo.png">
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ec4913",
+                        "background-light": "#f8f6f6",
+                        "background-dark": "#181311",
+                    },
+                    fontFamily: { "display": ["Be Vietnam Pro"] }
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Be Vietnam Pro', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .filled-icon { font-variation-settings: 'FILL' 1; }
+
+        /* Update card entrance animation */
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .update-card { animation: slideUp 0.35s ease both; }
+
+        /* "New" pulse dot */
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.4; }
+        }
+        .pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+
+        /* Tag colour helpers */
+        .tag-info    { background: rgba(59,130,246,0.12); color: #60a5fa; }
+        .tag-promo   { background: rgba(236,73,19,0.12);  color: #ec4913; }
+        .tag-deal    { background: rgba(234,179,8,0.12);  color: #eab308; }
+        .tag-feature { background: rgba(34,197,94,0.12);  color: #22c55e; }
+        .tag-alert   { background: rgba(239,68,68,0.12);  color: #f87171; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-[#181311] dark:text-white min-h-screen flex flex-col">
+    <div id="header-placeholder"></div>
+
+    <div class="flex-1 max-w-[1280px] mx-auto w-full px-4 lg:px-10 py-6 flex gap-6">
+
+        <!-- Left Nav Sidebar -->
+        <aside class="w-44 shrink-0 hidden lg:block sticky top-20 h-fit">
+            <h3 class="text-[9px] font-black uppercase tracking-[0.2em] text-primary/40 mb-2 px-2">Pages</h3>
+            <div class="space-y-0.5">
+                <a href="index.html" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-primary/80 dark:text-white/60 font-bold hover:bg-primary/5 dark:hover:bg-white/5 text-sm">
+                    <span class="material-symbols-outlined text-base">restaurant_menu</span>
+                    <span>Menu</span>
+                </a>
+                <a href="orders.html" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-primary/80 dark:text-white/60 font-bold hover:bg-primary/5 dark:hover:bg-white/5 text-sm">
+                    <span class="material-symbols-outlined text-base">receipt_long</span>
+                    <span>My Orders</span>
+                </a>
+                <a href="cart.html" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-primary/80 dark:text-white/60 font-bold hover:bg-primary/5 dark:hover:bg-white/5 text-sm">
+                    <span class="material-symbols-outlined text-base">shopping_bag</span>
+                    <span>Cart</span>
+                </a>
+                <a href="deals.html" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-primary/80 dark:text-white/60 font-bold hover:bg-primary/5 dark:hover:bg-white/5 text-sm">
+                    <span class="material-symbols-outlined text-base">local_offer</span>
+                    <span>Deals</span>
+                </a>
+                <a href="reviews.html" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-primary/80 dark:text-white/60 font-bold hover:bg-primary/5 dark:hover:bg-white/5 text-sm">
+                    <span class="material-symbols-outlined text-base">star</span>
+                    <span>Reviews</span>
+                </a>
+                <a href="updates.html" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-primary text-white font-bold shadow-md shadow-primary/30 transition-all text-sm">
+                    <span class="material-symbols-outlined text-base filled-icon">notifications</span>
+                    <span>Updates</span>
+                </a>
+                <a href="about.html" class="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-primary/80 dark:text-white/60 font-bold hover:bg-primary/5 dark:hover:bg-white/5 text-sm">
+                    <span class="material-symbols-outlined text-base">info</span>
+                    <span>About</span>
+                </a>
+            </div>
+        </aside>
+
+        <main class="flex-1 min-w-0">
+
+        <!-- Hero -->
+        <div class="flex items-center gap-4 mb-8">
+            <div class="w-12 h-12 flex-shrink-0 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl text-primary filled-icon">notifications</span>
+            </div>
+            <div>
+                <h1 class="text-2xl font-black dark:text-white leading-tight">Updates</h1>
+                <p class="text-primary/50 dark:text-white/40 text-xs font-medium mt-0.5">Latest news, offers & announcements from EzyBite</p>
+            </div>
+        </div>
+
+        <!-- Skeleton -->
+        <div id="updates-skeleton" class="space-y-3">
+            <div class="h-24 bg-white dark:bg-zinc-900 rounded-2xl animate-pulse border border-primary/5"></div>
+            <div class="h-24 bg-white dark:bg-zinc-900 rounded-2xl animate-pulse border border-primary/5"></div>
+            <div class="h-24 bg-white dark:bg-zinc-900 rounded-2xl animate-pulse border border-primary/5"></div>
+        </div>
+
+        <!-- Updates list -->
+        <div id="updates-list" class="hidden space-y-3"></div>
+
+        <!-- Empty -->
+        <div id="updates-empty" class="hidden py-20 text-center">
+            <span class="material-symbols-outlined text-5xl block mb-2 text-primary/20 filled-icon">notifications_off</span>
+            <p class="text-sm font-bold text-primary/40 dark:text-white/30">No updates yet</p>
+            <p class="text-xs text-primary/30 dark:text-white/20 font-medium mt-1">Check back soon for news and offers!</p>
+        </div>
+
+        </main>
+    </div>
+
+    <div id="footer-placeholder"></div>
+    <div id="modals-placeholder"></div>
+
+    <script type="module" src="../js/firebase-service.js"></script>
+    <script src="../js/ui-components.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/app.js"></script>
+    <script>
+        const TAG_LABELS = {
+            info: 'Info', promo: 'Promo', deal: 'Deal', feature: 'New Feature', alert: 'Alert'
+        };
+
+        function timeAgo(seconds) {
+            const diff = Math.floor(Date.now() / 1000) - seconds;
+            if (diff < 60)    return 'Just now';
+            if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+            if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+            const d = Math.floor(diff / 86400);
+            if (d < 30) return `${d}d ago`;
+            return new Date(seconds * 1000).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+
+        function isNew(seconds) {
+            const lastRead = parseInt(localStorage.getItem('ezybite_last_read_updates') || '0');
+            return (seconds * 1000) > lastRead;
+        }
+
+        function renderUpdates(updates) {
+            const listEl  = document.getElementById('updates-list');
+            const emptyEl = document.getElementById('updates-empty');
+
+            if (!updates.length) {
+                listEl.classList.add('hidden');
+                emptyEl.classList.remove('hidden');
+                return;
+            }
+            emptyEl.classList.add('hidden');
+            listEl.classList.remove('hidden');
+
+            listEl.innerHTML = updates.map((u, i) => {
+                const newItem = isNew(u.createdAt?.seconds || 0);
+                const tag = u.tag || 'info';
+                const tagLabel = TAG_LABELS[tag] || tag;
+                const date = timeAgo(u.createdAt?.seconds || 0);
+
+                // Icon per tag
+                const icons = { info: 'info', promo: 'local_offer', deal: 'sell', feature: 'new_releases', alert: 'warning' };
+                const icon = icons[tag] || 'notifications';
+
+                return `
+                <div class="update-card group relative bg-white dark:bg-zinc-900 rounded-2xl border ${newItem ? 'border-primary/25 dark:border-primary/20 shadow-primary/8 shadow-lg' : 'border-primary/8 dark:border-white/8'} p-5 overflow-hidden"
+                     style="animation-delay: ${i * 50}ms">
+                    ${newItem ? `<div class="absolute inset-0 bg-primary/3 dark:bg-primary/5 pointer-events-none rounded-2xl"></div>` : ''}
+                    <div class="relative flex items-start gap-4">
+                        <!-- Icon -->
+                        <div class="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-primary text-xl filled-icon">${icon}</span>
+                        </div>
+                        <!-- Content -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap mb-1.5">
+                                <h3 class="text-base font-black dark:text-white leading-tight">${u.title}</h3>
+                                ${newItem ? `<span class="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-primary bg-primary/10 px-1.5 py-0.5 rounded-full"><span class="w-1.5 h-1.5 bg-primary rounded-full pulse-dot inline-block"></span> New</span>` : ''}
+                                <span class="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full tag-${tag} ml-auto shrink-0">${tagLabel}</span>
+                            </div>
+                            ${u.body ? `<p class="text-sm font-medium text-[#181311]/65 dark:text-white/55 leading-relaxed">${u.body}</p>` : ''}
+                            <p class="text-xs text-primary/30 dark:text-white/20 font-bold mt-2">${date}</p>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        async function loadUpdates() {
+            try {
+                const updates = await window.fb_getUpdates();
+                document.getElementById('updates-skeleton').classList.add('hidden');
+                renderUpdates(updates);
+            } catch (err) {
+                document.getElementById('updates-skeleton').classList.add('hidden');
+                document.getElementById('updates-empty').classList.remove('hidden');
+                console.error('Failed to load updates:', err);
+            }
+        }
+
+        // Mark all as read when this page is visited
+        function markAsRead() {
+            localStorage.setItem('ezybite_last_read_updates', Date.now().toString());
+            // Clear badge everywhere on this page
+            document.querySelectorAll('#updates-badge, #updates-badge-mobile').forEach(el => {
+                el.textContent = '0';
+                el.classList.add('hidden');
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Mark read immediately
+            markAsRead();
+
+            const tryLoad = () => {
+                if (typeof window.fb_getUpdates === 'function') {
+                    loadUpdates();
+                } else {
+                    setTimeout(tryLoad, 300);
+                }
+            };
+            tryLoad();
+        });
+    </script>
+</body>
+</html>
