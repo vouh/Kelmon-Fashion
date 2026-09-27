@@ -1,6 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "@/lib/supabase/types";
+import {
+  DEV_SESSION_COOKIE,
+  isDevAdmin,
+  isDevAuthEnabled,
+  parseDevSession,
+} from "@/lib/dev-auth";
 
 /**
  * Server Supabase client, scoped to the caller's session cookies.
@@ -89,8 +95,25 @@ export async function getCurrentProfile() {
  * True when the caller is an admin. Reads the role from the database rather
  * than trusting a claim, and is the server-side equivalent of the
  * hardcoded ADMIN_EMAILS list in the old admin/admin-auth.js.
+ *
+ * Falls back to the development session cookie only when Supabase is
+ * unconfigured and NODE_ENV is not production (see lib/dev-auth.ts).
  */
 export async function isAdmin(): Promise<boolean> {
+  if (isDevAuthEnabled()) {
+    const cookieStore = await cookies();
+    return isDevAdmin(cookieStore.get(DEV_SESSION_COOKIE)?.value);
+  }
   const profile = await getCurrentProfile();
   return profile?.role === "admin";
+}
+
+/** The signed-in admin's email, for display in the admin shell. */
+export async function getAdminEmail(): Promise<string | null> {
+  if (isDevAuthEnabled()) {
+    const cookieStore = await cookies();
+    return parseDevSession(cookieStore.get(DEV_SESSION_COOKIE)?.value)?.email ?? null;
+  }
+  const profile = await getCurrentProfile();
+  return profile?.email ?? null;
 }

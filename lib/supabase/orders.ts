@@ -1,6 +1,8 @@
 import { createClient, createServiceClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { CartLine } from "@/lib/cart";
 import type { Database, OrderItemRow, OrderRow, PaymentMethod } from "@/lib/supabase/types";
+import { isDevAuthEnabled } from "@/lib/dev-auth";
+import { devOrders } from "@/lib/dev-fixtures";
 
 /** Columns an order update may touch (excludes created_at/updated_at). */
 export type OrderPatch = Database["public"]["Tables"]["orders"]["Update"];
@@ -128,6 +130,7 @@ export async function getOrderById(id: string): Promise<OrderWithItems | null> {
 
 /** Every order. Admin-only by RLS. Ports fb_getAllOrders. */
 export async function getAllOrders(): Promise<OrderWithItems[]> {
+  if (isDevAuthEnabled()) return devOrders;
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
 

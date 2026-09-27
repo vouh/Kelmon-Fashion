@@ -2,6 +2,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import ReviewsManager from "@/components/admin/ReviewsManager";
 import { getRatingsStats, getReviews } from "@/lib/supabase/content";
 import { StatCard } from "@/components/admin/ui";
+import { getAdminEmail } from "@/lib/supabase/server";
 
 export const metadata = { title: "Reviews — Kelmon Admin" };
 
@@ -9,8 +10,10 @@ export const metadata = { title: "Reviews — Kelmon Admin" };
 export default async function AdminReviewsPage() {
   const [reviews, stats] = await Promise.all([getReviews(), getRatingsStats()]);
 
+  const adminEmail = await getAdminEmail();
+
   return (
-    <AdminShell title="Reviews" subtitle={`${stats.total} total`}>
+    <AdminShell adminEmail={adminEmail} title="Reviews" subtitle={`${stats.total} total`}>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <StatCard
           label="Average"

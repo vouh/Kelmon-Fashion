@@ -2,6 +2,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import ProductsManager from "@/components/admin/ProductsManager";
 import { getAllProductsForAdmin, getCategories } from "@/lib/supabase/products";
 import { categories as fallbackCategories } from "@/lib/products";
+import { getAdminEmail } from "@/lib/supabase/server";
 
 export const metadata = { title: "Products — Kelmon Admin" };
 
@@ -17,8 +18,10 @@ export default async function AdminProductsPage() {
 
   const categories = liveCategories.length ? liveCategories : fallbackCategories;
 
+  const adminEmail = await getAdminEmail();
+
   return (
-    <AdminShell title="Products" subtitle={`${products.length} in catalogue`}>
+    <AdminShell adminEmail={adminEmail} title="Products" subtitle={`${products.length} in catalogue`}>
       <ProductsManager products={products} categories={categories} />
     </AdminShell>
   );

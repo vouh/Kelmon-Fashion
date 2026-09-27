@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/AuthProvider";
 
 /**
@@ -48,15 +48,33 @@ export default function AdminShell({
   title,
   subtitle,
   actions,
+  adminEmail,
 }: {
   children: React.ReactNode;
   title: string;
   subtitle?: string;
   actions?: React.ReactNode;
+  /** Passed from the server, so it also works in the dev-session fallback. */
+  adminEmail?: string | null;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { profile, signOut } = useAuth();
   const [open, setOpen] = useState(false);
+
+  const email = profile?.email ?? adminEmail ?? "Admin";
+
+  /** Clears whichever session is in play, then returns to the storefront. */
+  async function handleSignOut() {
+    try {
+      await signOut();
+    } catch {
+      // Supabase not configured — fall through to clearing the dev cookie.
+    }
+    await fetch("/api/dev-auth", { method: "DELETE" }).catch(() => {});
+    router.push("/");
+    router.refresh();
+  }
 
   // Longest matching href wins, so /admin/transactions/failed doesn't also
   // light up /admin/transactions.
@@ -148,7 +166,7 @@ export default function AdminShell({
             </div>
             <div className="min-w-0">
               <p className="truncate text-[10px] font-bold leading-none text-white">
-                {profile?.email ?? "Admin"}
+                {email}
               </p>
               <p className="mt-0.5 text-[8px] uppercase tracking-widest text-white/30">
                 Administrator
@@ -163,7 +181,7 @@ export default function AdminShell({
           </Link>
           <button
             type="button"
-            onClick={() => void signOut()}
+            onClick={() => void handleSignOut()}
             className="mt-0.5 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-bold text-red-400/60 transition-all hover:bg-red-500/5 hover:text-red-400"
           >
             <span className="material-symbols-outlined text-xs">logout</span> Sign Out

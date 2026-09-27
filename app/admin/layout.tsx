@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { isAdmin, isSupabaseConfigured } from "@/lib/supabase/server";
+import { isDevAuthEnabled } from "@/lib/dev-auth";
 
 /**
  * Server-side gate for every /admin route.
@@ -15,7 +16,9 @@ import { isAdmin, isSupabaseConfigured } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  if (!isSupabaseConfigured()) {
+  // Without Supabase, the development session cookie stands in so the panel can
+  // be reviewed locally (lib/dev-auth.ts). isAdmin() handles both cases.
+  if (!isSupabaseConfigured() && !isDevAuthEnabled()) {
     redirect("/?error=supabase-not-configured");
   }
   if (!(await isAdmin())) {

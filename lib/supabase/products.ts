@@ -1,5 +1,7 @@
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { productFromRow, type Product } from "@/lib/products";
+import { isDevAuthEnabled } from "@/lib/dev-auth";
+import { devProducts } from "@/lib/dev-fixtures";
 
 /**
  * Server-side product reads. These replace the hardcoded `shopProducts` /
@@ -13,6 +15,12 @@ export async function getProducts(options?: {
   category?: string;
   limit?: number;
 }): Promise<Product[]> {
+  if (isDevAuthEnabled()) {
+    const list = options?.category && options.category !== "All"
+      ? devProducts.filter((p) => p.category === options.category)
+      : devProducts;
+    return options?.limit ? list.slice(0, options.limit) : list;
+  }
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
 
@@ -39,6 +47,7 @@ export async function getProducts(options?: {
 
 /** Products worth putting on the homepage: badged first, then newest. */
 export async function getFeaturedProducts(limit = 6): Promise<Product[]> {
+  if (isDevAuthEnabled()) return devProducts.slice(0, limit);
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
 
@@ -71,6 +80,7 @@ export async function getFeaturedProducts(limit = 6): Promise<Product[]> {
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
+  if (isDevAuthEnabled()) return devProducts.find((p) => p.id === id) ?? null;
   if (!isSupabaseConfigured()) return null;
   const supabase = await createClient();
 
@@ -92,6 +102,11 @@ export async function getRelatedProducts(
   product: Pick<Product, "id" | "category">,
   limit = 6
 ): Promise<Product[]> {
+  if (isDevAuthEnabled()) {
+    return devProducts
+      .filter((p) => p.category === product.category && p.id !== product.id)
+      .slice(0, limit);
+  }
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
 
@@ -112,6 +127,7 @@ export async function getRelatedProducts(
 
 /** Distinct categories that actually have active products. */
 export async function getCategories(): Promise<string[]> {
+  if (isDevAuthEnabled()) return [...new Set(devProducts.map((p) => p.category))].sort();
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
 
@@ -129,6 +145,7 @@ export async function getCategories(): Promise<string[]> {
 
 /** Admin view: includes inactive products. Relies on RLS for authorisation. */
 export async function getAllProductsForAdmin(): Promise<Product[]> {
+  if (isDevAuthEnabled()) return devProducts;
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
 

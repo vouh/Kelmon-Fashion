@@ -47,7 +47,43 @@ function SignInForm() {
     setBusy("email");
 
     try {
-      if (mode === "signup") {
+      if (!configured) {
+        // A backend-free way to exercise the storefront locally. This deliberately
+        // stores only a display profile in the browser; it is never sent to a server.
+        const existing = JSON.parse(localStorage.getItem("kelmon-profile") ?? "{}") as {
+          name?: string;
+          location?: string;
+          phone?: string;
+          avatar?: string;
+        };
+        localStorage.setItem(
+          "kelmon-profile",
+          JSON.stringify({
+            ...existing,
+            name: mode === "signup" ? fullName.trim() : existing.name || email.split("@")[0],
+            email: email.trim(),
+            location: existing.location || "Nairobi, Kenya",
+            phone: existing.phone || "",
+            avatar: existing.avatar || "",
+          })
+        );
+
+        // Also set a server-readable cookie. localStorage alone can't unlock
+        // /admin, because that gate runs in middleware and a server layout.
+        const res = await fetch("/api/dev-auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email.trim(), name: fullName.trim() }),
+        });
+        const data = (await res.json()) as { session?: { role: string }; error?: string };
+        if (!res.ok) throw new Error(data.error ?? "Could not start the test session.");
+
+        toast(
+          data.session?.role === "admin"
+            ? "Signed in as admin — test session."
+            : "Test profile ready — stored only in this browser."
+        );
+      } else if (mode === "signup") {
         if (!fullName.trim()) throw new Error("Please enter your name.");
         await signUpWithEmail(email.trim(), password, fullName.trim());
         toast("Account created. Check your email to confirm.");
@@ -64,31 +100,22 @@ function SignInForm() {
     }
   }
 
-  if (!configured) {
-    return (
-      <div className="rounded-3xl border border-outline/40 bg-surface-container p-6 text-center">
-        <span className="material-symbols-outlined text-4xl text-error">cloud_off</span>
-        <h2 className="mt-3 font-headline-sm text-headline-sm text-on-surface">
-          Sign-in isn&apos;t configured
-        </h2>
-        <p className="mt-2 text-body-md text-on-surface-variant">
-          Add <code className="font-mono text-[13px]">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
-          <code className="font-mono text-[13px]">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to
-          your <code className="font-mono text-[13px]">.env.local</code>, then restart the
-          dev server.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="rounded-3xl border border-outline/40 bg-surface-container p-6 sm:p-8">
-      <div className="flex flex-col items-center text-center">
-        <Image src={logo} alt="Kelmon" width={48} height={48} className="rounded-full" />
-        <h1 className="mt-4 font-display-md text-headline-lg text-on-surface">
+    <div className="relative overflow-hidden rounded-[2rem] border border-primary/20 bg-white/90 p-6 shadow-[0_24px_70px_rgba(91,42,128,0.18)] backdrop-blur sm:p-9 dark:bg-surface/90">
+      <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-secondary/25 blur-2xl" />
+      <div className="absolute -bottom-20 -left-16 h-40 w-40 rounded-full bg-primary/15 blur-2xl" />
+
+      <div className="relative flex flex-col items-center text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/15 bg-white shadow-lg shadow-primary/10 dark:bg-surface-container">
+          <Image src={logo} alt="Kelmon" width={54} height={54} className="h-12 w-12 object-contain" />
+        </div>
+        <span className="mt-5 rounded-full bg-primary/10 px-3 py-1 font-label-caps text-[10px] uppercase tracking-[0.2em] text-primary">
+          Your Kelmon account
+        </span>
+        <h1 className="mt-3 font-display-md text-3xl text-on-surface sm:text-4xl">
           {mode === "signin" ? "Welcome back" : "Join Kelmon"}
         </h1>
-        <p className="mt-1.5 text-body-md text-on-surface-variant">
+        <p className="mt-2 max-w-sm text-body-md leading-relaxed text-on-surface-variant">
           {mode === "signin"
             ? "Sign in to track orders and save your favourites."
             : "Create an account to check out faster and earn Kelmon Points."}
@@ -98,15 +125,39 @@ function SignInForm() {
       {error && (
         <div
           role="alert"
-          className="mt-5 flex items-start gap-2 rounded-2xl border border-error/30 bg-error/10 px-4 py-3"
+          className="relative mt-6 flex items-start gap-2 rounded-2xl border border-error/30 bg-error/10 px-4 py-3"
         >
           <span className="material-symbols-outlined text-lg text-error">error</span>
           <p className="text-body-md text-error">{error}</p>
         </div>
       )}
 
-      {/* Google is the primary path — free, no password to forget. */}
-      <button
+      {!configured && (
+        <div className="relative mt-6 flex gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3.5 text-left text-sm text-on-surface-variant">
+          <span className="material-symbols-outlined mt-0.5 text-primary">science</span>
+          <p>
+            <strong className="text-on-surface">Local testing mode</strong>
+            <br />
+            Use any email and a 6+ character password. Your details stay in this browser.
+            <br />
+            For the admin panel, sign in as{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setEmail("admin@gmail.com");
+                setPassword("admin123");
+              }}
+              className="font-mono font-semibold text-primary underline underline-offset-2"
+            >
+              admin@gmail.com
+            </button>
+            .
+          </p>
+        </div>
+      )}
+
+      {/* Google is available only when Supabase authentication is configured. */}
+      {configured && <button
         type="button"
         onClick={handleGoogle}
         disabled={busy !== null}
@@ -131,62 +182,47 @@ function SignInForm() {
           />
         </svg>
         {busy === "google" ? "Redirecting…" : "Continue with Google"}
-      </button>
+      </button>}
 
-      <div className="my-5 flex items-center gap-3">
+      {configured && <div className="my-6 flex items-center gap-3">
         <span className="h-px flex-1 bg-outline/40" />
         <span className="font-label-caps text-label-caps uppercase text-on-surface-variant">
           or
         </span>
         <span className="h-px flex-1 bg-outline/40" />
-      </div>
+      </div>}
 
-      <form onSubmit={handleEmail} className="space-y-3">
+      <form onSubmit={handleEmail} className="relative mt-6 space-y-4">
         {mode === "signup" && (
-          <input
-            type="text"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            placeholder="Full name"
-            autoComplete="name"
-            required
-            className="w-full rounded-2xl border border-outline/50 bg-surface px-4 py-3 text-body-md text-on-surface outline-none transition focus:border-primary"
-          />
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold text-on-surface">Full name</span>
+            <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g. Amina Wanjiku" autoComplete="name" required className="w-full rounded-2xl border border-outline/50 bg-surface px-4 py-3.5 text-body-md text-on-surface outline-none transition placeholder:text-on-surface-variant/60 focus:border-primary focus:ring-4 focus:ring-primary/10" />
+          </label>
         )}
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email address"
-          autoComplete="email"
-          required
-          className="w-full rounded-2xl border border-outline/50 bg-surface px-4 py-3 text-body-md text-on-surface outline-none transition focus:border-primary"
-        />
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          autoComplete={mode === "signup" ? "new-password" : "current-password"}
-          minLength={6}
-          required
-          className="w-full rounded-2xl border border-outline/50 bg-surface px-4 py-3 text-body-md text-on-surface outline-none transition focus:border-primary"
-        />
+        <label className="block">
+          <span className="mb-1.5 block text-sm font-semibold text-on-surface">Email address</span>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required className="w-full rounded-2xl border border-outline/50 bg-surface px-4 py-3.5 text-body-md text-on-surface outline-none transition placeholder:text-on-surface-variant/60 focus:border-primary focus:ring-4 focus:ring-primary/10" />
+        </label>
+        <label className="block">
+          <span className="mb-1.5 flex items-center justify-between text-sm font-semibold text-on-surface"><span>Password</span>{!configured && <span className="font-normal text-on-surface-variant">6+ characters</span>}</span>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete={mode === "signup" ? "new-password" : "current-password"} minLength={6} required className="w-full rounded-2xl border border-outline/50 bg-surface px-4 py-3.5 text-body-md text-on-surface outline-none transition placeholder:text-on-surface-variant/60 focus:border-primary focus:ring-4 focus:ring-primary/10" />
+        </label>
 
         <button
           type="submit"
           disabled={busy !== null}
-          className="w-full rounded-full bg-primary px-5 py-3.5 font-button-text text-button-text text-on-primary transition hover:opacity-90 disabled:opacity-60"
+          className="group mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-4 font-button-text text-button-text text-on-primary shadow-lg shadow-primary/25 transition hover:-translate-y-0.5 hover:bg-primary/90 disabled:opacity-60"
         >
           {busy === "email"
             ? "Please wait…"
             : mode === "signin"
-              ? "Sign in"
+              ? "Enter Kelmon"
               : "Create account"}
+          <span className="material-symbols-outlined text-lg transition-transform group-hover:translate-x-1">arrow_forward</span>
         </button>
       </form>
 
-      <p className="mt-5 text-center text-body-md text-on-surface-variant">
+      <p className="relative mt-6 text-center text-body-md text-on-surface-variant">
         {mode === "signin" ? "New to Kelmon?" : "Already have an account?"}{" "}
         <button
           type="button"
@@ -200,7 +236,7 @@ function SignInForm() {
         </button>
       </p>
 
-      <p className="mt-6 text-center text-[12px] leading-relaxed text-on-surface-variant">
+      <p className="relative mt-7 text-center text-[12px] leading-relaxed text-on-surface-variant">
         By continuing you agree to Kelmon&apos;s{" "}
         <Link href="/about" className="underline underline-offset-2">
           terms
@@ -214,10 +250,11 @@ function SignInForm() {
 export default function SignInPage() {
   return (
     <AppShell activeNav="profile">
-      <section className="mx-auto w-full max-w-md px-margin-mobile py-lg sm:px-0">
+      <section className="relative mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-xl items-center px-margin-mobile py-12 sm:px-0">
+        <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/10 blur-3xl" />
         <Suspense
           fallback={
-            <div className="rounded-3xl border border-outline/40 bg-surface-container p-8 text-center text-on-surface-variant">
+            <div className="w-full rounded-[2rem] border border-outline/40 bg-surface-container p-8 text-center text-on-surface-variant">
               Loading…
             </div>
           }

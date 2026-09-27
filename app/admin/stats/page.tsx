@@ -2,6 +2,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import BarChart from "@/components/admin/BarChart";
 import { StatCard, formatKes } from "@/components/admin/ui";
 import { getOrdersWithStats } from "@/lib/supabase/stats";
+import { getAdminEmail } from "@/lib/supabase/server";
 
 export const metadata = { title: "Statistics — Kelmon Admin" };
 
@@ -27,8 +28,10 @@ export default async function AdminStatsPage() {
   const avgOrder = paid > 0 ? Math.round(revenue / paid) : 0;
   const conversion = orders.length ? Math.round((paid / orders.length) * 100) : 0;
 
+  const adminEmail = await getAdminEmail();
+
   return (
-    <AdminShell title="Statistics" subtitle="Last 7 days">
+    <AdminShell adminEmail={adminEmail} title="Statistics" subtitle="Last 7 days">
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <StatCard
           label="Revenue"

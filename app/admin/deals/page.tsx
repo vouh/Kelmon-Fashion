@@ -1,6 +1,7 @@
 import AdminShell from "@/components/admin/AdminShell";
 import DealsManager from "@/components/admin/DealsManager";
 import { getDeals } from "@/lib/supabase/content";
+import { getAdminEmail } from "@/lib/supabase/server";
 
 export const metadata = { title: "Manage Deals — Kelmon Admin" };
 
@@ -8,8 +9,10 @@ export const metadata = { title: "Manage Deals — Kelmon Admin" };
 export default async function AdminDealsPage() {
   const deals = await getDeals(false);
 
+  const adminEmail = await getAdminEmail();
+
   return (
-    <AdminShell title="Manage Deals" subtitle={`${deals.length} total`}>
+    <AdminShell adminEmail={adminEmail} title="Manage Deals" subtitle={`${deals.length} total`}>
       <DealsManager deals={deals} />
     </AdminShell>
   );

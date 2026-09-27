@@ -1,6 +1,7 @@
 import AdminShell from "@/components/admin/AdminShell";
 import OrdersManager from "@/components/admin/OrdersManager";
 import { getAllOrders } from "@/lib/supabase/orders";
+import { getAdminEmail } from "@/lib/supabase/server";
 
 export const metadata = { title: "All Orders — Kelmon Admin" };
 
@@ -12,8 +13,10 @@ export default async function AdminOrdersPage({
 }) {
   const [orders, params] = await Promise.all([getAllOrders(), searchParams]);
 
+  const adminEmail = await getAdminEmail();
+
   return (
-    <AdminShell title="All Orders" subtitle={`${orders.length} total`}>
+    <AdminShell adminEmail={adminEmail} title="All Orders" subtitle={`${orders.length} total`}>
       <OrdersManager orders={orders} openDirectOrder={params.new === "1"} />
     </AdminShell>
   );

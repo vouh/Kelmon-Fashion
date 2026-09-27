@@ -12,6 +12,7 @@ import {
   timeAgo,
 } from "@/components/admin/ui";
 import { getAdminStats, getOrdersWithStats } from "@/lib/supabase/stats";
+import { getAdminEmail } from "@/lib/supabase/server";
 
 export const metadata = { title: "Overview — Kelmon Admin" };
 
@@ -24,8 +25,10 @@ export default async function AdminOverviewPage() {
 
   const recent = orders.slice(0, 10);
 
+  const adminEmail = await getAdminEmail();
+
   return (
-    <AdminShell title="Overview" subtitle="Dashboard summary">
+    <AdminShell adminEmail={adminEmail} title="Overview" subtitle="Dashboard summary">
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <StatCard
           label="Total Orders"

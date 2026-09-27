@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { DEV_SESSION_COOKIE, isDevAdmin, isDevAuthEnabled } from "@/lib/dev-auth";
 
 /**
  * Refreshes the Supabase session cookie on every request, and gates /admin.
@@ -15,13 +16,25 @@ export async function middleware(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // Without Supabase configured, let everything through except /admin so the
-  // storefront still runs on a bare checkout.
+  // Without Supabase configured, fall back to the development session cookie so
+  // /admin can still be reviewed locally. See lib/dev-auth.ts for the guards
+  // that keep this out of production.
   if (!url || !anonKey) {
     if (request.nextUrl.pathname.startsWith("/admin")) {
+      const devSession = request.cookies.get(DEV_SESSION_COOKIE)?.value;
+
+      if (isDevAdmin(devSession)) {
+        return response;
+      }
+
       const redirect = request.nextUrl.clone();
-      redirect.pathname = "/";
-      redirect.searchParams.set("error", "supabase-not-configured");
+      redirect.pathname = isDevAuthEnabled() ? "/signin" : "/";
+      if (isDevAuthEnabled()) {
+        redirect.searchParams.set("next", request.nextUrl.pathname);
+        redirect.searchParams.set("error", "Sign in with an admin email to continue.");
+      } else {
+        redirect.searchParams.set("error", "supabase-not-configured");
+      }
       return NextResponse.redirect(redirect);
     }
     return response;

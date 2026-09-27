@@ -1,5 +1,7 @@
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { OrderRow } from "@/lib/supabase/types";
+import { isDevAuthEnabled } from "@/lib/dev-auth";
+import { devOrders } from "@/lib/dev-fixtures";
 
 /**
  * Admin dashboard aggregates.
@@ -36,6 +38,18 @@ const EMPTY_STATS: AdminStats = {
 };
 
 export async function getAdminStats(): Promise<AdminStats> {
+  if (isDevAuthEnabled()) {
+    return {
+      totalOrders: devOrders.length,
+      totalUsers: new Set(devOrders.map((o) => o.phone)).size,
+      totalRevenue: devOrders
+        .filter((o) => o.payment_status === "paid")
+        .reduce((sum, o) => sum + Number(o.total), 0),
+      pendingOrders: devOrders.filter(
+        (o) => o.status === "pending" || o.payment_status === "unpaid"
+      ).length,
+    };
+  }
   if (!isSupabaseConfigured()) return EMPTY_STATS;
   const supabase = await createClient();
 
@@ -70,20 +84,24 @@ export async function getAdminStats(): Promise<AdminStats> {
 /** Orders plus a 7-day bucket series for the stats charts. */
 export async function getOrdersWithStats(): Promise<OrdersWithStats> {
   const empty: OrdersWithStats = { orders: [], days: [], paid: 0, failed: 0, unpaid: 0 };
-  if (!isSupabaseConfigured()) return empty;
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("orders")
-    .select("*")
-    .order("created_at", { ascending: false });
+  let orders: OrderRow[];
+  if (isDevAuthEnabled()) {
+    orders = devOrders;
+  } else {
+    if (!isSupabaseConfigured()) return empty;
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-  if (error) {
-    console.error("[stats] getOrdersWithStats:", error.message);
-    return empty;
+    if (error) {
+      console.error("[stats] getOrdersWithStats:", error.message);
+      return empty;
+    }
+    orders = data ?? [];
   }
-
-  const orders = data ?? [];
 
   // Last 7 days, oldest first.
   const days: DayBucket[] = [];

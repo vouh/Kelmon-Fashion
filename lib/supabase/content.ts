@@ -1,5 +1,7 @@
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { DealRow, ReviewRow, UpdateRow } from "@/lib/supabase/types";
+import { isDevAuthEnabled } from "@/lib/dev-auth";
+import { devDeals, devReviews, devUpdates } from "@/lib/dev-fixtures";
 
 /**
  * Reviews, deals and updates.
@@ -12,6 +14,7 @@ import type { DealRow, ReviewRow, UpdateRow } from "@/lib/supabase/types";
 // ── Reviews ─────────────────────────────────────────────────────────────────
 
 export async function getReviews(limit?: number): Promise<ReviewRow[]> {
+  if (isDevAuthEnabled()) return limit ? devReviews.slice(0, limit) : devReviews;
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
 
@@ -49,24 +52,14 @@ export interface RatingsStats {
   avg: number;
 }
 
-/** Rating histogram for the admin stats charts. Ports fb_getRatingsStats. */
-export async function getRatingsStats(): Promise<RatingsStats> {
-  const empty: RatingsStats = { dist: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }, total: 0, avg: 0 };
-  if (!isSupabaseConfigured()) return empty;
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("reviews").select("rating");
-  if (error) {
-    console.error("[content] getRatingsStats:", error.message);
-    return empty;
-  }
-
+/** Builds the histogram from a flat list of ratings. */
+function statsFromRatings(ratings: number[]): RatingsStats {
   const dist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as RatingsStats["dist"];
   let total = 0;
   let sum = 0;
 
-  for (const row of data ?? []) {
-    const r = row.rating as 1 | 2 | 3 | 4 | 5;
+  for (const rating of ratings) {
+    const r = rating as 1 | 2 | 3 | 4 | 5;
     if (r >= 1 && r <= 5) {
       dist[r] += 1;
       total += 1;
@@ -77,9 +70,26 @@ export async function getRatingsStats(): Promise<RatingsStats> {
   return { dist, total, avg: total ? Number((sum / total).toFixed(1)) : 0 };
 }
 
+/** Rating histogram for the admin stats charts. Ports fb_getRatingsStats. */
+export async function getRatingsStats(): Promise<RatingsStats> {
+  const empty: RatingsStats = { dist: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }, total: 0, avg: 0 };
+  if (isDevAuthEnabled()) return statsFromRatings(devReviews.map((r) => r.rating));
+  if (!isSupabaseConfigured()) return empty;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("reviews").select("rating");
+  if (error) {
+    console.error("[content] getRatingsStats:", error.message);
+    return empty;
+  }
+
+  return statsFromRatings((data ?? []).map((row) => row.rating));
+}
+
 // ── Deals ───────────────────────────────────────────────────────────────────
 
 export async function getDeals(activeOnly = true): Promise<DealRow[]> {
+  if (isDevAuthEnabled()) return activeOnly ? devDeals.filter((d) => d.active) : devDeals;
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
 
@@ -97,6 +107,7 @@ export async function getDeals(activeOnly = true): Promise<DealRow[]> {
 // ── Updates ─────────────────────────────────────────────────────────────────
 
 export async function getUpdates(limit?: number): Promise<UpdateRow[]> {
+  if (isDevAuthEnabled()) return limit ? devUpdates.slice(0, limit) : devUpdates;
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
 

@@ -1,6 +1,8 @@
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { salonServiceFromRow, type SalonService } from "@/lib/salon";
 import type { SalonBookingRow } from "@/lib/supabase/types";
+import { isDevAuthEnabled } from "@/lib/dev-auth";
+import { devSalonServices } from "@/lib/dev-fixtures";
 
 /**
  * Salon services and bookings.
@@ -8,6 +10,7 @@ import type { SalonBookingRow } from "@/lib/supabase/types";
  */
 
 export async function getSalonServices(): Promise<SalonService[]> {
+  if (isDevAuthEnabled()) return devSalonServices;
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
 
