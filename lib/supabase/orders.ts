@@ -1,8 +1,7 @@
 import { createClient, createServiceClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { CartLine } from "@/lib/cart";
 import type { Database, OrderItemRow, OrderRow, PaymentMethod } from "@/lib/supabase/types";
-import { isDevAuthEnabled } from "@/lib/dev-auth";
-import { devOrders } from "@/lib/dev-fixtures";
+import { getIdentity } from "@/lib/firebase/session";
 
 /** Columns an order update may touch (excludes created_at/updated_at). */
 export type OrderPatch = Database["public"]["Tables"]["orders"]["Update"];
@@ -44,15 +43,15 @@ export interface NewOrderInput {
  * client cannot open an order that claims to be already paid.
  */
 export async function createOrder(input: NewOrderInput): Promise<string> {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) throw new Error("You must be signed in to place an order.");
+  const identity = await getIdentity();
+  if (!identity) throw new Error("You must be signed in to place an order.");
 
+  const supabase = await createClient();
   const id = createOrderId();
 
   const { error: orderError } = await supabase.from("orders").insert({
     id,
-    user_id: auth.user.id,
+    user_id: identity.uid,
     customer_name: input.customerName,
     phone: input.phone,
     drop_point: input.dropPoint,
@@ -94,14 +93,14 @@ export async function createOrder(input: NewOrderInput): Promise<string> {
 /** The signed-in user's orders, newest first. Ports fb_getUserOrders. */
 export async function getUserOrders(): Promise<OrderWithItems[]> {
   if (!isSupabaseConfigured()) return [];
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return [];
+  const identity = await getIdentity();
+  if (!identity) return [];
 
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("orders")
     .select("*, order_items(*)")
-    .eq("user_id", auth.user.id)
+    .eq("user_id", identity.uid)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -130,7 +129,6 @@ export async function getOrderById(id: string): Promise<OrderWithItems | null> {
 
 /** Every order. Admin-only by RLS. Ports fb_getAllOrders. */
 export async function getAllOrders(): Promise<OrderWithItems[]> {
-  if (isDevAuthEnabled()) return devOrders;
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
 

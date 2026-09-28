@@ -65,11 +65,6 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/salon" className="font-body-md text-body-md text-white/80 hover:text-white transition-colors">
-                  Salon booking
-                </Link>
-              </li>
-              <li>
                 <Link href="/orders" className="font-body-md text-body-md text-white/80 hover:text-white transition-colors">
                   Orders
                 </Link>

@@ -12,7 +12,7 @@ const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
-      // Seed imagery from the original hardcoded catalogue.
+      // Preset avatar artwork in lib/avatars.ts.
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
       // Google account avatars, for profiles created via Google sign-in.
       { protocol: "https", hostname: "*.googleusercontent.com" },

@@ -3,6 +3,7 @@ import type { CartLine } from "@/lib/cart";
 import { deliveryFeeFor, cartSubtotal } from "@/lib/cart";
 import { createOrder } from "@/lib/supabase/orders";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { getIdentity } from "@/lib/firebase/session";
 import type { PaymentMethod } from "@/lib/supabase/types";
 
 interface CreateOrderBody {
@@ -43,11 +44,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Your cart is empty." }, { status: 400 });
     }
 
-    const supabase = await createClient();
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth.user) {
+    if (!(await getIdentity())) {
       return NextResponse.json({ error: "You must be signed in to order." }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     // Re-price against the catalogue so a tampered client price can't stick.
     const ids = [...new Set(body.lines.map((l) => l.productId))];

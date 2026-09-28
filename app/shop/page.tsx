@@ -1,6 +1,5 @@
 import ShopClient from "@/components/shop/ShopClient";
 import { getCategories, getProducts } from "@/lib/supabase/products";
-import { categories as fallbackCategories } from "@/lib/products";
 
 export const metadata = {
   title: "Shop — Kelmon",
@@ -12,7 +11,7 @@ interface ShopPageProps {
 }
 
 export default async function ShopPage({ searchParams }: ShopPageProps) {
-  const [params, products, liveCategories] = await Promise.all([
+  const [params, products, categories] = await Promise.all([
     searchParams,
     getProducts(),
     getCategories(),
@@ -21,7 +20,9 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
   return (
     <ShopClient
       products={products}
-      categories={liveCategories.length ? liveCategories : fallbackCategories}
+      // Only categories that actually have active products, so a filter chip
+      // never leads to an empty shelf.
+      categories={categories}
       initialQuery={params.q ?? ""}
       initialCategory={params.category ?? "All"}
     />

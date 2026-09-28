@@ -3,7 +3,6 @@ import type { ProductRow } from "@/lib/supabase/types";
 export type NavItem =
   | "home"
   | "shop"
-  | "salon"
   | "cart"
   | "orders"
   | "profile"
@@ -63,8 +62,11 @@ export function productFromRow(row: ProductRow): Product {
 }
 
 /**
- * Fallback category list, used for filter chips before any product loads.
- * The live list is derived from the products table by getCategories().
+ * Starter categories, offered in the admin product form while `products` is
+ * still empty and getCategories() has nothing to derive a list from. Category
+ * is free text, so this is a convenience, not a constraint — and the storefront
+ * never uses it, because a filter chip should only appear for a category that
+ * has something in it.
  */
 export const categories = ["Bags", "Perfumes", "Fashion", "Nails"];
 

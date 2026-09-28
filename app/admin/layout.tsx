@@ -1,13 +1,15 @@
 import { redirect } from "next/navigation";
 import { isAdmin, isSupabaseConfigured } from "@/lib/supabase/server";
-import { isDevAuthEnabled } from "@/lib/dev-auth";
+import { isFirebaseAdminConfigured } from "@/lib/firebase/admin";
 
 /**
- * Server-side gate for every /admin route.
+ * The authorisation boundary for every /admin route.
  *
- * middleware.ts already redirects non-admins, but this is a second, independent
- * check: a layout runs on the server for every nested route, so no admin page
- * can ever render for a non-admin even if the matcher is later changed.
+ * middleware.ts already redirects non-admins, but it runs on the Edge runtime
+ * and can only *decode* the token, not verify it. This layout runs on Node, so
+ * isAdmin() here goes through the Admin SDK and checks the signature. A layout
+ * also runs for every nested route, so no admin page can render for a non-admin
+ * even if the middleware matcher is later narrowed.
  */
 /**
  * Never prerender or cache an admin route: every page depends on the caller's
@@ -16,9 +18,12 @@ import { isDevAuthEnabled } from "@/lib/dev-auth";
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  // Without Supabase, the development session cookie stands in so the panel can
-  // be reviewed locally (lib/dev-auth.ts). isAdmin() handles both cases.
-  if (!isSupabaseConfigured() && !isDevAuthEnabled()) {
+  // Without the service account there is no way to verify a token, so the gate
+  // cannot be trusted — fail closed rather than waving everyone through.
+  if (!isFirebaseAdminConfigured()) {
+    redirect("/?error=firebase-admin-not-configured");
+  }
+  if (!isSupabaseConfigured()) {
     redirect("/?error=supabase-not-configured");
   }
   if (!(await isAdmin())) {

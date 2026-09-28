@@ -1,39 +1,24 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
-import type { Database } from "@/lib/supabase/types";
-import {
-  DEV_SESSION_COOKIE,
-  isDevAdmin,
-  isDevAuthEnabled,
-  parseDevSession,
-} from "@/lib/dev-auth";
+import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { Database, ProfileRow } from "@/lib/supabase/types";
+import { getIdentity, getIdTokenCookie, type Identity } from "@/lib/firebase/session";
 
 /**
- * Server Supabase client, scoped to the caller's session cookies.
- * Every query it runs is subject to RLS as the signed-in user.
+ * Server-side Supabase access, authenticated by the Firebase ID token that
+ * AuthProvider mirrors into an httpOnly cookie.
+ *
+ * There is no Supabase session to refresh here and no auth cookies to shuttle
+ * around, which is why this no longer uses @supabase/ssr: the only credential
+ * is the bearer token, and Firebase owns its lifecycle.
  */
-export async function createClient() {
-  const cookieStore = await cookies();
+export async function createClient(): Promise<SupabaseClient<Database>> {
+  const token = await getIdTokenCookie();
 
-  return createServerClient<Database>(
+  return createSupabaseClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Called from a Server Component, where cookies are read-only.
-            // Session refresh is handled by middleware.ts instead.
-          }
-        },
-      },
+      // Resolved per request. Null means anonymous, and RLS treats it that way.
+      accessToken: async () => token ?? null,
     }
   );
 }
@@ -41,24 +26,19 @@ export async function createClient() {
 /**
  * Service-role client. Bypasses RLS entirely — only for trusted server paths
  * that must write on the user's behalf, such as the M-Pesa callback promoting
- * an order to 'paid'.
+ * an order to 'paid', or the sign-in route creating a profiles row.
  *
  * Never import this into a Client Component.
  */
-export function createServiceClient() {
+export function createServiceClient(): SupabaseClient<Database> {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!key) {
     throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set");
   }
 
-  return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    key,
-    {
-      cookies: { getAll: () => [], setAll: () => {} },
-      auth: { persistSession: false, autoRefreshToken: false },
-    }
-  );
+  return createSupabaseClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 }
 
 export function isSupabaseConfigured(): boolean {
@@ -67,53 +47,47 @@ export function isSupabaseConfigured(): boolean {
   );
 }
 
-/** The signed-in user, or null. */
-export async function getCurrentUser() {
-  if (!isSupabaseConfigured()) return null;
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  return data.user ?? null;
+/** The verified Firebase identity behind this request, or null. */
+export async function getCurrentUser(): Promise<Identity | null> {
+  return getIdentity();
 }
 
 /** The signed-in user's profile row, or null. */
-export async function getCurrentProfile() {
+export async function getCurrentProfile(): Promise<ProfileRow | null> {
   if (!isSupabaseConfigured()) return null;
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return null;
 
+  const identity = await getIdentity();
+  if (!identity) return null;
+
+  const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")
     .select("*")
-    .eq("id", auth.user.id)
-    .single();
+    .eq("id", identity.uid)
+    .maybeSingle();
 
   return data ?? null;
 }
 
 /**
- * True when the caller is an admin. Reads the role from the database rather
- * than trusting a claim, and is the server-side equivalent of the
- * hardcoded ADMIN_EMAILS list in the old admin/admin-auth.js.
+ * True when the caller is an admin.
  *
- * Falls back to the development session cookie only when Supabase is
- * unconfigured and NODE_ENV is not production (see lib/dev-auth.ts).
+ * The `admin` custom claim is checked first because it is already in the
+ * verified token — no database round trip, and it works before Supabase is
+ * configured. profiles.role is the fallback for the window between an admin
+ * being granted in the panel and the user's next token refresh.
  */
 export async function isAdmin(): Promise<boolean> {
-  if (isDevAuthEnabled()) {
-    const cookieStore = await cookies();
-    return isDevAdmin(cookieStore.get(DEV_SESSION_COOKIE)?.value);
-  }
+  const identity = await getIdentity();
+  if (!identity) return false;
+  if (identity.admin) return true;
+
   const profile = await getCurrentProfile();
   return profile?.role === "admin";
 }
 
 /** The signed-in admin's email, for display in the admin shell. */
 export async function getAdminEmail(): Promise<string | null> {
-  if (isDevAuthEnabled()) {
-    const cookieStore = await cookies();
-    return parseDevSession(cookieStore.get(DEV_SESSION_COOKIE)?.value)?.email ?? null;
-  }
-  const profile = await getCurrentProfile();
-  return profile?.email ?? null;
+  const identity = await getIdentity();
+  return identity?.email ?? null;
 }

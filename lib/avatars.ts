@@ -1,4 +1,9 @@
-/** Curated avatar library for guest profiles */
+/**
+ * Preset avatars, offered alongside uploading a photo.
+ *
+ * These are plain URLs, stored in `profiles.avatar_url` exactly as an uploaded
+ * image's URL would be, so nothing downstream has to tell them apart.
+ */
 
 export interface AvatarOption {
   id: string;
@@ -60,41 +65,3 @@ export const avatarLibrary: AvatarOption[] = [
   { id: "letter-s", label: "S", src: solidAvatar("#6B2D7B", "S") },
   { id: "letter-m", label: "M", src: solidAvatar("#2D1B36", "M") },
 ];
-
-/** Resize + compress a user photo for localStorage */
-export function fileToAvatarDataUrl(file: File, maxSize = 320): Promise<string> {
-  return new Promise((resolve, reject) => {
-    if (!file.type.startsWith("image/")) {
-      reject(new Error("Please choose an image file."));
-      return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      reject(new Error("Image is too large (max 8MB)."));
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Could not read that image."));
-    reader.onload = () => {
-      const img = new window.Image();
-      img.onerror = () => reject(new Error("Could not load that image."));
-      img.onload = () => {
-        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-        const w = Math.max(1, Math.round(img.width * scale));
-        const h = Math.max(1, Math.round(img.height * scale));
-        const canvas = document.createElement("canvas");
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          reject(new Error("Could not process image."));
-          return;
-        }
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", 0.82));
-      };
-      img.src = String(reader.result);
-    };
-    reader.readAsDataURL(file);
-  });
-}

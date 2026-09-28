@@ -3,18 +3,13 @@ import AppShell from "@/components/layout/AppShell";
 import Reveal from "@/components/ui/Reveal";
 import HeroShowcase from "@/components/home/HeroShowcase";
 import CircleCollection from "@/components/home/CircleCollection";
-import SalonServicesSection from "@/components/home/SalonServicesSection";
 import FeatureProductCard from "@/components/shop/FeatureProductCard";
 import { getProducts } from "@/lib/supabase/products";
-import { getSalonServices } from "@/lib/supabase/salon";
 
 const brandStrip = ["Chanel", "Dior", "Louis Vuitton", "Gucci", "YSL", "Prada", "Armani"];
 
 export default async function HomePage() {
-  const [shopProducts, salonServices] = await Promise.all([
-    getProducts(),
-    getSalonServices(),
-  ]);
+  const shopProducts = await getProducts();
 
   const gridProducts = shopProducts.slice(0, 8);
 
@@ -69,10 +64,6 @@ export default async function HomePage() {
             </div>
           </Reveal>
         </section>
-
-        <Reveal>
-          <SalonServicesSection services={salonServices.slice(0, 3)} />
-        </Reveal>
       </main>
     </AppShell>
   );

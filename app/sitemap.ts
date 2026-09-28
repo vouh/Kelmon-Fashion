@@ -5,7 +5,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://kelmon.co.ke";
 
 /** Static pages plus a URL per active product, pulled from Supabase. */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const staticRoutes = ["", "/shop", "/salon", "/about", "/contact"].map((path) => ({
+  const staticRoutes = ["", "/shop", "/about", "/contact"].map((path) => ({
     url: `${siteUrl}${path}`,
     lastModified: new Date(),
     changeFrequency: "weekly" as const,

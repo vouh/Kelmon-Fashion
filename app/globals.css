@@ -113,6 +113,131 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* Admin uses the same plum palette as the storefront, rather than a separate
+   black-only dashboard. These overrides also cover the compact shared table
+   and manager components without duplicating their markup. */
+.kelmon-admin {
+  --admin-page: var(--kelmon-bg-primary);
+  --admin-panel: var(--kelmon-bg-elevated);
+  --admin-panel-raised: var(--theme-surface-container);
+  --admin-text: var(--kelmon-text-primary);
+  --admin-muted: var(--kelmon-text-secondary);
+  --admin-line: var(--kelmon-border-default);
+  background: var(--admin-page);
+  color: var(--admin-text);
+  color-scheme: light;
+}
+
+.dark .kelmon-admin { color-scheme: dark; }
+
+.kelmon-admin .bg-zinc-950 { background-color: var(--admin-page) !important; }
+.kelmon-admin .bg-zinc-900 { background-color: var(--admin-panel) !important; }
+.kelmon-admin .bg-zinc-800 { background-color: var(--admin-panel-raised) !important; }
+.kelmon-admin .bg-white\/5 { background-color: var(--kelmon-purple-muted) !important; }
+.kelmon-admin .bg-white\/10 { background-color: var(--kelmon-purple-muted) !important; }
+.kelmon-admin .border-white\/5,
+.kelmon-admin .border-white\/10,
+.kelmon-admin .border-white\/15 { border-color: var(--admin-line) !important; }
+.kelmon-admin .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color: var(--admin-line) !important; }
+.kelmon-admin .text-white { color: var(--admin-text) !important; }
+.kelmon-admin .text-white\/80 { color: color-mix(in srgb, var(--admin-text) 80%, transparent) !important; }
+.kelmon-admin .text-white\/70 { color: color-mix(in srgb, var(--admin-text) 70%, transparent) !important; }
+.kelmon-admin .text-white\/60 { color: color-mix(in srgb, var(--admin-text) 60%, transparent) !important; }
+.kelmon-admin .text-white\/50 { color: color-mix(in srgb, var(--admin-text) 55%, transparent) !important; }
+.kelmon-admin .text-white\/45 { color: color-mix(in srgb, var(--admin-text) 48%, transparent) !important; }
+.kelmon-admin .text-white\/40 { color: color-mix(in srgb, var(--admin-text) 42%, transparent) !important; }
+.kelmon-admin .text-white\/35 { color: color-mix(in srgb, var(--admin-text) 38%, transparent) !important; }
+.kelmon-admin .text-white\/30 { color: color-mix(in srgb, var(--admin-text) 34%, transparent) !important; }
+.kelmon-admin .text-white\/25 { color: color-mix(in srgb, var(--admin-text) 30%, transparent) !important; }
+.kelmon-admin .text-white\/20 { color: color-mix(in srgb, var(--admin-text) 25%, transparent) !important; }
+.kelmon-admin .text-white\/15 { color: color-mix(in srgb, var(--admin-text) 20%, transparent) !important; }
+.kelmon-admin .admin-active,
+.kelmon-admin .admin-active .text-white { color: #fff !important; }
+
+.admin-command-bar {
+  background: color-mix(in srgb, var(--kelmon-bg-elevated) 94%, transparent);
+  border-color: var(--kelmon-border-default);
+  backdrop-filter: blur(18px);
+}
+
+.admin-command-icon {
+  display: inline-flex;
+  height: 34px;
+  width: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--kelmon-text-secondary);
+  transition: background-color .2s ease, color .2s ease;
+}
+
+.admin-command-icon:hover { background: var(--kelmon-purple-muted); color: var(--kelmon-purple-brand); }
+
+.admin-command-search {
+  display: flex;
+  width: min(400px, 30vw);
+  height: 42px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px 0 13px;
+  border: 1px solid var(--kelmon-border-default);
+  border-radius: 999px;
+  background: var(--theme-surface-dim);
+  color: var(--kelmon-text-secondary);
+}
+
+.admin-command-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--kelmon-text-primary);
+  font-size: 14px;
+}
+
+.admin-command-search input::placeholder { color: var(--kelmon-text-secondary); }
+.admin-command-search kbd {
+  border: 1px solid var(--kelmon-border-default);
+  border-radius: 6px;
+  padding: 3px 6px;
+  background: var(--kelmon-bg-elevated);
+  color: var(--kelmon-text-secondary);
+  font-family: var(--kelmon-font-mono);
+  font-size: 10px;
+}
+
+.admin-workspace {
+  display: flex;
+  width: 174px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--kelmon-border-default);
+  border-radius: 11px;
+  padding: 7px 10px;
+  background: var(--kelmon-bg-elevated);
+  color: var(--kelmon-text-secondary);
+  transition: border-color .2s ease, background-color .2s ease;
+}
+
+.admin-workspace:hover { border-color: var(--kelmon-purple-brand); background: var(--kelmon-purple-muted); }
+
+.admin-signout {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 10px;
+  padding: 9px 13px;
+  background: #d9ad2b;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  transition: transform .2s ease, background-color .2s ease;
+}
+
+.admin-signout:hover { transform: translateY(-1px); background: #bd9012; }
+
 @keyframes landing-fade-up {
   from {
     opacity: 0;

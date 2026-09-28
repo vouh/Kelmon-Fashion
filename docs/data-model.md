@@ -3,7 +3,10 @@
 The complete data model: every table, column, relationship, constraint, function
 and trigger, with the reasoning where a choice is not obvious.
 
-Source of truth: [`supabase/migrations/0001_init.sql`](../supabase/migrations/0001_init.sql).
+Source of truth: the migrations in [`supabase/migrations/`](../supabase/migrations/),
+applied in order. 0001 creates the schema, 0002 drops salon, and
+[0003](../supabase/migrations/0003_firebase_auth.sql) moves identity to Firebase
+Auth and restates every policy — so where 0001 and 0003 disagree, 0003 is current.
 TypeScript mirror: [`lib/supabase/types.ts`](../lib/supabase/types.ts).
 Access rules: [security.md](security.md#row-level-security).
 
@@ -17,18 +20,28 @@ npx supabase gen types typescript --project-id <ref> > lib/supabase/types.ts
 ## Entity relationships
 
 ```
-auth.users ──1:1── profiles
-                     │
-      ┌──────────────┴──────────────┐
-      │                             │
-   orders ──1:N── order_items    salon_bookings
-                     │                  │
-                 products ──┐      salon_services
-                            │
-                        reviews
+Firebase Auth (external)
+      │  UID
+      ▼
+   profiles ─────┬──────────────┐
+                 │              │
+              orders         reviews
+                 │              │
+           order_items ──── products
+                 (product_id)     ▲
+                                  │
+                            reviews.product_id
 
 deals, updates  (standalone content tables)
 ```
+
+`profiles` is the user table. There is no `auth.users` row behind it — accounts
+live in Firebase, and `profiles.id` **is** the Firebase UID. The row is created by
+`app/api/auth/session/route.ts` on first sign-in.
+
+`orders.user_id` and `reviews.user_id` are both `on delete set null` foreign keys
+to `profiles.id`: an order stays a readable receipt and a review keeps its
+`author_name` after the account behind it is gone.
 
 ## Enums
 
@@ -51,14 +64,13 @@ design and it could not express those combinations.
 
 ### `profiles`
 
-One row per `auth.users` row, created automatically by the `handle_new_user`
-trigger on signup.
+One row per Firebase user, created by `/api/auth/session` on first sign-in.
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | `uuid` PK | FK → `auth.users`, `on delete cascade` |
-| `email` | `text` | |
-| `full_name` | `text` | From Google OAuth metadata, or the signup form |
+| `id` | `text` PK | The Firebase UID. No foreign key — the account lives in Firebase, not in `auth.users` |
+| `email` | `text` | Refreshed from the ID token on each sign-in; not user-editable |
+| `full_name` | `text` | From the ID token's `name` claim on first sign-in, then the user's own |
 | `phone` | `text` | |
 | `campus` | `text` | |
 | `avatar_url` | `text` | From Google, if present |
@@ -66,9 +78,12 @@ trigger on signup.
 | `loyalty_points` | `integer` | Default 0, `check >= 0`. EzyBite's `bitePoints` |
 | `created_at` / `updated_at` | `timestamptz` | `updated_at` maintained by trigger |
 
-`role` and `loyalty_points` cannot be changed by the account holder — the RLS
-update policy re-reads the stored row and requires both to be unchanged. See
-[security.md](security.md#row-level-security).
+`role` and `loyalty_points` cannot be changed by the account holder: the
+`guard_profile_columns()` trigger raises if either differs from the stored value,
+unless the caller is an admin or the service role. 0001 enforced this inside the
+RLS `WITH CHECK` instead; the trigger also covers writes arriving through the
+admin policy, and it raises rather than silently rejecting. See
+[security.md](security.md#privilege-escalation-is-blocked-in-the-schema).
 
 ### `products`
 
@@ -104,7 +119,7 @@ delete a review and the trigger recomputes them.
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `text` PK | `KM-XXXXX`, from `createOrderId()` |
-| `user_id` | `uuid` | FK → `auth.users`, `on delete set null`. **Nullable** |
+| `user_id` | `text` | FK → `profiles`, `on delete set null`. **Nullable**. A Firebase UID |
 | `customer_name`, `phone`, `drop_point` | `text` | Required |
 | `campus`, `notes` | `text` | |
 | `payment_method` | `payment_method` | |
@@ -141,20 +156,12 @@ Line details are copied rather than referenced. An order must remain an accurate
 receipt after the product is renamed, repriced or deleted — `on delete set null`
 on `product_id` keeps the line readable when the product is gone.
 
-### `salon_services` / `salon_bookings`
-
-`salon_services` is seeded from `lib/salon.ts`. `salon_bookings` replaces
-EzyBite's `customOrders` collection.
-
-Bookings carry `service_name` denormalised for the same receipt reason as
-`order_items`.
-
 ### `reviews`
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `uuid` PK | |
-| `user_id` | `uuid` | `on delete set null` |
+| `user_id` | `text` | Firebase UID, FK → `profiles`, `on delete set null` |
 | `product_id` | `text` | `on delete cascade` |
 | `author_name` | `text` | Stored so the name survives account deletion |
 | `rating` | `integer` | `check between 1 and 5` |
@@ -173,13 +180,19 @@ Content tables: public read, admin write. `deals` has a
 
 | Function | Purpose |
 |---|---|
-| `handle_new_user()` | Trigger on `auth.users` insert → creates `profiles` row, pulling name/avatar from OAuth metadata |
+| `app_uid()` | The caller's Firebase UID, from the JWT `sub` claim. Replaces `auth.uid()`, which cannot represent a non-uuid subject |
+| `app_is_admin_claim()` | Reads the `admin` custom claim out of the JWT |
+| `app_is_service()` | True for the service role or a superuser, so trusted paths can write guarded columns |
 | `touch_updated_at()` | Maintains `updated_at` without trusting the client |
-| `is_admin()` | `SECURITY DEFINER`, used by every admin policy |
+| `guard_profile_columns()` | Trigger: raises if a client changes `role` or `loyalty_points` |
+| `is_admin()` | `SECURITY DEFINER`, used by every admin policy. Claim first, `profiles.role` second |
 | `sync_product_rating()` | Recomputes `products.rating` / `review_count` |
 | `award_loyalty_points(order_id)` | Idempotent points award |
 | `redeem_loyalty_points(points)` | Atomic balance check and decrement |
 | `cancel_order(order_id)` | Owner-only, unpaid-only, within 5 minutes |
+
+`handle_new_user()` and its trigger on `auth.users` were dropped in 0003:
+Firebase users never appear in that table, so nothing would ever have fired it.
 
 `is_admin()` is `SECURITY DEFINER` with a pinned `search_path` so it can read
 `profiles` without recursing through that table's own RLS policies — a policy
@@ -209,8 +222,24 @@ if not found then raise exception 'Not enough points.'; end if;
 
 ## Storage
 
-One public bucket, `product-images`: public read, admin-only write. Paths are
-`<product-slug>/<timestamp>-<random>.<ext>`.
+Three public-read buckets. Helpers live in
+[`lib/supabase/storage.ts`](../lib/supabase/storage.ts); the policies are at the
+bottom of 0003.
+
+| Bucket | Path shape | Write | Limit |
+|---|---|---|---|
+| `product-images` | `<product-slug>/<timestamp>-<random>.<ext>` | admin | 5 MB |
+| `deal-images` | `<timestamp>-<random>.<ext>` | admin | 5 MB |
+| `avatars` | `<firebase-uid>/<timestamp>-<random>.<ext>` | owner only | 2 MB |
+
+Public read means anyone with the URL can fetch the object, which is what a
+storefront product photo is for. The URL is what gets stored on the row —
+`products.images`, `deals.image`, `profiles.avatar_url` — so a preset avatar URL
+and an uploaded one are indistinguishable downstream.
+
+The avatars folder is the caller's own UID because the policy compares
+`(storage.foldername(name))[1]` against `app_uid()`. Uploading anywhere else is
+refused.
 
 ---
 
@@ -218,13 +247,20 @@ One public bucket, `product-images`: public read, admin-only write. Paths are
 
 ```
 supabase/
-  migrations/0001_init.sql   schema, functions, triggers, RLS, storage bucket
-  seed.sql                   sample catalogue + first admin grant
+  migrations/0001_init.sql           schema, functions, triggers, RLS, storage
+  migrations/0002_remove_salon.sql   drops salon_bookings / salon_services
+  migrations/0003_firebase_auth.sql  Firebase identity, RLS restated, 3 buckets
+  seed.sql                           first admin grant — no sample catalogue
 ```
+
+`seed.sql` deliberately contains **no products**. Catalogue content is entered
+through `/admin/products`, so an empty storefront means an empty table rather
+than a fixture that never ran.
 
 ### Applying
 
-**Dashboard** — paste `0001_init.sql` into the SQL Editor and run, then `seed.sql`.
+**Dashboard** — paste each migration into the SQL Editor in numerical order, then
+`seed.sql`.
 
 **CLI**
 
@@ -305,18 +341,16 @@ The file is hand-written here only so the repo typechecks without network access
 
 ### Version compatibility
 
-`@supabase/ssr` must match the installed `@supabase/supabase-js`. Version 0.5.x
-imports `GenericSchema` from a deep path
+`@supabase/ssr` was removed when authentication moved to Firebase: there is no
+Supabase session to refresh and no auth cookies to shuttle between request and
+response, so `@supabase/supabase-js` is used directly on both sides with an
+`accessToken` callback.
+
+Worth knowing if you ever add it back: `@supabase/ssr` 0.5.x imports
+`GenericSchema` from a deep path
 (`@supabase/supabase-js/dist/module/lib/types`) that no longer exists in
 supabase-js 2.117+. The symptom is identical to trap 1 — every query types as
 `never`, with nothing pointing at the version mismatch.
-
-Check the deep path exists before debugging your own types:
-
-```bash
-test -e node_modules/@supabase/supabase-js/dist/module/lib/types.d.ts \
-  && echo present || echo "missing — upgrade @supabase/ssr"
-```
 
 ---
 

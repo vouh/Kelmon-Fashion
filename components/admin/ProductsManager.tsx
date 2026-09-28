@@ -5,11 +5,10 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { EmptyState, formatKes } from "@/components/admin/ui";
 import { deleteProduct, setProductActive, upsertProduct } from "@/app/admin/actions";
-import { createClient } from "@/lib/supabase/client";
+import { uploadAll, uploadProductImage } from "@/lib/supabase/storage";
 import type { Product } from "@/lib/products";
 
 const BADGES = ["", "New", "Hot", "Sale"];
-const BUCKET = "product-images";
 
 const inputClass =
   "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-xs text-white placeholder:text-white/25 focus:border-purple-400/50 focus:outline-none";
@@ -103,37 +102,20 @@ export default function ProductsManager({
     });
   }
 
-  /** Uploads straight to Supabase Storage; RLS restricts writes to admins. */
+  /**
+   * Uploads straight to the product-images bucket. Writes there are admin-only
+   * by RLS, checked against the Firebase token the Supabase client sends.
+   */
   async function handleUpload(files: FileList | null) {
     if (!files?.length || !draft) return;
     setError(null);
     setUploading(true);
 
     try {
-      const supabase = createClient();
-      const urls: string[] = [];
-
-      for (const file of Array.from(files)) {
-        if (!file.type.startsWith("image/")) {
-          throw new Error(`${file.name} is not an image.`);
-        }
-        if (file.size > 5 * 1024 * 1024) {
-          throw new Error(`${file.name} is larger than 5MB.`);
-        }
-
-        const ext = file.name.split(".").pop() ?? "jpg";
-        const slug = draft.id || slugify(draft.name) || "product";
-        const path = `${slug}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from(BUCKET)
-          .upload(path, file, { cacheControl: "31536000", upsert: false });
-        if (uploadError) throw new Error(uploadError.message);
-
-        const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-        urls.push(data.publicUrl);
-      }
-
+      const slug = draft.id || slugify(draft.name) || "product";
+      const urls = await uploadAll(Array.from(files), (file) =>
+        uploadProductImage(file, slug)
+      );
       setDraft({ ...draft, images: [...draft.images, ...urls] });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

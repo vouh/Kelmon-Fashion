@@ -33,10 +33,14 @@ function SignInForm() {
     setError(null);
     setBusy("google");
     try {
-      // Redirects away; the /auth/callback route finishes the exchange.
-      await signInWithGoogle(nextPath);
+      // A popup, so the caller stays on this page and finishes below.
+      await signInWithGoogle();
+      toast("Welcome!");
+      router.push(nextPath);
+      router.refresh();
     } catch (err) {
       setError(authErrorMessage(err));
+    } finally {
       setBusy(null);
     }
   }
@@ -47,46 +51,10 @@ function SignInForm() {
     setBusy("email");
 
     try {
-      if (!configured) {
-        // A backend-free way to exercise the storefront locally. This deliberately
-        // stores only a display profile in the browser; it is never sent to a server.
-        const existing = JSON.parse(localStorage.getItem("kelmon-profile") ?? "{}") as {
-          name?: string;
-          location?: string;
-          phone?: string;
-          avatar?: string;
-        };
-        localStorage.setItem(
-          "kelmon-profile",
-          JSON.stringify({
-            ...existing,
-            name: mode === "signup" ? fullName.trim() : existing.name || email.split("@")[0],
-            email: email.trim(),
-            location: existing.location || "Nairobi, Kenya",
-            phone: existing.phone || "",
-            avatar: existing.avatar || "",
-          })
-        );
-
-        // Also set a server-readable cookie. localStorage alone can't unlock
-        // /admin, because that gate runs in middleware and a server layout.
-        const res = await fetch("/api/dev-auth", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: email.trim(), name: fullName.trim() }),
-        });
-        const data = (await res.json()) as { session?: { role: string }; error?: string };
-        if (!res.ok) throw new Error(data.error ?? "Could not start the test session.");
-
-        toast(
-          data.session?.role === "admin"
-            ? "Signed in as admin — test session."
-            : "Test profile ready — stored only in this browser."
-        );
-      } else if (mode === "signup") {
+      if (mode === "signup") {
         if (!fullName.trim()) throw new Error("Please enter your name.");
         await signUpWithEmail(email.trim(), password, fullName.trim());
-        toast("Account created. Check your email to confirm.");
+        toast("Account created. Welcome to Kelmon!");
       } else {
         await signInWithEmail(email.trim(), password);
         toast("Welcome back!");
@@ -133,30 +101,22 @@ function SignInForm() {
       )}
 
       {!configured && (
-        <div className="relative mt-6 flex gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3.5 text-left text-sm text-on-surface-variant">
-          <span className="material-symbols-outlined mt-0.5 text-primary">science</span>
+        <div
+          role="alert"
+          className="relative mt-6 flex gap-3 rounded-2xl border border-error/30 bg-error/10 px-4 py-3.5 text-left text-sm text-on-surface-variant"
+        >
+          <span className="material-symbols-outlined mt-0.5 text-error">key_off</span>
           <p>
-            <strong className="text-on-surface">Local testing mode</strong>
+            <strong className="text-on-surface">Sign-in is unavailable</strong>
             <br />
-            Use any email and a 6+ character password. Your details stay in this browser.
-            <br />
-            For the admin panel, sign in as{" "}
-            <button
-              type="button"
-              onClick={() => {
-                setEmail("admin@gmail.com");
-                setPassword("admin123");
-              }}
-              className="font-mono font-semibold text-primary underline underline-offset-2"
-            >
-              admin@gmail.com
-            </button>
-            .
+            Firebase credentials are missing. Add the{" "}
+            <code className="font-mono text-xs">NEXT_PUBLIC_FIREBASE_*</code> values to{" "}
+            <code className="font-mono text-xs">.env.local</code> and restart the dev server.
           </p>
         </div>
       )}
 
-      {/* Google is available only when Supabase authentication is configured. */}
+      {/* Google is available only once Firebase credentials are present. */}
       {configured && <button
         type="button"
         onClick={handleGoogle}
@@ -204,13 +164,13 @@ function SignInForm() {
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required className="w-full rounded-2xl border border-outline/50 bg-surface px-4 py-3.5 text-body-md text-on-surface outline-none transition placeholder:text-on-surface-variant/60 focus:border-primary focus:ring-4 focus:ring-primary/10" />
         </label>
         <label className="block">
-          <span className="mb-1.5 flex items-center justify-between text-sm font-semibold text-on-surface"><span>Password</span>{!configured && <span className="font-normal text-on-surface-variant">6+ characters</span>}</span>
+          <span className="mb-1.5 flex items-center justify-between text-sm font-semibold text-on-surface"><span>Password</span>{mode === "signup" && <span className="font-normal text-on-surface-variant">6+ characters</span>}</span>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete={mode === "signup" ? "new-password" : "current-password"} minLength={6} required className="w-full rounded-2xl border border-outline/50 bg-surface px-4 py-3.5 text-body-md text-on-surface outline-none transition placeholder:text-on-surface-variant/60 focus:border-primary focus:ring-4 focus:ring-primary/10" />
         </label>
 
         <button
           type="submit"
-          disabled={busy !== null}
+          disabled={busy !== null || !configured}
           className="group mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-4 font-button-text text-button-text text-on-primary shadow-lg shadow-primary/25 transition hover:-translate-y-0.5 hover:bg-primary/90 disabled:opacity-60"
         >
           {busy === "email"

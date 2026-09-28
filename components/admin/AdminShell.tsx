@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/AuthProvider";
+import ThemeToggle from "@/components/layout/ThemeToggle";
 
 /**
  * Admin sidebar, topbar and mobile drawer.
@@ -54,7 +55,7 @@ export default function AdminShell({
   title: string;
   subtitle?: string;
   actions?: React.ReactNode;
-  /** Passed from the server, so it also works in the dev-session fallback. */
+  /** Passed from the server, so the header has a name before the profile loads. */
   adminEmail?: string | null;
 }) {
   const pathname = usePathname();
@@ -64,14 +65,13 @@ export default function AdminShell({
 
   const email = profile?.email ?? adminEmail ?? "Admin";
 
-  /** Clears whichever session is in play, then returns to the storefront. */
+  /** Ends the Firebase session and clears the server cookie, then goes home. */
   async function handleSignOut() {
     try {
       await signOut();
     } catch {
-      // Supabase not configured — fall through to clearing the dev cookie.
+      // Already signed out, or Firebase unconfigured. Leaving is still correct.
     }
-    await fetch("/api/dev-auth", { method: "DELETE" }).catch(() => {});
     router.push("/");
     router.refresh();
   }
@@ -83,7 +83,7 @@ export default function AdminShell({
     .sort((a, b) => b.length - a.length)[0];
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white [color-scheme:dark]">
+    <div className="kelmon-admin min-h-screen">
       {/* Mobile overlay */}
       {open && (
         <div
@@ -106,7 +106,7 @@ export default function AdminShell({
         <span className="text-[10px] font-black uppercase tracking-widest text-white/60">
           {title}
         </span>
-        <span className="w-7" />
+        <ThemeToggle />
       </header>
 
       {/* Sidebar */}
@@ -140,7 +140,7 @@ export default function AdminShell({
                 onClick={() => setOpen(false)}
                 className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all ${
                   active
-                    ? "bg-purple-600 text-white shadow shadow-purple-600/40"
+                    ? "admin-active bg-purple-600 text-white shadow shadow-purple-600/40"
                     : "text-white/50 hover:bg-white/5 hover:text-white"
                 }`}
               >
@@ -191,19 +191,66 @@ export default function AdminShell({
 
       {/* Page body */}
       <div className="flex min-h-screen flex-col pt-11 md:pl-44 md:pt-0">
-        <div className="sticky top-0 z-20 hidden items-center justify-between border-b border-white/5 bg-zinc-950 px-6 py-3 md:flex">
-          <div>
-            <h1 className="text-base font-black leading-none text-white">{title}</h1>
-            {subtitle && (
-              <p className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-white/30">
-                {subtitle}
-              </p>
-            )}
+        <div className="admin-command-bar sticky top-0 z-20 hidden h-[68px] items-center border-b px-6 md:flex">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              aria-label="Open navigation"
+              className="admin-command-icon"
+              onClick={() => setOpen((value) => !value)}
+            >
+              <span className="material-symbols-outlined text-xl">menu</span>
+            </button>
+            <span className="text-lg text-[var(--kelmon-text-disabled)]">‹</span>
+            <label className="admin-command-search">
+              <span className="material-symbols-outlined text-[18px]">search</span>
+              <input aria-label="Search admin pages" placeholder="Search pages…" />
+              <kbd>Ctrl K</kbd>
+            </label>
           </div>
-          {actions && <div className="flex items-center gap-2">{actions}</div>}
+
+          <div className="ml-auto flex items-center gap-3">
+            {actions}
+            <button type="button" className="admin-workspace" aria-label="Current workspace">
+              <span className="min-w-0 text-left">
+                <span className="block text-[9px] font-black uppercase tracking-widest text-[#c5a059]">Workspace</span>
+                <span className="block truncate text-xs font-extrabold text-white">{title}</span>
+              </span>
+              <span className="material-symbols-outlined text-base">expand_more</span>
+            </button>
+            <button type="button" aria-label="Notifications" className="admin-command-icon">
+              <span className="material-symbols-outlined text-xl">notifications</span>
+            </button>
+            <span className="h-7 w-px bg-[var(--kelmon-border-default)]" />
+            <ThemeToggle />
+            <span className="h-7 w-px bg-[var(--kelmon-border-default)]" />
+            <div className="flex items-center gap-2.5 pr-1">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-xs font-black text-primary">
+                {email.slice(0, 1).toUpperCase()}
+              </div>
+              <div className="max-w-[145px]">
+                <p className="truncate text-xs font-black text-white">{email}</p>
+                <p className="truncate text-[10px] text-white/50">Administrator</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleSignOut()}
+              className="admin-signout"
+            >
+              <span className="material-symbols-outlined text-base">logout</span>
+              Sign out
+            </button>
+          </div>
         </div>
 
-        <main className="flex-1 space-y-6 p-4 md:p-6">{children}</main>
+        <main className="flex-1 space-y-6 p-4 md:p-6">
+          <div className="hidden md:block">
+            <h1 className="text-xl font-black text-white">{title}</h1>
+            {subtitle && <p className="mt-1 text-xs font-medium text-white/50">{subtitle}</p>}
+          </div>
+          {children}
+        </main>
       </div>
     </div>
   );

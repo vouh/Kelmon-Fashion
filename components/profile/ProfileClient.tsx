@@ -4,107 +4,71 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useCart } from "@/components/providers/CartProvider";
+import { useAuth } from "@/components/providers/AuthProvider";
+import { uploadAvatar } from "@/lib/supabase/storage";
 import { formatKes } from "@/lib/products";
-import {
-  DEFAULT_AVATAR,
-  avatarLibrary,
-  fileToAvatarDataUrl,
-} from "@/lib/avatars";
+import { DEFAULT_AVATAR, avatarLibrary } from "@/lib/avatars";
 
-const PROFILE_KEY = "kelmon-profile";
+/**
+ * The account page, backed by the database.
+ *
+ * Name, phone, campus and photo live in `profiles`; the points balance is
+ * `profiles.loyalty_points`, maintained by award_loyalty_points() in Postgres;
+ * the order list is read server-side and passed in. Nothing here is stored in
+ * the browser any more — the previous version kept a "kelmon-profile" object in
+ * localStorage, which meant the page showed something different on every device
+ * and could not show a real points balance at all.
+ *
+ * Email is displayed but not editable: it comes from the Firebase identity the
+ * user signed in with, and changing it there is a different operation.
+ */
 
-interface StoredOrder {
+export interface ProfileOrder {
   id: string;
   createdAt: string;
-  name: string;
-  phone: string;
   dropPoint: string;
-  payment: string;
   total: number;
   status: string;
+  paid: boolean;
+  pointsEarned: number;
   lines: { name: string; quantity: number; price: number }[];
 }
 
-interface ProfileData {
-  name: string;
-  email: string;
-  location: string;
+interface Draft {
+  fullName: string;
+  campus: string;
   phone: string;
-  avatar: string;
 }
 
-const emptyProfile: ProfileData = {
-  name: "",
-  email: "",
-  location: "Nairobi, Kenya",
-  phone: "",
-  avatar: DEFAULT_AVATAR,
-};
-
-/** 1 glam point per KES 100 spent */
-function pointsFromTotal(totalKes: number) {
-  return Math.floor(Math.max(0, totalKes) / 100);
+/**
+ * The tiers award_loyalty_points() applies, mirrored for display only — the
+ * database is what actually awards them, on payment.
+ */
+function pointsForOrder(total: number): number {
+  if (total >= 5000) return 50;
+  if (total >= 1000) return 20;
+  return 5;
 }
 
-function persistProfile(next: ProfileData) {
-  try {
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(next));
-  } catch {
-    /* quota / private mode */
-  }
-}
-
-export default function ProfileClient() {
+export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
   const { itemCount } = useCart();
+  const { user, profile, loading, updateProfile } = useAuth();
+
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [orders, setOrders] = useState<StoredOrder[]>([]);
-  const [profile, setProfile] = useState<ProfileData>(emptyProfile);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<ProfileData>(emptyProfile);
+  const [draft, setDraft] = useState<Draft>({ fullName: "", campus: "", phone: "" });
   const [savedFlash, setSavedFlash] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  useEffect(() => {
-    let nextProfile = { ...emptyProfile };
-    let nextOrders: StoredOrder[] = [];
-
-    try {
-      const rawProfile = localStorage.getItem(PROFILE_KEY);
-      if (rawProfile) {
-        nextProfile = { ...emptyProfile, ...(JSON.parse(rawProfile) as ProfileData) };
-      }
-    } catch {
-      /* ignore */
-    }
-
-    try {
-      const rawOrders = localStorage.getItem("kelmon-orders");
-      if (rawOrders) {
-        nextOrders = JSON.parse(rawOrders) as StoredOrder[];
-        if (!Array.isArray(nextOrders)) nextOrders = [];
-      }
-    } catch {
-      nextOrders = [];
-    }
-
-    const latest = nextOrders[0];
-    if (latest) {
-      if (!nextProfile.name.trim()) nextProfile.name = latest.name || "";
-      if (!nextProfile.phone.trim()) nextProfile.phone = latest.phone || "";
-      if (!nextProfile.location.trim() || nextProfile.location === "Nairobi, Kenya") {
-        nextProfile.location = latest.dropPoint || nextProfile.location;
-      }
-    }
-
-    if (!nextProfile.name.trim()) nextProfile.name = "Guest";
-    if (!nextProfile.avatar) nextProfile.avatar = DEFAULT_AVATAR;
-
-    setProfile(nextProfile);
-    setDraft(nextProfile);
-    setOrders(nextOrders);
-  }, []);
+  const name = profile?.full_name?.trim() || user?.displayName || "Your account";
+  const email = profile?.email ?? user?.email ?? "";
+  const campus = profile?.campus?.trim() ?? "";
+  const phone = profile?.phone?.trim() ?? "";
+  const avatar = profile?.avatar_url || user?.photoURL || DEFAULT_AVATAR;
+  const points = profile?.loyalty_points ?? 0;
 
   useEffect(() => {
     if (!avatarOpen) return;
@@ -115,11 +79,12 @@ export default function ProfileClient() {
     return () => window.removeEventListener("keydown", onKey);
   }, [avatarOpen]);
 
+  // Only paid orders count towards spend, which is the same rule the admin
+  // revenue figure uses.
   const spent = useMemo(
-    () => orders.reduce((sum, o) => sum + (Number(o.total) || 0), 0),
+    () => orders.filter((o) => o.paid).reduce((sum, o) => sum + (Number(o.total) || 0), 0),
     [orders]
   );
-  const points = pointsFromTotal(spent);
 
   const stats = [
     { value: orders.length, label: "Orders", href: "#order-history" },
@@ -127,24 +92,29 @@ export default function ProfileClient() {
     { value: itemCount, label: "In cart", href: "/cart" },
   ];
 
-  const applyAvatar = (src: string) => {
-    const next = { ...profile, avatar: src };
-    setProfile(next);
-    setDraft((d) => ({ ...d, avatar: src }));
-    persistProfile(next);
-    setAvatarError(null);
-    setAvatarOpen(false);
+  function flashSaved() {
     setSavedFlash(true);
     window.setTimeout(() => setSavedFlash(false), 1800);
+  }
+
+  const applyAvatar = async (src: string) => {
+    setAvatarError(null);
+    try {
+      await updateProfile({ avatar_url: src });
+      setAvatarOpen(false);
+      flashSaved();
+    } catch (err) {
+      setAvatarError(err instanceof Error ? err.message : "Could not save that photo.");
+    }
   };
 
+  /** Uploads into the caller's own folder in the avatars bucket. */
   const onUpload = async (file: File | undefined) => {
-    if (!file) return;
+    if (!file || !user) return;
     setUploading(true);
     setAvatarError(null);
     try {
-      const dataUrl = await fileToAvatarDataUrl(file);
-      applyAvatar(dataUrl);
+      await applyAvatar(await uploadAvatar(file, user.uid));
     } catch (err) {
       setAvatarError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -154,30 +124,64 @@ export default function ProfileClient() {
   };
 
   const startEdit = () => {
-    setDraft(profile);
+    setDraft({ fullName: name === "Your account" ? "" : name, campus, phone });
+    setSaveError(null);
     setEditing(true);
   };
 
   const cancelEdit = () => {
-    setDraft(profile);
+    setSaveError(null);
     setEditing(false);
   };
 
-  const saveProfile = (e: FormEvent) => {
+  const saveProfile = async (e: FormEvent) => {
     e.preventDefault();
-    const next: ProfileData = {
-      name: draft.name.trim() || "Guest",
-      email: draft.email.trim(),
-      location: draft.location.trim() || "Nairobi, Kenya",
-      phone: draft.phone.trim(),
-      avatar: draft.avatar || profile.avatar || DEFAULT_AVATAR,
-    };
-    setProfile(next);
-    setEditing(false);
-    persistProfile(next);
-    setSavedFlash(true);
-    window.setTimeout(() => setSavedFlash(false), 1800);
+    setSaveError(null);
+    try {
+      await updateProfile({
+        full_name: draft.fullName.trim() || null,
+        campus: draft.campus.trim() || null,
+        phone: draft.phone.trim() || null,
+      });
+      setEditing(false);
+      flashSaved();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Could not save your profile.");
+    }
   };
+
+  if (!loading && !user) {
+    return (
+      <main className="relative flex-grow overflow-hidden">
+        <div
+          className="absolute inset-x-0 top-0 h-[280px] md:h-[320px] bg-primary-container"
+          aria-hidden="true"
+        />
+        <div className="relative z-10 px-margin-mobile md:px-margin-desktop pt-14 md:pt-16 pb-16 md:pb-24">
+          <div className="max-w-md mx-auto mt-8 bg-white dark:bg-surface rounded-[1.75rem] px-6 py-12 text-center shadow-[0_20px_60px_rgba(142,68,173,0.18)]">
+            <span
+              className="material-symbols-outlined text-[40px] text-primary"
+              aria-hidden="true"
+            >
+              account_circle
+            </span>
+            <h1 className="mt-4 font-display-lg text-2xl text-on-surface tracking-tight">
+              Sign in to see your account
+            </h1>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              Your orders, points and saved details all live with your account.
+            </p>
+            <Link
+              href="/signin?next=/profile"
+              className="mt-6 inline-flex h-11 px-7 rounded-full bg-primary text-white text-[11px] font-semibold uppercase tracking-[0.14em] items-center"
+            >
+              Sign in
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="relative flex-grow overflow-hidden">
@@ -201,7 +205,7 @@ export default function ProfileClient() {
                 aria-label="Change profile photo"
               >
                 <Image
-                  src={profile.avatar || DEFAULT_AVATAR}
+                  src={avatar}
                   alt="Your avatar"
                   fill
                   unoptimized
@@ -256,34 +260,33 @@ export default function ProfileClient() {
                     Name
                   </span>
                   <input
-                    value={draft.name}
-                    onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))}
+                    value={draft.fullName}
+                    onChange={(e) => setDraft((p) => ({ ...p, fullName: e.target.value }))}
                     className="mt-1 w-full h-11 px-3.5 rounded-xl bg-[#faf6fc] dark:bg-surface-container border border-primary/15 text-sm outline-none focus:border-primary"
                     placeholder="Your name"
                     required
                   />
                 </label>
-                <label className="block">
+                <div className="block">
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
                     Email
                   </span>
-                  <input
-                    type="email"
-                    value={draft.email}
-                    onChange={(e) => setDraft((p) => ({ ...p, email: e.target.value }))}
-                    className="mt-1 w-full h-11 px-3.5 rounded-xl bg-[#faf6fc] dark:bg-surface-container border border-primary/15 text-sm outline-none focus:border-primary"
-                    placeholder="you@email.com"
-                  />
-                </label>
+                  <p className="mt-1 flex h-11 items-center gap-2 rounded-xl border border-primary/10 bg-[#faf6fc] px-3.5 text-sm text-on-surface-variant dark:bg-surface-container">
+                    <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
+                      lock
+                    </span>
+                    {email || "No email on this account"}
+                  </p>
+                </div>
                 <label className="block">
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
-                    Location
+                    Campus / location
                   </span>
                   <input
-                    value={draft.location}
-                    onChange={(e) => setDraft((p) => ({ ...p, location: e.target.value }))}
+                    value={draft.campus}
+                    onChange={(e) => setDraft((p) => ({ ...p, campus: e.target.value }))}
                     className="mt-1 w-full h-11 px-3.5 rounded-xl bg-[#faf6fc] dark:bg-surface-container border border-primary/15 text-sm outline-none focus:border-primary"
-                    placeholder="Nairobi, Kenya"
+                    placeholder="e.g. Main Campus, Nairobi"
                   />
                 </label>
                 <label className="block">
@@ -298,6 +301,11 @@ export default function ProfileClient() {
                     placeholder="07XX XXX XXX"
                   />
                 </label>
+                {saveError && (
+                  <p className="text-xs text-red-600" role="alert">
+                    {saveError}
+                  </p>
+                )}
                 <button
                   type="button"
                   onClick={() => setAvatarOpen(true)}
@@ -315,17 +323,17 @@ export default function ProfileClient() {
             ) : (
               <div className="text-center mt-4">
                 <h1 className="font-display-lg text-[1.65rem] md:text-[1.85rem] text-on-surface tracking-tight">
-                  {profile.name}
+                  {name}
                 </h1>
-                <p className="mt-1.5 text-sm text-on-surface-variant">{profile.location}</p>
-                {profile.email ? (
-                  <p className="mt-3 text-sm text-primary">{profile.email}</p>
+                {campus ? (
+                  <p className="mt-1.5 text-sm text-on-surface-variant">{campus}</p>
                 ) : (
-                  <p className="mt-3 text-sm text-on-surface-variant/70">No email yet — tap Edit</p>
+                  <p className="mt-1.5 text-sm text-on-surface-variant/70">
+                    Add your campus — tap Edit
+                  </p>
                 )}
-                {profile.phone && (
-                  <p className="mt-1 text-sm text-on-surface-variant">{profile.phone}</p>
-                )}
+                {email && <p className="mt-3 text-sm text-primary">{email}</p>}
+                {phone && <p className="mt-1 text-sm text-on-surface-variant">{phone}</p>}
                 {savedFlash && (
                   <p className="mt-2 text-xs text-secondary" role="status">
                     Profile saved
@@ -363,7 +371,7 @@ export default function ProfileClient() {
               </span>
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
-                  Glam points
+                  Kelmon points
                 </p>
                 <p className="text-lg font-semibold text-on-surface tabular-nums">
                   {points} pts
@@ -374,7 +382,8 @@ export default function ProfileClient() {
               </div>
             </div>
             <p className="text-xs text-on-surface-variant sm:text-right max-w-xs">
-              Earn 1 point per KES 100 on every order.
+              Earn 5, 20 or 50 points per paid order — under KES 1,000, up to KES 5,000, and
+              above.
             </p>
           </div>
 
@@ -386,8 +395,8 @@ export default function ProfileClient() {
                 </h2>
                 <p className="mt-1 text-sm text-on-surface-variant">
                   {orders.length === 0
-                    ? "No orders on this device yet."
-                    : `${orders.length} order${orders.length === 1 ? "" : "s"} · points from each checkout`}
+                    ? "No orders yet."
+                    : `${orders.length} order${orders.length === 1 ? "" : "s"} · points land once payment clears`}
                 </p>
               </div>
               <Link
@@ -413,7 +422,8 @@ export default function ProfileClient() {
             ) : (
               <ul className="space-y-3">
                 {orders.map((order) => {
-                  const pts = pointsFromTotal(order.total);
+                  // Awarded points once paid; otherwise show what it will earn.
+                  const pts = order.pointsEarned || pointsForOrder(order.total);
                   return (
                     <li
                       key={order.id}
@@ -433,8 +443,12 @@ export default function ProfileClient() {
                           <p className="text-sm font-semibold text-primary">
                             {formatKes(order.total)}
                           </p>
-                          <p className="mt-0.5 text-xs text-secondary font-semibold">
-                            +{pts} pts
+                          <p
+                            className={`mt-0.5 text-xs font-semibold ${
+                              order.paid ? "text-secondary" : "text-on-surface-variant"
+                            }`}
+                          >
+                            {order.paid ? `+${pts} pts` : `${pts} pts on payment`}
                           </p>
                         </div>
                       </div>
@@ -455,7 +469,8 @@ export default function ProfileClient() {
           </section>
 
           <p className="text-center text-xs text-on-surface-variant/80 leading-relaxed">
-            Profile, cart &amp; orders stay on this device until accounts go live.
+            Your profile, orders and points are saved to your account, on every device you sign
+            in on.
           </p>
         </div>
       </div>
@@ -499,7 +514,7 @@ export default function ProfileClient() {
               type="file"
               accept="image/*"
               className="sr-only"
-              onChange={(e) => onUpload(e.target.files?.[0])}
+              onChange={(e) => void onUpload(e.target.files?.[0])}
             />
 
             <button
@@ -513,6 +528,9 @@ export default function ProfileClient() {
               </span>
               {uploading ? "Uploading…" : "Upload your photo"}
             </button>
+            <p className="mt-2 text-center text-[10px] text-on-surface-variant/80">
+              JPEG, PNG, WebP or AVIF, up to 2MB.
+            </p>
 
             {avatarError && (
               <p className="mt-2 text-xs text-red-600" role="alert">
@@ -525,12 +543,12 @@ export default function ProfileClient() {
             </p>
             <div className="grid grid-cols-4 gap-3">
               {avatarLibrary.map((opt) => {
-                const selected = profile.avatar === opt.src;
+                const selected = avatar === opt.src;
                 return (
                   <button
                     key={opt.id}
                     type="button"
-                    onClick={() => applyAvatar(opt.src)}
+                    onClick={() => void applyAvatar(opt.src)}
                     title={opt.label}
                     className={`relative aspect-square rounded-full overflow-hidden ring-2 transition-all ${
                       selected

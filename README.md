@@ -1,11 +1,10 @@
 # Kelmon
 
-**Campus fashion, beauty and salon platform for Kenya.**
-Next.js 15 · Supabase · M-Pesa
+**Campus fashion and beauty platform for Kenya.**
+Next.js 15 · Firebase Auth · Supabase · M-Pesa
 
 Kelmon sells bags, perfumes, fashion accessories and nail products to university
-students, delivered to campus drop points and paid for with M-Pesa. It also
-lists salon services — nails, lashes, brows, makeup.
+students, delivered to campus drop points and paid for with M-Pesa.
 
 📚 **Documentation:** [architecture](docs/architecture.md) · [data model](docs/data-model.md) · [security](docs/security.md) · [design](design.md)
 
@@ -40,7 +39,8 @@ They have been merged into one Next.js application:
   re-skinned for Kelmon.
 - The database moved from Firestore to **Supabase Postgres with Row Level
   Security**.
-- Auth moved from Firebase Auth to **Supabase Auth** with Google sign-in.
+- Auth is **Firebase Auth**, registered with Supabase as a third-party provider,
+  so Firebase issues the tokens and Supabase's RLS enforces access against them.
 - The two M-Pesa implementations were **merged into one**.
 
 There are no HTML files left; it is a single Next.js app. See
@@ -58,8 +58,7 @@ preserved in the first Git commit, so nothing removed is lost.
 - Order history and live payment status
 - Kelmon Points loyalty scheme, awarded on paid orders
 - Product reviews with ratings
-- Salon service listings
-- Google and email/password sign-in
+- Google and email/password sign-in, with profile photo uploads
 - Light/dark theme, mobile-first, bottom nav on small screens
 
 ### Admin panel (`/admin`)
@@ -80,17 +79,21 @@ preserved in the first Git commit, so nothing removed is lost.
 | Framework | Next.js 15, App Router, TypeScript |
 | Styling | Tailwind CSS v3 + CSS custom properties |
 | Database | Supabase Postgres with Row Level Security |
-| Auth | Supabase Auth — Google OAuth + email/password |
-| File storage | Supabase Storage |
+| Auth | Firebase Auth — Google + email/password — as a Supabase third-party provider |
+| File storage | Supabase Storage — `product-images`, `deal-images`, `avatars` |
 | Payments | M-Pesa STK Push (Safaricom Daraja) |
 
-**Why Supabase Auth rather than Firebase Auth** — Google sign-in is free on both,
-so cost did not decide it. Supabase Auth issues the JWT that Row Level Security
-reads, so authorisation rules live in the schema rather than in app code. Pairing
-Firebase Auth with a Supabase database would mean signing a custom JWT and
-bridging it into every policy — a bug there is an authorisation bug across every
-table at once. Full reasoning in
-[docs/architecture.md](docs/architecture.md#1-supabase-auth-over-firebase-auth).
+**How the two halves join** — Supabase is configured with Firebase as a
+third-party auth provider, so it validates Firebase ID tokens itself and every RLS
+policy reads the Firebase UID straight out of the token. There is no second JWT to
+sign and no bridge to maintain, which is what made this workable; authorisation
+rules still live in the schema rather than in app code.
+
+Two consequences worth knowing up front: a user id is a Firebase UID, so
+`auth.uid()` is unusable and `app_uid()` replaces it; and every token needs a
+`role: authenticated` custom claim, without which Supabase treats the caller as
+anonymous. Full reasoning in
+[docs/architecture.md](docs/architecture.md#6-firebase-auth-as-a-supabase-third-party-provider).
 
 ---
 
@@ -102,40 +105,61 @@ table at once. Full reasoning in
 npm install
 ```
 
-### 2. Run it immediately (no database needed)
-
 ```bash
 cp .env.example .env.local
 npm run dev
 ```
 
-The app runs **unconfigured**: pages render with sample data and you can reach
-the admin panel with a test login. Nothing is saved.
+The storefront renders without credentials, but **empty, with sign-in disabled**.
+There is no offline mode and no sample data — an empty shop means an empty
+`products` table. Everything below is needed before the app does anything.
 
-**Test admin login** at `/signin`:
+### 2. Create the Firebase project
 
-| Field | Value |
-|---|---|
-| Email | `admin@gmail.com` |
-| Password | anything 6+ characters |
+At [console.firebase.google.com](https://console.firebase.google.com):
 
-Then open `/admin`. This fallback is disabled in production and whenever
-Supabase is configured — see [Security](#security).
+1. **Authentication → Sign-in method** → enable **Email/Password** and **Google**.
+2. **Authentication → Settings → Authorised domains** → add `localhost` and your
+   production domain. Missing this shows up as `auth/unauthorized-domain` when the
+   sign-in popup opens.
+3. **Project settings → General → Your apps** → register a Web app and copy its
+   config into `.env.local`:
 
-### 3. Create the Supabase project
-
-Create one at [supabase.com](https://supabase.com), then apply the schema —
-either paste [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql)
-into the dashboard SQL editor, or:
-
-```bash
-npx supabase link --project-ref <your-project-ref>
-npx supabase db push
+```
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
 ```
 
-### 4. Configure environment
+All six are public by design — they identify the project and authorise nothing.
 
-Fill in `.env.local` from **Project Settings → API**:
+### 3. Add the Firebase service account
+
+**Project settings → Service accounts → Generate new private key.** The server
+needs this to verify tokens and to write the custom claims RLS reads, so `/admin`
+stays closed until it exists.
+
+```
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@<project>.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIE…\n-----END PRIVATE KEY-----\n"
+ADMIN_EMAILS=you@example.com
+```
+
+Keep the `\n` escapes and the surrounding quotes — the key arrives as one line and
+is unescaped at load. **Never prefix these with `NEXT_PUBLIC_`.** Alternatively set
+`FIREBASE_SERVICE_ACCOUNT_JSON` to the whole downloaded file, raw or base64.
+
+`ADMIN_EMAILS` is how the first admin comes to exist: neither the claim nor
+`profiles.role` can be self-granted, so one of them has to be seeded from outside
+the app.
+
+### 4. Create the Supabase project
+
+Create one at [supabase.com](https://supabase.com) and fill in `.env.local` from
+**Project Settings → API**:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
@@ -149,31 +173,38 @@ protects data. **The service-role key bypasses RLS and must never carry a
 
 Full variable list: [docs/architecture.md](docs/architecture.md#environment-variables).
 
-### 5. Enable Google sign-in
+### 5. Point Supabase at Firebase
 
-1. **Google Cloud Console → Credentials** → new OAuth 2.0 Web client.
-   Authorised redirect URI — this is *Supabase's* callback, not your app's:
-   `https://<ref>.supabase.co/auth/v1/callback`
-2. **Supabase → Authentication → Providers → Google** → paste the client ID and
-   secret.
-3. **Supabase → Authentication → URL Configuration → Redirect URLs** → add
-   `http://localhost:3000/auth/callback` and your production equivalent.
+**Supabase → Authentication → Third Party Auth → Add provider → Firebase**, and
+give it your Firebase **project ID**.
 
-Details: [docs/architecture.md](docs/architecture.md#google-oauth).
+Do not skip this. Without it Supabase rejects every token, and the symptom is not
+a sign-in error — sign-in succeeds and then nothing loads, because each query
+fails authorisation before RLS is even reached.
 
-### 6. Seed, then grant yourself admin
+### 6. Apply the schema
+
+Paste each file in [`supabase/migrations/`](supabase/migrations/) into the
+dashboard SQL editor in numerical order, or:
 
 ```bash
-psql "$DATABASE_URL" -f supabase/seed.sql
+npx supabase link --project-ref <your-project-ref>
+npx supabase db push
 ```
 
-This loads the products and salon services. The admin grant at the bottom of
-that file needs your account to exist first, so **sign in once**, then edit the
-email in `supabase/seed.sql` and re-run it (it is idempotent).
+0001 creates the schema, 0002 drops the salon tables, and 0003 moves identity to
+Firebase and restates every RLS policy. Where 0001 and 0003 disagree, 0003 wins.
 
-`profiles.role` is deliberately not client-writable — the RLS policy re-reads the
-stored row, so nobody can promote themselves. The first admin must be granted
-with the service role.
+### 7. Sign in, then add your catalogue
+
+Restart the dev server — `NEXT_PUBLIC_*` values are inlined at build time and do
+not hot-reload — then sign in with the email you put in `ADMIN_EMAILS`. The
+`admin` claim and `profiles.role` are both written on that first sign-in, and
+`/admin` opens.
+
+Add products at `/admin/products`, images included; they upload straight to the
+`product-images` bucket. `supabase/seed.sql` contains no catalogue — only an
+optional admin grant by email, for promoting someone who has already signed in.
 
 ### M-Pesa in development
 
@@ -210,32 +241,33 @@ what catches schema drift.
 
 ```
 app/
-  (storefront)      /, shop, product/[id], salon, cart, checkout,
+  (storefront)      /, shop, product/[id], cart, checkout,
                     orders, profile, about, contact, signin
   admin/            dashboard, orders, products, stats, deals,
                     updates, reviews, transactions[/failed]
   admin/actions.ts  all admin mutations as Server Actions
   api/
+    auth/session/   ID token -> claims, profile row, cookie
     orders/         create an order (re-prices server-side)
     mpesa/stk-push/ start a payment
     mpesa/callback/ Safaricom result handler
-  auth/callback/    OAuth code exchange
 components/
   admin/            AdminShell, per-screen managers, BarChart
   providers/        Auth, Cart, Theme, Toast
-  home|shop|product|layout|salon|orders|ui/
+  home|shop|product|layout|orders|ui/
 lib/
+  firebase/         client SDK, Admin SDK, server identity, cookie
   supabase/         client, server, types, products, orders,
-                    content, stats, salon
+                    content, stats, storage
   mpesa.ts          STK Push
   products.ts       Product type, row mapper, formatKes
   cart.ts           cart maths, delivery fee, variant options
-  dev-auth.ts       development-only login fallback
-  dev-fixtures.ts   development-only sample data
-middleware.ts       session refresh + /admin gate
+middleware.ts       /admin gate (decode only — see security.md)
 styles/design.css   design tokens
 supabase/
   migrations/0001_init.sql
+  migrations/0002_remove_salon.sql
+  migrations/0003_firebase_auth.sql
   seed.sql
 docs/
   architecture.md   front end, back end, API, integrations, decisions
@@ -262,11 +294,28 @@ README.md           this file
 5. Safaricom calls `/api/mpesa/callback`, which marks the order paid and awards
    loyalty points.
 
+### Signing in
+
+1. Firebase signs the user in — Google popup or email/password — entirely in the
+   browser.
+2. `AuthProvider` POSTs the ID token to `/api/auth/session`, which verifies it,
+   writes the `role: authenticated` and `admin` custom claims, ensures a
+   `profiles` row, and stores the token in an httpOnly cookie.
+3. Every Supabase call — browser and server — sends that token as its access
+   token. Supabase validates it and RLS reads the Firebase UID out of it.
+
+Custom claims can only be written with the service-account key, so admin can
+never be self-granted.
+
 ### Reaching the admin panel
 
 Four checks: middleware, the admin layout, `requireAdmin()` in each Server
 Action, and finally RLS. The first three are redundant by design; RLS is the
 guarantee.
+
+Middleware runs on the Edge runtime and can only *decode* the token, not verify
+it — so it decides redirects and nothing else. The admin layout does the real
+signature check.
 
 Full flows and all design decisions: [docs/architecture.md](docs/architecture.md).
 
@@ -277,8 +326,11 @@ Full flows and all design decisions: [docs/architecture.md](docs/architecture.md
 - **RLS on every table.** The anon key ships to the browser, so anyone can query
   the REST API directly — route handlers are not the security boundary, RLS is.
 - **Privilege escalation is blocked in the schema.** `profiles.role` and
-  `loyalty_points` are not client-writable: the update policy re-reads the stored
-  row and requires both unchanged.
+  `loyalty_points` are not client-writable: a `BEFORE UPDATE` trigger raises if a
+  client changes either.
+- **Admin cannot be self-granted.** The `admin` custom claim needs the Firebase
+  service-account private key to write, and `profiles.role` needs the Supabase
+  service role. The first admin comes from the `ADMIN_EMAILS` allowlist.
 - **Money is never trusted from the client.** `/api/orders` re-prices every line;
   `/api/mpesa/stk-push` takes no amount at all.
 - **Order status is pinned on insert**, so a client cannot open an order that
@@ -286,11 +338,13 @@ Full flows and all design decisions: [docs/architecture.md](docs/architecture.md
   service role.
 - **Loyalty points are awarded in Postgres** and are idempotent — a duplicate
   M-Pesa callback cannot double-award.
-- **The development login cannot reach production.** It requires *both*
-  `NODE_ENV !== "production"` **and** Supabase being unconfigured; the role is
-  re-derived from the email server-side, so a forged cookie grants nothing.
-  Verified against a real production build: the endpoint 404s and the cookie is
-  ignored.
+- **Storage writes are policy-controlled.** Product and deal images are
+  admin-only; avatars may only be written inside a folder named after the
+  caller's own Firebase UID.
+- **There is no development auth bypass.** The cookie-based dev login and the
+  sample-data fallback have both been removed. They made a misconfigured
+  environment look like a working one, which is the opposite of what a fallback
+  should do.
 
 Trust boundaries, RLS policies and open risks: [docs/security.md](docs/security.md).
 
@@ -300,7 +354,7 @@ Trust boundaries, RLS policies and open risks: [docs/security.md](docs/security.
 
 | Document | Covers |
 |---|---|
-| [docs/architecture.md](docs/architecture.md) | **Everything about the front end and back end** — routes, components, providers, styling, middleware, data layer, full API reference, Server Actions, M-Pesa, Google OAuth, environment, local setup, deployment, and all five design decisions |
+| [docs/architecture.md](docs/architecture.md) | **Everything about the front end and back end** — routes, components, providers, styling, middleware, data layer, full API reference, Server Actions, M-Pesa, Firebase Auth setup, environment, local setup, deployment, and all six design decisions |
 | [docs/data-model.md](docs/data-model.md) | Every table, column, constraint, function and trigger; migrations and the TypeScript mirror |
 | [docs/security.md](docs/security.md) | Trust boundaries, authorisation layers, RLS policies table by table, and 11 open risks with fixes |
 | [design.md](design.md) | Colours, typography, spacing, components, theming |
@@ -317,11 +371,11 @@ What happened to each part of EzyBite:
 | `admin/*.html` + `admin-shell.js` | `app/admin/*` + `components/admin/AdminShell.tsx` |
 | `admin/admin-auth.js` (hardcoded email list, client-side gate) | `middleware.ts` + `app/admin/layout.tsx` + `profiles.role` |
 | `js/firebase-service.js` (`window.fb_*`) | `lib/supabase/*` + `app/admin/actions.ts` |
-| `js/auth.js` (`getAuthErrorMessage`) | `authErrorMessage()` in `AuthProvider.tsx` |
+| `js/auth.js` (`getAuthErrorMessage`) | `authErrorMessage()` in `AuthProvider.tsx` — back to matching `auth/*` codes, since Firebase issues them again |
 | `api/stkpush.js` | merged into `lib/mpesa.ts` + `app/api/mpesa/stk-push/route.ts` |
 | `api/callback.js` | `app/api/mpesa/callback/route.ts` |
 | Firestore `users` / `bitePoints` | `profiles` / `loyalty_points` (tiers rescaled for fashion prices) |
-| Firestore `customOrders` | `salon_bookings` |
+| Firestore `customOrders` | `salon_bookings` — since dropped, in `0002_remove_salon.sql` |
 | Chart.js via CDN | `components/admin/BarChart.tsx` — inline SVG, no dependency |
 | `robots.txt`, `vercel.json` | `app/robots.ts`, `app/sitemap.ts`; the wildcard CORS config was dropped |
 | — | `products` table + admin products CRUD (**new** — EzyBite's menu was hardcoded) |
@@ -349,13 +403,15 @@ Not finished:
   no order reduces it, so overselling is possible.
 - **M-Pesa callbacks are unauthenticated.** Safaricom does not sign them; the
   `CheckoutRequestID` being unguessable is mitigation, not a fix.
-- **Salon bookings are not wired up.** The table, RLS and query layer exist, but
-  `/salon` is still the waitlist UI — it needs scheduling and availability
-  decisions.
-- **No automated tests.** RLS policy tests are the highest-value place to start.
+- **The catalogue starts empty.** There is no seed data by design — products are
+  added in `/admin/products`. A fresh install shows an empty shop until you add
+  one.
+- **No automated tests.** RLS policy tests are the highest-value place to start,
+  and the token path — claims, cookie expiry, third-party auth config — is the
+  riskiest untested surface.
 - **No rate limiting** and **no admin audit log**.
-- **Seed images are borrowed URLs** that will eventually expire; replace with
-  real photography.
+- **Preset avatar images are borrowed URLs** that will eventually expire; replace
+  with real artwork.
 
 All eleven open items, with severity and suggested fixes, are in
 [docs/security.md](docs/security.md#known-issues-and-accepted-risks).

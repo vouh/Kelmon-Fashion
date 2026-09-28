@@ -38,7 +38,7 @@ export default function ContactPage() {
             Get in touch
           </h1>
           <p className="font-body-lg text-body-lg text-on-surface-variant max-w-xl mb-12">
-            Orders, salon bookings, or delivery questions — we&apos;re here for it.
+            Orders, delivery questions, or product support — we&apos;re here for it.
           </p>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-start">
@@ -78,7 +78,7 @@ export default function ContactPage() {
               <div className="bg-primary text-white p-6 md:p-8">
                 <h3 className="font-display-lg text-lg mb-2">Prefer WhatsApp?</h3>
                 <p className="text-white/85 text-sm leading-relaxed mb-5">
-                  Fastest way to check stock, delivery slots, or salon availability.
+                  Fastest way to check stock and delivery slots.
                 </p>
                 <a
                   href="https://wa.me/254700000000"

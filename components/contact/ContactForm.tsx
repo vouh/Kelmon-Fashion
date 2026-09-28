@@ -5,14 +5,35 @@ import { useState, type FormEvent } from "react";
 export default function ContactForm() {
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSending(true);
-    window.setTimeout(() => {
+    setError(null);
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.fromEntries(formData)),
+      });
+      const result = await response.json() as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(result.error || "We could not send your message. Please try again.");
+      }
+
+      form.reset();
       setSending(false);
       setSent(true);
-    }, 600);
+    } catch (submissionError) {
+      setSending(false);
+      setError(submissionError instanceof Error ? submissionError.message : "We could not send your message. Please try again.");
+    }
   };
 
   if (sent) {
@@ -117,6 +138,11 @@ export default function ContactForm() {
           send
         </span>
       </button>
+      {error ? (
+        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+          {error}
+        </p>
+      ) : null}
     </form>
   );
 }

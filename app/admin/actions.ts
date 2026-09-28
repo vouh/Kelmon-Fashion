@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, isAdmin } from "@/lib/supabase/server";
-import type { BookingStatus, OrderStatus, PaymentStatus } from "@/lib/supabase/types";
+import type { OrderStatus, PaymentStatus } from "@/lib/supabase/types";
 
 /**
  * Admin mutations as Server Actions.
@@ -298,23 +298,6 @@ export async function deleteReview(id: string): Promise<ActionResult> {
     const { error } = await supabase.from("reviews").delete().eq("id", id);
     if (error) throw new Error(error.message);
     revalidatePath("/admin/reviews");
-    return ok();
-  } catch (err) {
-    return fail(err);
-  }
-}
-
-// ── Salon bookings ──────────────────────────────────────────────────────────
-
-export async function updateBookingStatus(
-  id: string,
-  status: BookingStatus
-): Promise<ActionResult> {
-  try {
-    const supabase = await requireAdmin();
-    const { error } = await supabase.from("salon_bookings").update({ status }).eq("id", id);
-    if (error) throw new Error(error.message);
-    revalidatePath("/admin/bookings");
     return ok();
   } catch (err) {
     return fail(err);

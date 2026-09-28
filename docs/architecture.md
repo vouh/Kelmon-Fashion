@@ -34,7 +34,7 @@ Companion documents: [data-model.md](data-model.md) (tables and columns),
 
 **Integrations**
 - [M-Pesa](#m-pesa)
-- [Google OAuth](#google-oauth)
+- [Firebase Auth](#firebase-auth)
 
 **Operations**
 - [Environment variables](#environment-variables)
@@ -49,37 +49,42 @@ Companion documents: [data-model.md](data-model.md) (tables and columns),
 
 ## System shape
 
-Kelmon is a single Next.js 15 application (App Router) backed by Supabase. There
-is no separate backend service and no separate admin app — a deliberate change
-from the pre-merge state, where the storefront and admin panel were different
-codebases on different hosts.
+Kelmon is a single Next.js 15 application (App Router). Supabase holds the data
+and enforces access; Firebase Auth issues the identity tokens that access is
+enforced against. There is no separate backend service and no separate admin
+app — a deliberate change from the pre-merge state, where the storefront and admin
+panel were different codebases on different hosts.
 
 ```
 ┌──────────────────────────── Next.js app ─────────────────────────────┐
 │                                                                      │
 │  Storefront (public)          Admin (/admin, gated)                  │
 │  /  /shop  /product/[id]      /admin            /admin/products      │
-│  /salon  /cart  /checkout     /admin/orders     /admin/stats         │
+│  /cart  /checkout             /admin/orders     /admin/stats         │
 │  /orders  /profile  /signin   /admin/deals      /admin/updates       │
 │  /about  /contact             /admin/reviews    /admin/transactions  │
 │                                                                      │
-│  ── middleware.ts ── session refresh + /admin gate on every request   │
+│  ── middleware.ts ── /admin gate on every request (unverified peek)   │
 │                                                                      │
 │  Route handlers                Server Actions                        │
-│  /api/orders                   app/admin/actions.ts                  │
-│  /api/mpesa/stk-push           (all admin writes)                    │
+│  /api/auth/session             app/admin/actions.ts                  │
+│  /api/orders                   (all admin writes)                    │
+│  /api/mpesa/stk-push                                                 │
 │  /api/mpesa/callback                                                 │
-│  /auth/callback                                                      │
-└──────────┬──────────────────────────────────┬────────────────────────┘
-           │                                  │
-           ▼                                  ▼
- ┌──────────────────┐              ┌─────────────────────┐
- │    Supabase      │              │  Safaricom Daraja   │
- │  Postgres + RLS  │              │     (M-Pesa)        │
- │  Auth (Google)   │◄─── callback ┤   STK Push          │
- │  Storage         │              └─────────────────────┘
- └──────────────────┘
+└──────┬─────────────────┬───────────────────────┬─────────────────────┘
+       │                 │                       │
+       ▼                 ▼                       ▼
+┌──────────────┐  ┌──────────────────┐  ┌─────────────────────┐
+│Firebase Auth │  │    Supabase      │  │  Safaricom Daraja   │
+│Google +      │  │  Postgres + RLS  │  │     (M-Pesa)        │
+│email/password│──│  Storage         │◄─┤   STK Push          │
+│custom claims │ID│  (3 buckets)     │  └─────────────────────┘
+└──────────────┘tk└──────────────────┘
 ```
+
+The ID token is the only thing joining the left two boxes: Supabase is registered
+with Firebase as a third-party auth provider, so it validates that token itself
+and every RLS policy reads the Firebase UID out of it.
 
 ### Stack
 
@@ -88,8 +93,8 @@ codebases on different hosts.
 | Framework | Next.js 15, App Router, TypeScript |
 | Styling | Tailwind CSS v3 + CSS custom properties |
 | Database | Supabase Postgres with Row Level Security |
-| Auth | Supabase Auth — Google OAuth + email/password |
-| File storage | Supabase Storage (`product-images` bucket) |
+| Auth | Firebase Auth — Google popup + email/password — as a Supabase third-party provider |
+| File storage | Supabase Storage (`product-images`, `deal-images`, `avatars`) |
 | Payments | M-Pesa STK Push (Safaricom Daraja) |
 
 ---
@@ -99,12 +104,12 @@ codebases on different hosts.
 ```
 app/
   page.tsx            home
-  shop/  product/[id]/  salon/  cart/  checkout/
+  shop/  product/[id]/  cart/  checkout/
   orders/  profile/  signin/  about/  contact/
   admin/              gated admin routes
   admin/actions.ts    admin mutations (Server Actions)
   api/                route handlers
-  auth/callback/      OAuth code exchange
+  api/auth/session/   ID token -> claims, profile, cookie
   robots.ts  sitemap.ts
   layout.tsx  globals.css  not-found.tsx
 components/
@@ -113,29 +118,36 @@ components/
   layout/             AppShell, FloatingTopNav, BottomNav, Footer,
                       SearchOverlay, ThemeToggle
   home/               HeroShowcase, HeroSlider, CircleCollection,
-                      SaleBanner, SalonServicesSection, FaqSection,
-                      NewsletterSignup
+                      SaleBanner, FaqSection, NewsletterSignup
   shop/               ProductCard, FeatureProductCard, ProductSlider,
                       ProductCarousel, FilterBoard, ShopClient
   product/            ProductDetailClient
-  orders/  profile/  salon/  contact/
+  orders/  profile/  contact/
   ui/                 Reveal, StarRating, Toast
 lib/
+  firebase/
+    client.ts         browser SDK singleton (auth, firestore, storage)
+    admin.ts          Admin SDK: verify tokens, write custom claims
+    session.ts        verified server identity (Node only)
+    cookie.ts         cookie name + unverified peek (Edge safe)
   supabase/           client, server, types, products, orders,
-                      content, stats, salon
+                      content, stats, storage
   mpesa.ts            STK Push
   products.ts         Product type, row mapper, formatKes
   cart.ts             cart maths, delivery fee, variant options
-  salon.ts            SalonService type and mapper
   avatars.ts  logo.ts
-  dev-auth.ts         development-only login fallback
-  dev-fixtures.ts     development-only sample data
-middleware.ts         session refresh + /admin gate
+middleware.ts         /admin gate
 styles/design.css     design tokens
 supabase/
   migrations/0001_init.sql
+  migrations/0002_remove_salon.sql
+  migrations/0003_firebase_auth.sql
   seed.sql
 ```
+
+`lib/firebase/session.ts` and `lib/firebase/cookie.ts` are split for a reason:
+middleware runs on the Edge runtime, where the Admin SDK's Node crypto cannot
+load, so anything middleware imports has to stay free of it.
 
 ---
 
@@ -147,7 +159,7 @@ supabase/
 
 | Route | Rendering | Purpose |
 |---|---|---|
-| `/` | Static shell, server-fetched data | Hero, collections, featured products, salon teaser |
+| `/` | Static shell, server-fetched data | Hero, collections, featured products |
 | `/shop` | Dynamic | Catalogue with category filter and search |
 | `/product/[id]` | Dynamic | Detail page, variant picker, add to cart |
 | `/salon` | Server fetch → client | Service listing and waitlist |
@@ -224,27 +236,40 @@ deliberate for the same reason.
 
 ```
 ThemeProvider          light/dark, persisted to localStorage
-└── AuthProvider       Supabase session, profile, sign-in/out
+└── AuthProvider       Firebase session, profile, sign-in/out
     └── CartProvider   cart lines, persisted to localStorage
         └── ToastProvider
 ```
 
 ### AuthProvider
 
-Exposes `{ configured, loading, user, session, profile, isAdmin,
-signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, updateProfile,
-refreshProfile }`.
+Exposes `{ configured, loading, user, profile, isAdmin, signInWithGoogle,
+signInWithEmail, signUpWithEmail, signOut, updateProfile, refreshProfile }`.
+`user` is a Firebase `User`; `profile` is the `profiles` row read through
+Supabase.
 
-It replaces EzyBite's pattern of `window.fb_*` globals plus a
-`document.addEventListener('auth-changed')` event. `onAuthStateChange` keeps the
-session in React state; the profile row is refetched whenever it changes.
+It listens with **`onIdTokenChanged`**, not `onAuthStateChanged`. The difference
+matters: `onIdTokenChanged` also fires for the automatic refresh Firebase performs
+shortly before the hour is up, which is what keeps the server's cookie from going
+stale while a tab sits open. On every firing it:
 
-`authErrorMessage()` maps Supabase errors to friendly copy — the same role
-`getAuthErrorMessage()` played in `js/auth.js`, rewritten because Supabase
-reports messages rather than `auth/*` codes.
+1. POSTs the token to `/api/auth/session`, which verifies it, writes the custom
+   claims, ensures a `profiles` row, and sets the httpOnly cookie;
+2. reloads the profile row;
+3. calls `router.refresh()` **only when the uid changed**, so server components
+   rendered before the cookie existed get re-rendered, while a routine hourly
+   refresh does not remount the page.
 
-When Supabase is unconfigured the provider yields `configured: false` and no
-client is constructed, so the app renders instead of throwing.
+If the session route reports `refreshRequired` — meaning it just wrote a claim
+that the token predates — the provider forces `getIdToken(true)` and posts again.
+That settles in exactly one extra round, because the second call finds nothing
+left to write.
+
+`authErrorMessage()` maps Firebase `auth/*` codes to friendly copy — the same role
+`getAuthErrorMessage()` played in `js/auth.js`.
+
+When Firebase is unconfigured the provider yields `configured: false` and never
+touches the SDK, so the app renders instead of throwing.
 
 ### CartProvider
 
@@ -333,12 +358,22 @@ and own only interaction state. Three consequences worth knowing:
 
 `middleware.ts` runs on nearly every request and does two jobs:
 
-1. **Refreshes the Supabase session.** Calling `getUser()` renews an expired
-   access token and writes the new cookie onto the response. Without this,
-   sessions expire mid-visit.
-2. **Gates `/admin`.** Unauthenticated → `/signin?next=…`. Authenticated
-   non-admin → `/?error=not-authorized`. The role is read from `profiles`, not
-   from a token claim.
+1. **Gates `/admin`.** No usable token → `/signin?next=…`. Signed in without the
+   `admin` claim → `/?error=not-authorized`.
+2. **Redirects away from `/signin`** for anyone already signed in.
+
+It does **not** refresh anything: Firebase refreshes its own token in the
+browser, and `AuthProvider` re-posts the cookie when it does.
+
+It also does **not verify** the token. Middleware runs on the Edge runtime, where
+the Admin SDK cannot load, so `peekIdToken()` decodes the JWT payload and checks
+`exp` without checking the signature. That is sound only because it decides
+nothing but a redirect — `app/admin/layout.tsx` verifies properly, and RLS is the
+real boundary. See
+[security.md](security.md#authorisation-layers).
+
+An expired cookie is treated as signed out, which bounces `/admin` through
+`/signin`; the page mints a fresh token and sends the user on to `next`.
 
 The matcher excludes Next internals and static assets — widening it would add
 latency to image requests for no benefit.
@@ -348,12 +383,11 @@ latency to image requests for no benefit.
 ## Data layer
 
 `lib/supabase/` has one module per domain: `products`, `orders`, `content`
-(reviews/deals/updates), `stats`, `salon`. Every read function has the same
+(reviews/deals/updates), `stats`, `storage`. Every read function has the same
 shape:
 
 ```ts
 export async function getThing(): Promise<Thing[]> {
-  if (isDevAuthEnabled()) return devThings;   // local review only
   if (!isSupabaseConfigured()) return [];     // degrade, never throw
   const supabase = await createClient();
   const { data, error } = await supabase.from("things").select("*");
@@ -369,6 +403,12 @@ Two properties this buys:
 - **A read failure degrades rather than 500s.** A broken RLS policy shows an empty
   shop and logs the cause, instead of an error page.
 
+There is no sample-data branch. An earlier version returned fixtures from
+`lib/dev-fixtures.ts` when Supabase was unconfigured, which meant a misconfigured
+environment looked like a working one — the shop was full either way. Both the
+fixtures and the dev-auth cookie they came with have been removed, so an empty
+storefront now unambiguously means an empty table.
+
 Writes behave the opposite way — they throw, or return `{ ok: false, error }`.
 Silently dropping a write is worse than failing loudly.
 
@@ -376,9 +416,15 @@ Silently dropping a write is worse than failing loudly.
 
 | Factory | Use |
 |---|---|
-| `createClient()` (client.ts) | Browser, anon key, subject to RLS |
-| `createClient()` (server.ts) | Server, caller's session cookies, subject to RLS |
-| `createServiceClient()` | **Bypasses RLS.** Two call sites only — see [security.md](security.md#service-role-key) |
+| `createClient()` (client.ts) | Browser, anon key + `accessToken` from `getIdToken()`, subject to RLS |
+| `createClient()` (server.ts) | Server, anon key + the token from the cookie, subject to RLS |
+| `createServiceClient()` | **Bypasses RLS.** Three call sites only — see [security.md](security.md#service-role-key) |
+
+Both session clients come from `@supabase/supabase-js` directly rather than
+`@supabase/ssr`. With Firebase owning the session there is no Supabase session to
+refresh and no auth cookies to shuttle between request and response, so the only
+credential is the bearer token and the `accessToken` callback is the whole
+integration. `@supabase/ssr` was removed from the dependencies.
 
 ---
 
@@ -500,23 +546,39 @@ Safaricom configurations probe the URL.
 
 ---
 
-### `GET /auth/callback`
+### `POST` / `DELETE /api/auth/session`
 
-OAuth landing route. Exchanges the one-time `code` for a session.
+Bridges the Firebase session in the browser to the server. Called by
+`AuthProvider` on sign-in and on every token refresh — not by page code.
 
-| Query | Meaning |
+**POST** body: `{ "idToken": "<firebase id token>" }`
+
+It verifies the token with the Admin SDK, decides whether the user is an admin,
+writes the `role` and `admin` custom claims, ensures a `profiles` row exists, and
+sets the httpOnly `kelmon-token` cookie.
+
+```json
+{ "uid": "8f2…", "admin": false, "refreshRequired": false }
+```
+
+`refreshRequired: true` means a claim was just written that the submitted token
+predates. The client must call `getIdToken(true)` and POST again, otherwise
+Postgres never sees the new claim.
+
+| Status | When |
 |---|---|
-| `code` | Authorisation code from the provider |
-| `next` | Post-sign-in path. **Same-site only** — must start with a single `/`, else falls back to `/profile` |
+| 200 | Token verified, cookie set |
+| 401 | Token invalid or expired |
+| 503 | Firebase Admin credentials missing on the server |
 
----
+A failed `profiles` write does **not** fail the request: the user is authenticated
+either way, and the next request retries.
 
-### `POST` / `DELETE /api/dev-auth`
+**DELETE** clears the cookie. No body, always 200.
 
-**Development only.** Returns **404** whenever `NODE_ENV === "production"` or
-Supabase is configured. `POST { email, name }` sets an `httpOnly` cookie; the role
-is derived from the email server-side, never read from the cookie. `DELETE`
-clears it. See [decision 5](#5-development-only-auth-fallback).
+There is no OAuth landing route. Google sign-in uses `signInWithPopup`, so the
+caller stays on the page and there is no `code` to exchange — `/auth/callback` was
+removed with the switch to Firebase.
 
 ---
 
@@ -547,7 +609,6 @@ across the boundary, then `revalidatePath()` the affected routes.
 | Orders | `updateOrderStatus`, `updatePaymentStatus`, `deleteOrder`, `createDirectOrder` |
 | Products | `upsertProduct`, `deleteProduct`, `setProductActive` |
 | Content | `createDeal`, `deleteDeal`, `createUpdate`, `deleteUpdate`, `deleteReview` |
-| Salon | `updateBookingStatus` |
 
 Notes:
 
@@ -576,12 +637,17 @@ startTransition(async () => {
 
 ## Auth
 
-Supabase Auth with Google OAuth and email/password. `auth.users` is the single
-user directory; the `handle_new_user` trigger creates the matching `profiles` row
-on signup, pulling name and avatar from OAuth metadata.
+Firebase Auth with Google (popup) and email/password, registered with Supabase as
+a third-party auth provider. Firebase is the user directory; `profiles` mirrors it,
+keyed by the Firebase UID, and the row is created by `/api/auth/session` on first
+sign-in.
 
-Admin access is `profiles.role = 'admin'`, a database value — not a hardcoded
-list. `profiles.role` is not client-writable; see
+The full model — claims, the token cookie, and why middleware only peeks at the
+token — is in [security.md](security.md#authentication).
+
+Admin access is the `admin` custom claim, backed by `profiles.role = 'admin'`.
+Neither is client-writable, and the first admin comes from the `ADMIN_EMAILS`
+allowlist; see
 [security.md](security.md#privilege-escalation-is-blocked-in-the-schema).
 
 ---
@@ -658,26 +724,31 @@ Both routes log with `[stk-push]` / `[mpesa-callback]` prefixes.
 
 ---
 
-## Google OAuth
+## Firebase Auth
 
-Handled by Supabase Auth. **No environment variables in this app** — the client
-ID and secret live in the Supabase dashboard.
+Four console steps, and the third is the one that is easy to miss.
 
-1. **Google Cloud Console → Credentials** → OAuth 2.0 Web client. Authorised
-   redirect URI is *Supabase's* callback, not your app's:
-   `https://<project-ref>.supabase.co/auth/v1/callback`
-   This is the step most often got wrong — the browser goes Google → Supabase →
-   your app, so Google must be told Supabase's URL.
-2. **Supabase → Authentication → Providers → Google** → paste ID and secret.
-3. **Supabase → Authentication → URL Configuration → Redirect URLs** → add your
-   app's `/auth/callback` for each environment. Supabase refuses to redirect to an
-   unlisted URL; a missing entry shows as a successful Google sign-in that lands
-   back on `/signin` with an error.
+1. **Firebase console → Authentication → Sign-in method** → enable **Email/Password**
+   and **Google**. Google needs no client ID here; Firebase provisions one.
+2. **Firebase console → Authentication → Settings → Authorised domains** → add
+   `localhost` and your production domain. A missing entry surfaces as
+   `auth/unauthorized-domain` when the popup opens.
+3. **Supabase dashboard → Authentication → Third Party Auth** → add a Firebase
+   provider and give it your Firebase **project ID**. Without this, Supabase
+   rejects every token and each query fails on authorisation rather than on RLS —
+   the symptom is a signed-in user seeing nothing at all.
+4. **Firebase console → Project settings → Service accounts** → *Generate new
+   private key*. Those three fields become `FIREBASE_PROJECT_ID`,
+   `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY`. The server cannot verify a
+   token or write a claim without them, so `/admin` stays closed until they exist.
 
-`prompt: "select_account"` is set so returning users can switch accounts.
+`prompt: "select_account"` is set on the Google provider so returning users can
+switch accounts.
 
 Google avatar URLs (`*.googleusercontent.com`) are allow-listed in
 `next.config.ts`; a new image host must be added there or `next/image` refuses it.
+Uploaded images come from your Supabase Storage domain, which must be allow-listed
+the same way.
 
 ---
 
@@ -693,7 +764,33 @@ Template: `.env.example`. Copy to `.env.local`.
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | `https://<ref>.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | Public by design — RLS protects data |
-| `SUPABASE_SERVICE_ROLE_KEY` | for M-Pesa | **Bypasses RLS. Never `NEXT_PUBLIC_`** |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes | Needed by sign-in and M-Pesa. **Bypasses RLS. Never `NEXT_PUBLIC_`** |
+
+### Firebase
+
+The `NEXT_PUBLIC_` block is the web app config from **Project settings → General →
+Your apps**. All of it is public by design: it identifies the project and
+authorises nothing.
+
+| Variable | Required | Notes |
+|---|---|---|
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | yes | |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | yes | `<project>.firebaseapp.com` |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | yes | Also what Supabase's Third Party Auth entry wants |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | yes | |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | yes | |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | yes | |
+
+The service account is the opposite — it is a private key and must never carry a
+`NEXT_PUBLIC_` prefix. Either shape works:
+
+| Variable | Required | Notes |
+|---|---|---|
+| `FIREBASE_PROJECT_ID` | yes | Falls back to the public project id |
+| `FIREBASE_CLIENT_EMAIL` | yes | `firebase-adminsdk-…@<project>.iam.gserviceaccount.com` |
+| `FIREBASE_PRIVATE_KEY` | yes | Keep the `\n` escapes; quote the whole value |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | alternative | The whole downloaded JSON, raw or base64. Replaces the three above |
+| `ADMIN_EMAILS` | first admin | Comma-separated. Granted admin on next sign-in |
 
 ### M-Pesa
 
@@ -717,8 +814,11 @@ Template: `.env.example`. Copy to `.env.local`.
 
 | Missing | Behaviour |
 |---|---|
-| All Supabase vars | Pages render empty; `/admin` uses the dev fallback locally |
-| `SUPABASE_SERVICE_ROLE_KEY` | Storefront fine; M-Pesa callback throws when it fires |
+| All Supabase vars | Pages render empty; sign-in still works but nothing persists |
+| `SUPABASE_SERVICE_ROLE_KEY` | Sign-in works but creates no `profiles` row; M-Pesa callback throws when it fires |
+| `NEXT_PUBLIC_FIREBASE_*` | Sign-in disabled with a notice on `/signin`; the storefront still browses |
+| Firebase service account | `/api/auth/session` returns 503 and `/admin` stays closed — the gate cannot verify anything, so it fails closed |
+| Supabase Third Party Auth not configured | Sign-in succeeds, then every query fails authorisation — a signed-in user sees nothing |
 | All M-Pesa vars | STK Push returns 503; cash on delivery still works |
 
 Restart the dev server after editing — `NEXT_PUBLIC_*` values are inlined at build
@@ -734,7 +834,9 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Runs with **no configuration**: sample data, and a test admin login.
+This gets the storefront rendering, but empty and with sign-in disabled. Real
+credentials are needed for anything past browsing — see [First-run
+setup](#first-run-setup) below.
 
 | Script | Does |
 |---|---|
@@ -747,25 +849,31 @@ Runs with **no configuration**: sample data, and a test admin login.
 Run `typecheck` before committing — the Supabase types are hand-written, so it is
 what catches schema drift.
 
-### Test admin login
+### First-run setup
 
-At `/signin`: `admin@gmail.com`, any 6+ character password. Then open `/admin`.
-Any other email signs in as a customer and is refused.
+There is no offline mode and no sample data: an empty catalogue is an empty
+`products` table. Six steps, in order.
 
-Sample data comes from `lib/dev-fixtures.ts`: 8 orders across every state spread
-over 5 days, 6 products, 6 reviews, 3 deals, 3 updates, 4 salon services.
-**Writes do not persist in this mode.**
+1. **Firebase** — create a project, enable Email/Password and Google, and add
+   `localhost` to the authorised domains. Copy the web app config into the
+   `NEXT_PUBLIC_FIREBASE_*` variables. See [Firebase Auth](#firebase-auth).
+2. **Firebase service account** — generate a private key and set
+   `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY`. Without these the server
+   cannot verify a token, so `/admin` stays shut.
+3. **Supabase** — create a project, copy the URL, anon key and service-role key.
+4. **Supabase → Authentication → Third Party Auth** — add your Firebase project
+   id. Skipping this is the single most confusing failure mode: sign-in works and
+   then nothing loads.
+5. **Schema** —
+   ```bash
+   npx supabase link --project-ref <ref>
+   npx supabase db push
+   ```
+6. **First admin** — put your email in `ADMIN_EMAILS`, restart, and sign in. The
+   claim and `profiles.role` are both written on that sign-in. Then open
+   `/admin/products` and add your first product.
 
-### Against real Supabase
-
-```bash
-npx supabase link --project-ref <ref>
-npx supabase db push
-psql "$DATABASE_URL" -f supabase/seed.sql
-```
-
-Sign in once, then grant admin (see
-[security.md](security.md#privilege-escalation-is-blocked-in-the-schema)).
+`supabase/seed.sql` only grants admin by email; it contains no catalogue.
 
 ### M-Pesa locally
 
@@ -780,9 +888,16 @@ npx ngrok http 3000
 - **`next dev` and `next build` conflict** — they share `.next` and produce
   confusing `Cannot find module for page` errors. Stop dev before building.
 - **Every query types as `never`** — a row declared as `interface` instead of
-  `type`, or an `@supabase/ssr` version mismatch. See
-  [data-model.md](data-model.md#the-typescript-mirror).
+  `type`. See [data-model.md](data-model.md#the-typescript-mirror).
 - **New image host** — must be allow-listed in `next.config.ts`.
+- **Signed in but everything is empty** — Supabase is not accepting the Firebase
+  token. Check Third Party Auth is configured with the right project id, and that
+  the `role: authenticated` claim is on the token (decode it at jwt.io).
+- **`/admin` bounces to `/signin` in a loop** — the token cookie is expiring
+  before it is read. Check the server clock, and that `/api/auth/session` is
+  returning 200 rather than 503 for missing Admin credentials.
+- **`FIREBASE_PRIVATE_KEY` errors on start** — the `\n` escapes were stripped, or
+  the surrounding quotes were not. Keep it on one line, quoted, escapes intact.
 
 ---
 
@@ -799,18 +914,23 @@ long as middleware is supported — the `/admin` gate lives there.
 - [ ] `NEXT_PUBLIC_SITE_URL` is the real origin
 - [ ] `MPESA_ENV=production` with production credentials
 - [ ] `MPESA_CALLBACK_URL` → `https://<domain>/api/mpesa/callback`
-- [ ] Google provider configured; redirect URLs include production
+- [ ] Firebase sign-in methods enabled; production domain in Firebase's
+      **Authorised domains**
+- [ ] Supabase **Third Party Auth** entry present, with the right Firebase project id
+- [ ] Firebase service-account key set, **not** `NEXT_PUBLIC_`
+- [ ] `ADMIN_EMAILS` set, or the first admin already granted in the database
+- [ ] Supabase Storage domain allow-listed in `next.config.ts`
 - [ ] `npm run typecheck && npm run build && npm run lint`
-- [ ] Confirm the dev login is inert:
-      `curl -X POST https://<domain>/api/dev-auth` → **404**
 
 ### Smoke test
 
 1. `/` renders real products.
 2. `/shop` filters by category.
 3. `/product/<slug>` renders; a bad slug 404s.
-4. Google sign-in works; `/profile` shows your name.
+4. Google sign-in works; `/profile` shows your name, points and orders — proving
+   Supabase accepted the Firebase token, not just that sign-in succeeded.
 5. `/admin` refuses a non-admin, admits an admin.
+6. Upload a product image in `/admin/products` and confirm it renders on `/shop`.
 6. **Place and pay a small real order.** Confirm the prompt arrives, the order
    flips to `paid` with a receipt, points are awarded, and it appears under
    Successful Payments.
@@ -839,7 +959,8 @@ change one, add a new entry rather than rewriting history.
 
 ## 1. Supabase Auth over Firebase Auth
 
-**Accepted · 2026-09-27**
+**Superseded by [decision 6](#6-firebase-auth-as-a-supabase-third-party-provider) · 2026-09-28**
+(originally accepted 2026-09-27)
 
 ### Context
 
@@ -880,6 +1001,11 @@ anyway); Google OAuth needs dashboard configuration not captured in code.
 
 **Bootstrapping consequence** — `profiles.role` is not client-writable, so the
 first admin must be granted with the service role.
+
+**Why this was reversed** — the objection to option A was the bridge: verify the
+Firebase token, mint a second Supabase-signed JWT, keep two directories in step.
+Supabase's third-party auth support removes that bridge entirely, so the reasoning
+no longer applies. See [decision 6](#6-firebase-auth-as-a-supabase-third-party-provider).
 
 ---
 
@@ -1092,10 +1218,72 @@ path depends on it.
 mode; `DEV_ADMIN_EMAILS` is a hardcoded list, the same pattern criticised in
 decision 3, acceptable only because it cannot execute in production.
 
-**To remove:** delete `lib/dev-auth.ts`, `lib/dev-fixtures.ts`,
-`app/api/dev-auth/route.ts`, and the `isDevAuthEnabled()` branches in
-`middleware.ts`, `lib/supabase/server.ts`, `app/admin/layout.tsx` and each
-`lib/supabase/*` read module.
+**Reversed · 2026-09-28.** `lib/dev-auth.ts`, `lib/dev-fixtures.ts` and
+`app/api/dev-auth/route.ts` are deleted, along with every `isDevAuthEnabled()`
+branch. The accepted cost turned out to be worse than described: because the
+fixtures were returned whenever Supabase was *unconfigured*, a misconfigured
+environment was indistinguishable from a working one — the shop was full either
+way, so the failure the fallback was meant to smooth over was the failure it hid.
+The app now renders empty and says so.
+
+---
+
+## 6. Firebase Auth as a Supabase third-party provider
+
+**Accepted · 2026-09-28** — supersedes [decision 1](#1-supabase-auth-over-firebase-auth)
+
+### Context
+
+Decision 1 chose Supabase Auth on the grounds that authorisation belongs in the
+schema, and that bolting Firebase onto Supabase RLS meant maintaining a
+token-bridge nobody wanted to own. Kelmon subsequently needs Firebase Auth. The
+question is whether the objection still stands.
+
+### Options
+
+**A. Keep Supabase Auth.** Nothing to build. Does not meet the requirement.
+
+**B. Firebase Auth with a hand-written bridge.** The option decision 1 rejected:
+verify the Firebase token server-side, mint a second JWT signed with the Supabase
+secret, attach it to every request, reconcile two directories. Every policy then
+depends on that bridge, and a bug in it is an authorisation bug across every table
+at once. The objection was correct and still is.
+
+**C. Firebase Auth as a Supabase third-party auth provider.** Supabase validates
+Firebase ID tokens itself, against Google's published keys, before PostgREST sees
+the request. There is no second token, no bridge, and one directory — Firebase —
+with `profiles` mirroring it.
+
+### Decision
+
+**Option C.** It satisfies the requirement without reintroducing what decision 1
+was actually objecting to. Authorisation still lives in the schema; only the
+issuer of the token changed. The work is a migration (`0003_firebase_auth.sql`)
+plus an `accessToken` callback on two Supabase clients.
+
+### Consequences
+
+**Good** — no custom token bridge; policies stay in SQL and still hold against a
+raw query from the browser console; `@supabase/ssr` dropped, since there is no
+Supabase session to refresh; the `admin` custom claim makes `is_admin()` free in
+the common case.
+
+**Accepted** —
+
+- **`auth.uid()` is unusable.** It casts `sub` to uuid, and a Firebase UID is a
+  28-character string. `app_uid()` replaces it, and identity columns became
+  `text`. Any policy written from a Supabase tutorial will need translating.
+- **The `role: authenticated` claim is load-bearing.** PostgREST picks the
+  Postgres role from it. A token without it is anonymous, which fails closed —
+  correct, but the symptom (signed in, sees nothing) points nowhere near the
+  cause.
+- **Two consoles to configure.** Firebase for sign-in methods and domains,
+  Supabase for the third-party provider entry. Neither is captured in code.
+- **A service-account private key now exists in the server environment.** It is
+  what makes claim-writing possible and self-granting impossible.
+- **ID tokens expire in an hour**, so a cold load after a longer absence renders
+  as signed out until the client posts a fresh one. `/admin` bounces through
+  `/signin`, which does exactly that.
 
 ---
 

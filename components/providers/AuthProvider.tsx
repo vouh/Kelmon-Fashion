@@ -1,174 +1,243 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import type { Session, User } from "@supabase/supabase-js";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useRouter } from "next/navigation";
+import {
+  GoogleAuthProvider,
+  createUserWithEmailAndPassword,
+  onIdTokenChanged,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut as firebaseSignOut,
+  updateProfile as updateFirebaseProfile,
+  type User,
+} from "firebase/auth";
+import { getFirebaseAuth, isFirebaseConfigured } from "@/lib/firebase/client";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import type { ProfileRow } from "@/lib/supabase/types";
 
 /**
- * Supabase auth session for the whole app.
+ * Firebase Authentication for the whole app, with the server kept in step.
  *
- * Replaces FirebaseProvider and the window.fb_* / document 'auth-changed'
- * event pattern from js/firebase-service.js and js/auth.js with React context.
+ * Firebase owns the session; Supabase owns the data. The join between them is
+ * the ID token, which this provider does two things with on every change:
+ *
+ *   1. POSTs it to /api/auth/session, so the server has an httpOnly copy to
+ *      read (server components, the /admin gate) and the custom claims RLS
+ *      needs get written.
+ *   2. Leaves it where the Supabase client can find it — lib/supabase/client.ts
+ *      calls getIdToken() itself before each request.
+ *
+ * onIdTokenChanged rather than onAuthStateChanged: it fires for sign-in and
+ * sign-out *and* for the automatic refresh Firebase performs shortly before the
+ * hour is up. That last one is what keeps the server's cookie from going stale
+ * while a tab sits open.
  */
 interface AuthContextValue {
+  /** True when Firebase credentials are present. */
   configured: boolean;
-  /** True until the initial session lookup settles. */
+  /** True until the initial token lookup settles. */
   loading: boolean;
   user: User | null;
-  session: Session | null;
   profile: ProfileRow | null;
   isAdmin: boolean;
-  signInWithGoogle: (redirectTo?: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
-  updateProfile: (patch: Partial<Pick<ProfileRow, "full_name" | "phone" | "campus" | "avatar_url">>) => Promise<void>;
+  updateProfile: (
+    patch: Partial<Pick<ProfileRow, "full_name" | "phone" | "campus" | "avatar_url">>
+  ) => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 /**
- * Maps Supabase auth errors to friendly copy.
- * Ported from getAuthErrorMessage() in js/auth.js — same intent, different
- * error strings, since Supabase reports messages rather than auth/* codes.
+ * Maps Firebase auth errors to friendly copy.
+ *
+ * Firebase reports `auth/*` codes, so this matches on those rather than on the
+ * message text Supabase used to return.
  */
 export function authErrorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error ?? "");
-  const msg = raw.toLowerCase();
+  const code = (error as { code?: string } | null)?.code ?? raw;
 
-  if (msg.includes("invalid login credentials")) return "Invalid email or password.";
-  if (msg.includes("email not confirmed")) return "Check your inbox and confirm your email first.";
-  if (msg.includes("user already registered") || msg.includes("already been registered"))
+  if (code.includes("auth/invalid-credential") || code.includes("auth/wrong-password"))
+    return "Invalid email or password.";
+  if (code.includes("auth/user-not-found"))
+    return "No account with that email. Create one below.";
+  if (code.includes("auth/email-already-in-use"))
     return "An account with this email already exists. Try signing in.";
-  if (msg.includes("password should be at least"))
+  if (code.includes("auth/weak-password"))
     return "Password is too short. Use at least 6 characters.";
-  if (msg.includes("unable to validate email") || msg.includes("invalid email"))
+  if (code.includes("auth/invalid-email"))
     return "That doesn't look like a valid email address.";
-  if (msg.includes("rate limit") || msg.includes("too many"))
+  if (code.includes("auth/too-many-requests"))
     return "Too many attempts. Please wait a moment and try again.";
-  if (msg.includes("popup") || msg.includes("cancelled"))
+  if (code.includes("auth/popup-closed-by-user") || code.includes("auth/cancelled-popup-request"))
     return "Sign-in was cancelled. Please try again.";
-  if (msg.includes("failed to fetch") || msg.includes("network"))
+  if (code.includes("auth/popup-blocked"))
+    return "Your browser blocked the sign-in popup. Allow popups and try again.";
+  if (code.includes("auth/network-request-failed"))
     return "Network error. Check your internet connection.";
+  if (code.includes("auth/operation-not-allowed"))
+    return "That sign-in method is not enabled for this project yet.";
+  if (code.includes("auth/unauthorized-domain"))
+    return "This domain is not authorised in the Firebase console.";
 
   return raw || "Something went wrong. Please try again.";
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const configured = isSupabaseConfigured();
-  // Only build a client when env is present, so the app still renders without it.
-  const supabase = useMemo(() => (configured ? createClient() : null), [configured]);
+  const configured = isFirebaseConfigured();
+  const router = useRouter();
 
   const [loading, setLoading] = useState(configured);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
 
-  const user = session?.user ?? null;
+  /** The uid the server was last told about, so a refresh only fires on change. */
+  const syncedUid = useRef<string | null>(null);
 
-  const loadProfile = useCallback(
-    async (userId: string | undefined) => {
-      if (!supabase || !userId) {
-        setProfile(null);
-        return;
-      }
-      const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
-      setProfile(data ?? null);
-    },
-    [supabase]
-  );
+  const loadProfile = useCallback(async (uid: string | undefined) => {
+    if (!uid || !isSupabaseConfigured()) {
+      setProfile(null);
+      return;
+    }
+    const { data } = await createClient()
+      .from("profiles")
+      .select("*")
+      .eq("id", uid)
+      .maybeSingle();
+    setProfile(data ?? null);
+  }, []);
+
+  /** Mirrors the current token into the server's cookie. */
+  const syncSession = useCallback(async (next: User | null) => {
+    if (!next) {
+      await fetch("/api/auth/session", { method: "DELETE" }).catch(() => {});
+      return;
+    }
+
+    const post = (idToken: string) =>
+      fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+
+    const response = await post(await next.getIdToken());
+    if (!response.ok) return;
+
+    const { refreshRequired } = (await response.json()) as { refreshRequired?: boolean };
+    if (refreshRequired) {
+      // The server wrote a custom claim, which the token just sent predates.
+      // Force a new one so Postgres actually sees it, and store that instead.
+      // This settles in one extra round: the second sync finds nothing to write.
+      await post(await next.getIdToken(true));
+    }
+  }, []);
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!configured) return;
 
     let active = true;
 
-    supabase.auth.getSession().then(({ data }) => {
+    const unsubscribe = onIdTokenChanged(getFirebaseAuth(), async (next) => {
       if (!active) return;
-      setSession(data.session);
-      setLoading(false);
-      void loadProfile(data.session?.user.id);
-    });
 
-    // Equivalent of onAuthStateChanged in js/firebase-service.js
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (!active) return;
-      setSession(nextSession);
+      setUser(next);
       setLoading(false);
-      void loadProfile(nextSession?.user.id);
+
+      await syncSession(next);
+      if (!active) return;
+
+      await loadProfile(next?.uid);
+      if (!active) return;
+
+      // Server components rendered before the cookie existed still think the
+      // visitor is anonymous. Re-render them, but only when the identity itself
+      // changed — a routine hourly token refresh must not remount the page.
+      const uid = next?.uid ?? null;
+      if (syncedUid.current !== uid) {
+        syncedUid.current = uid;
+        router.refresh();
+      }
     });
 
     return () => {
       active = false;
-      sub.subscription.unsubscribe();
+      unsubscribe();
     };
-  }, [supabase, loadProfile]);
+  }, [configured, syncSession, loadProfile, router]);
 
-  const requireClient = useCallback(() => {
-    if (!supabase) throw new Error("Supabase is not configured. Add credentials to .env.local");
-    return supabase;
-  }, [supabase]);
+  const requireAuth = useCallback(() => {
+    if (!configured) {
+      throw new Error("Firebase is not configured. Add credentials to .env.local");
+    }
+    return getFirebaseAuth();
+  }, [configured]);
 
-  const signInWithGoogle = useCallback(async (redirectTo?: string) => {
-    const client = requireClient();
-    const next = redirectTo ?? window.location.pathname;
-    const { error } = await client.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
-        queryParams: { prompt: "select_account" },
-      },
-    });
-    if (error) throw error;
-  }, [requireClient]);
+  const signInWithGoogle = useCallback(async () => {
+    const auth = requireAuth();
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    // A popup rather than a redirect: it keeps the caller on the page, so there
+    // is no OAuth landing route to maintain and no code to exchange.
+    await signInWithPopup(auth, provider);
+  }, [requireAuth]);
 
-  const signInWithEmail = useCallback(async (email: string, password: string) => {
-    const client = requireClient();
-    const { error } = await client.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-  }, [requireClient]);
+  const signInWithEmail = useCallback(
+    async (email: string, password: string) => {
+      await signInWithEmailAndPassword(requireAuth(), email, password);
+    },
+    [requireAuth]
+  );
 
   const signUpWithEmail = useCallback(
     async (email: string, password: string, fullName: string) => {
-      const client = requireClient();
-      // full_name lands in raw_user_meta_data, which the handle_new_user()
-      // trigger copies into profiles.full_name.
-      const { error } = await client.auth.signUp({
-        email,
-        password,
-        options: { data: { full_name: fullName } },
-      });
-      if (error) throw error;
+      const credential = await createUserWithEmailAndPassword(requireAuth(), email, password);
+      // Set it on the Firebase user too, so the name is in the ID token's `name`
+      // claim and /api/auth/session can seed profiles.full_name from it.
+      await updateFirebaseProfile(credential.user, { displayName: fullName });
+      await syncSession(credential.user);
     },
-    [requireClient]
+    [requireAuth, syncSession]
   );
 
   const signOut = useCallback(async () => {
-    const client = requireClient();
-    await client.auth.signOut();
+    await firebaseSignOut(requireAuth());
     setProfile(null);
-  }, [requireClient]);
+    await fetch("/api/auth/session", { method: "DELETE" }).catch(() => {});
+    router.refresh();
+  }, [requireAuth, router]);
 
   const updateProfile = useCallback(
     async (patch: Partial<Pick<ProfileRow, "full_name" | "phone" | "campus" | "avatar_url">>) => {
-      const client = requireClient();
       if (!user) throw new Error("You must be signed in.");
-      const { error } = await client.from("profiles").update(patch).eq("id", user.id);
-      if (error) throw error;
-      await loadProfile(user.id);
+      const { error } = await createClient().from("profiles").update(patch).eq("id", user.uid);
+      if (error) throw new Error(error.message);
+      await loadProfile(user.uid);
     },
-    [requireClient, user, loadProfile]
+    [user, loadProfile]
   );
 
-  const refreshProfile = useCallback(() => loadProfile(user?.id), [loadProfile, user?.id]);
+  const refreshProfile = useCallback(() => loadProfile(user?.uid), [loadProfile, user?.uid]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       configured,
       loading,
       user,
-      session,
       profile,
       isAdmin: profile?.role === "admin",
       signInWithGoogle,
@@ -182,7 +251,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       configured,
       loading,
       user,
-      session,
       profile,
       signInWithGoogle,
       signInWithEmail,

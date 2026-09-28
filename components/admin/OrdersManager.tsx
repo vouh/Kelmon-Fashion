@@ -47,6 +47,7 @@ export default function OrdersManager({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showDirect, setShowDirect] = useState(openDirectOrder);
   const [error, setError] = useState<string | null>(null);
+  const [stkSending, setStkSending] = useState<string | null>(null);
 
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -71,6 +72,27 @@ export default function OrdersManager({
       if (!result.ok) setError(result.error ?? "Something went wrong.");
       else router.refresh();
     });
+  }
+
+  async function sendStkPush(order: OrderWithItems) {
+    setError(null);
+    setStkSending(order.id);
+    try {
+      // The server reads the amount from this order, so staff cannot alter the
+      // payment total in the browser before a Safaricom prompt is sent.
+      const response = await fetch("/api/mpesa/stk-push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.id, phone: order.phone }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Could not send STK push.");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not send STK push.");
+    } finally {
+      setStkSending(null);
+    }
   }
 
   return (
@@ -214,6 +236,17 @@ export default function OrdersManager({
                         </td>
                         <td className={TD}>
                           <div className="flex items-center gap-1">
+                            {order.payment_status !== "paid" && (
+                              <button
+                                type="button"
+                                disabled={pending || stkSending === order.id}
+                                onClick={() => void sendStkPush(order)}
+                                className="rounded px-1.5 py-1 text-[9px] font-black uppercase tracking-wide text-purple-300 hover:bg-purple-400/10 disabled:opacity-50"
+                                aria-label={`Send M-Pesa prompt to ${order.customer_name}`}
+                              >
+                                {stkSending === order.id ? "Sending…" : "Send STK"}
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() =>
@@ -301,6 +334,16 @@ export default function OrdersManager({
                       onConfirm={() => run(() => deleteOrder(order.id))}
                     />
                   </div>
+                  {order.payment_status !== "paid" && (
+                    <button
+                      type="button"
+                      disabled={pending || stkSending === order.id}
+                      onClick={() => void sendStkPush(order)}
+                      className="w-full rounded-lg border border-purple-400/25 bg-purple-400/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-purple-300 hover:bg-purple-400/20 disabled:opacity-50"
+                    >
+                      {stkSending === order.id ? "Sending M-Pesa prompt…" : "Send M-Pesa STK prompt"}
+                    </button>
+                  )}
                   <OrderItems order={order} />
                 </div>
               ))}

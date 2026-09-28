@@ -2,22 +2,23 @@
 
 Trust boundaries, Row Level Security policies, and open risks.
 
-**Current as of:** 2026-09-27.
+**Current as of:** 2026-09-28.
 
 ---
 
 ## Contents
 
 - [Trust boundaries](#trust-boundaries)
+- [Authentication](#authentication)
 - [Authorisation layers](#authorisation-layers)
 - [Row Level Security](#row-level-security)
+- [Storage](#storage)
 - [Privilege escalation is blocked in the schema](#privilege-escalation-is-blocked-in-the-schema)
 - [Money handling](#money-handling)
 - [Idempotency](#idempotency)
 - [Service-role key](#service-role-key)
 - [Secrets](#secrets)
 - [Input handling](#input-handling)
-- [Development auth fallback](#development-auth-fallback)
 - [Testing checklist](#testing-checklist)
 - [Known issues and accepted risks](#known-issues-and-accepted-risks)
 
@@ -27,12 +28,17 @@ Trust boundaries, Row Level Security policies, and open risks.
 
 ```
 ┌─ Untrusted ─────────────────────────────────────────────────┐
-│ Browser: anon key, cart state, form input, dev cookie       │
+│ Browser: anon key, cart state, form input, the token cookie  │
 │ Safaricom callback body (unauthenticated — see known issues) │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌─ Trusted issuer ─────────▼──────────────────────────────────┐
+│ Firebase Auth — signs ID tokens, holds the custom claims     │
 └──────────────────────────┬──────────────────────────────────┘
                            │
 ┌─ Server ─────────────────▼──────────────────────────────────┐
 │ middleware.ts · Server Components · Server Actions · routes  │
+│ Verifies tokens with the Admin SDK private key               │
 │ Holds SUPABASE_SERVICE_ROLE_KEY and M-Pesa credentials       │
 └──────────────────────────┬──────────────────────────────────┘
                            │
@@ -51,16 +57,64 @@ Test with the anon key against the API directly.
 
 ---
 
+## Authentication
+
+Firebase Auth issues identity; Supabase enforces access. Supabase is configured
+with Firebase as a third-party auth provider (dashboard -> Authentication -> Third
+Party Auth), so it accepts Firebase ID tokens directly and no second session
+exists to fall out of step with the first.
+
+**The token is the whole join.** `lib/supabase/client.ts` and
+`lib/supabase/server.ts` pass it as Supabase's `accessToken`, and Supabase
+validates the signature against Google's published keys before PostgREST ever
+sees the request. A user id in this system is a Firebase UID — a string, not a
+uuid — which is why `auth.uid()` is unusable here and `app_uid()` replaces it.
+
+### Custom claims
+
+Two claims, both written server-side only, by the Admin SDK in
+`lib/firebase/admin.ts`:
+
+| Claim | Set to | Why |
+|---|---|---|
+| `role` | `"authenticated"` | **Required.** PostgREST reads `role` to pick the Postgres role for the request. A Firebase token without it is treated as anonymous, and every policy that expects a signed-in user fails closed |
+| `admin` | `true` for admins | Read by `is_admin()` in Postgres, so the admin check costs no table read |
+
+A claim can never be self-granted: writing one needs the service-account private
+key, which only the server has. `admin` comes from the `ADMIN_EMAILS` allowlist or
+from an existing admin, and `setAdminClaim()` revokes refresh tokens so a change
+takes effect immediately rather than whenever the current token expires.
+
+### The token cookie
+
+Firebase keeps its session in IndexedDB, which the server cannot read, so
+`AuthProvider` mirrors the ID token into an httpOnly `kelmon-token` cookie on
+sign-in and on every refresh, and `/api/auth/session` verifies it before storing
+it. An ID token is stored rather than a Firebase session cookie because Supabase
+accepts only the `securetoken.google.com` issuer.
+
+The cookie is httpOnly, `sameSite: lax`, and `secure` in production. It holds a
+token that expires within the hour, and possessing it is not itself
+authorisation: every path that matters verifies the signature.
+
+---
+
 ## Authorisation layers
 
 Reaching `/admin` passes three checks, then RLS:
 
 | Layer | Where | Purpose |
 |---|---|---|
-| 1 | `middleware.ts` | Redirect before any admin markup is generated |
-| 2 | `app/admin/layout.tsx` | Re-check on every nested route |
+| 1 | `middleware.ts` | Redirect before any admin markup is generated. **Decodes the token, does not verify it** — see below |
+| 2 | `app/admin/layout.tsx` | Verifies the signature with the Admin SDK, on every nested route |
 | 3 | `requireAdmin()` in `app/admin/actions.ts` | Server Actions are callable POST endpoints, invocable without ever loading a page |
 | 4 | RLS policies | The guarantee — holds even if 1–3 are bypassed |
+
+Layer 1 runs on the Edge runtime, where the Admin SDK's Node crypto cannot load,
+so `peekIdToken()` reads the JWT payload **without checking the signature**. That
+is safe only because it decides nothing but a redirect: a forged cookie gets past
+layer 1 and is then stopped by layer 2 and by RLS. Never authorise a read or a
+write on a peeked claim.
 
 Layers 1–3 are redundant by design. Layer 4 is what actually protects the data.
 
@@ -76,24 +130,54 @@ RLS is enabled on **every** table in `public`. With RLS on and no matching
 policy, the default is deny — so a table added without policies is inaccessible
 rather than open. That is the intended failure direction.
 
-Source: [`supabase/migrations/0001_init.sql`](../supabase/migrations/0001_init.sql).
+Source: [`supabase/migrations/0003_firebase_auth.sql`](../supabase/migrations/0003_firebase_auth.sql),
+which restates every policy in full. 0001 is the original uuid-identity version
+and is superseded by it.
+
+### Identity
+
+```sql
+create or replace function public.app_uid()
+returns text
+language sql
+stable
+as $$
+  select nullif(
+    coalesce(
+      current_setting('request.jwt.claim.sub', true),
+      nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'
+    ),
+    ''
+  );
+$$;
+```
+
+`auth.uid()` casts the `sub` claim to uuid and a Firebase UID is not one, so
+every policy uses `app_uid()` instead. It returns null for an unauthenticated
+request, and `column = null` is never true — so an anonymous caller matches no
+owner row, which is the right failure direction.
 
 ### The admin check
 
 ```sql
-create or replace function is_admin()
+create or replace function public.is_admin()
 returns boolean
 language sql
 security definer
 set search_path = public
 stable
 as $$
-  select exists (
-    select 1 from public.profiles
-    where id = auth.uid() and role = 'admin'
-  );
+  select public.app_is_admin_claim()
+      or exists (
+        select 1 from public.profiles
+        where id = public.app_uid() and role = 'admin'
+      );
 $$;
 ```
+
+Claim first, table second. The claim is already in the verified token, so the
+common case costs no read; `profiles.role` covers the window between a grant and
+the user's next token refresh, and is the record that survives re-minting.
 
 `SECURITY DEFINER` is required: the function reads `profiles`, and `profiles` has
 its own RLS policies. Without it, evaluating a policy that calls `is_admin()`
@@ -107,30 +191,31 @@ in a schema earlier in their path.
 
 ```sql
 create policy "profiles: read own" on profiles
-  for select using (id = auth.uid());
+  for select using (id = public.app_uid());
 
 create policy "profiles: admin reads all" on profiles
-  for select using (is_admin());
+  for select using (public.is_admin());
 
+-- role and loyalty_points are guarded by a trigger, not by this policy.
 create policy "profiles: update own" on profiles
-  for update using (id = auth.uid())
-  with check (
-    id = auth.uid()
-    and role = (select role from profiles where id = auth.uid())
-    and loyalty_points = (select loyalty_points from profiles where id = auth.uid())
-  );
+  for update using (id = public.app_uid())
+  with check (id = public.app_uid());
 
 create policy "profiles: admin writes all" on profiles
-  for all using (is_admin()) with check (is_admin());
+  for all using (public.is_admin()) with check (public.is_admin());
 ```
+
+Rows are created by `/api/auth/session` on first sign-in, with the service role.
+There is no insert policy for clients and no trigger on `auth.users` to create
+one, because Firebase users never appear in that table.
 
 ### `products`
 
 ```sql
 create policy "products: public reads active" on products
-  for select using (active or is_admin());
+  for select using (active or public.is_admin());
 create policy "products: admin writes" on products
-  for all using (is_admin()) with check (is_admin());
+  for all using (public.is_admin()) with check (public.is_admin());
 ```
 
 `active or is_admin()` gives admins visibility of unpublished products through
@@ -140,11 +225,11 @@ the same query the storefront uses.
 
 ```sql
 create policy "orders: read own" on orders
-  for select using (user_id = auth.uid());
+  for select using (user_id = public.app_uid());
 
 create policy "orders: create own" on orders
   for insert with check (
-    user_id = auth.uid()
+    user_id = public.app_uid()
     and status = 'pending'
     and payment_status = 'unpaid'
     and source = 'storefront'
@@ -152,7 +237,7 @@ create policy "orders: create own" on orders
   );
 
 create policy "orders: admin full access" on orders
-  for all using (is_admin()) with check (is_admin());
+  for all using (public.is_admin()) with check (public.is_admin());
 ```
 
 The insert policy pins the opening state. A client cannot create an order that
@@ -171,7 +256,7 @@ Access derives from the parent order rather than being duplicated:
 ```sql
 create policy "order_items: read own" on order_items
   for select using (
-    exists (select 1 from orders o where o.id = order_id and o.user_id = auth.uid())
+    exists (select 1 from orders o where o.id = order_id and o.user_id = public.app_uid())
   );
 ```
 
@@ -181,36 +266,70 @@ Public read; insert, update and delete restricted to the author; admins have ful
 access. `author_name` is stored separately so a deleted account's review still
 renders.
 
-### `deals`, `updates`, `salon_services`, `salon_bookings`
+### `deals`, `updates`
 
-Content tables follow public read / admin write. `salon_bookings` follows the
-`orders` pattern: read and create your own, admin sees all.
+Content tables follow public read / admin write. The salon tables these notes
+also covered were dropped in `0002_remove_salon.sql`.
+
+---
+
+## Storage
+
+Three buckets, all public-read, because a product photo on a storefront is meant
+to be fetchable by anyone with the URL. Writes are what is restricted:
+
+| Bucket | Path shape | Write |
+|---|---|---|
+| `product-images` | `<slug>/<timestamp>-<random>.<ext>` | `is_admin()` |
+| `deal-images` | `<timestamp>-<random>.<ext>` | `is_admin()` |
+| `avatars` | `<firebase-uid>/<timestamp>.<ext>` | owner only |
+
+The avatars policy compares `(storage.foldername(name))[1]` against
+`app_uid()`, so a signed-in user can write only inside the folder named after
+their own UID — not over somebody else's photo.
+
+Each bucket also carries a `file_size_limit` and an `allowed_mime_types` list, so
+an oversized or non-image upload is refused by Storage itself. The checks in
+`lib/supabase/storage.ts` exist to produce a message naming the file, not to
+provide the guarantee.
 
 ---
 
 ## Privilege escalation is blocked in the schema
 
 Postgres has no column-level RLS, so `role` and `loyalty_points` are protected by
-comparing the incoming row against the **stored** row in `WITH CHECK` (see the
-`profiles` policy above). An update that changes either fails.
-
-That is what makes this a no-op from the browser:
+a `BEFORE UPDATE` trigger, `guard_profile_columns()`, which raises unless the
+caller is an admin or the service role:
 
 ```sql
--- as a normal signed-in user, expect 0 rows updated
-update profiles set role = 'admin' where id = auth.uid();
+if new.role is distinct from old.role then
+  raise exception 'profiles.role is not client-writable.';
+end if;
 ```
 
-`loyalty_points` is protected the same way, because it is spendable currency.
-
-The trade-off is the **admin bootstrap**: the first admin cannot be created
-through the app and must be granted with the service role. Sign in once, then:
+That is what makes this fail from the browser:
 
 ```sql
-update profiles set role = 'admin' where email = 'you@example.com';
+-- as a normal signed-in user
+update profiles set role = 'admin' where id = app_uid();
+-- ERROR: profiles.role is not client-writable.
 ```
 
-Subsequent admins can be promoted by an existing admin, since
+`loyalty_points` is protected the same way, because it is spendable currency —
+only `award_loyalty_points()` and `redeem_loyalty_points()` may move it, and both
+are `SECURITY DEFINER`.
+
+0001 did this inside the RLS `WITH CHECK` instead, by re-reading the stored row. A
+trigger was chosen in 0003 for two reasons: it also covers writes arriving through
+the admin policy, and it raises rather than letting a rejected write look like a
+no-op.
+
+### The admin bootstrap
+
+Neither the claim nor `profiles.role` can be self-granted, so the first admin has
+to come from outside the app. Set `ADMIN_EMAILS` in `.env.local`; on that
+account's next sign-in, `/api/auth/session` writes both the `admin` claim and
+`profiles.role`. Subsequent admins can be promoted by an existing admin, since
 `"profiles: admin writes all"` permits it.
 
 ---
@@ -249,12 +368,14 @@ race that two concurrent callbacks could both win.
 ## Service-role key
 
 `createServiceClient()` in `lib/supabase/server.ts` **bypasses RLS entirely**.
-It is used in exactly two places, both of which run with no user session:
+It is used in exactly three places, each of which must write something the
+caller themselves may not:
 
 | Caller | Why |
 |---|---|
-| `/api/mpesa/callback` | Safaricom calls it server-to-server |
+| `/api/mpesa/callback` | Safaricom calls it server-to-server, with no session |
 | `/api/mpesa/stk-push` | Writes payment bookkeeping columns a customer cannot set |
+| `/api/auth/session` | Creates the `profiles` row on first sign-in, and writes `role`, which is not client-writable |
 
 Rules:
 
@@ -296,8 +417,9 @@ git check-ignore -v .env.local    # must report a match
 - **Phone numbers** are normalised and validated to `2547…`/`2541…` before
   reaching Safaricom.
 - **Quantities** are floored with a minimum of 1.
-- **Uploads** are checked for `image/*` and a 5 MB ceiling client-side, and the
-  Storage bucket policy restricts writes to admins.
+- **Uploads** are checked for an image MIME type and a size ceiling client-side,
+  and again by the bucket's own `allowed_mime_types` / `file_size_limit`. Writes
+  are restricted by policy to admins, or to the owner's own folder for avatars.
 - **XSS** is handled by React's default escaping. The one
   `dangerouslySetInnerHTML` is the inline theme script in `app/layout.tsx`, a
   static string with no interpolation.
@@ -306,39 +428,23 @@ git check-ignore -v .env.local    # must report a match
 
 ---
 
-## Development auth fallback
-
-`lib/dev-auth.ts` permits a cookie-based admin login, gated on **both**
-`NODE_ENV !== "production"` **and** Supabase being unconfigured. The role is
-re-derived from the email server-side, so a forged cookie grants nothing.
-
-Verified against a real production build:
-
-| Test | Expected | Result |
-|---|---|---|
-| `POST /api/dev-auth` in production | 404 | 404 |
-| `/admin` + admin cookie in production | redirect | 307 |
-| Forged cookie `{"role":"admin"}` in dev | refused | 307 |
-| Non-admin email in dev | `customer` | refused |
-
-Details and removal procedure in
-[architecture.md](architecture.md#5-development-only-auth-fallback).
-
----
-
 ## Testing checklist
 
 After changing any policy:
 
 1. **As anonymous** — can you read only active products? Zero orders?
-2. **As a customer** — only your own orders? Can you `update` your `role`
-   (expect 0 rows)? Your `loyalty_points`?
+2. **As a customer** — only your own orders? Does `update profiles set role`
+   raise? `loyalty_points` too?
 3. **As another customer** — can you read customer A's orders by id?
 4. **As admin** — full access to orders, products, reviews, deals, updates?
 5. **Insert an order** with `payment_status: 'paid'` as a customer — must fail.
-6. **Review the service-role call sites** — still only the two above?
+6. **Review the service-role call sites** — still only the three above?
+7. **Without the `role: authenticated` claim** — a Firebase token missing it must
+   behave as anonymous, not as a signed-in user.
+8. **Upload an avatar** into another user's UID folder — must be refused.
 
-Run these with the anon key against the REST API, not through the UI.
+Run these with the anon key plus a real Firebase ID token against the REST API,
+not through the UI.
 
 ---
 
@@ -385,8 +491,8 @@ still never used for the charge — only for detecting drift.
 Notably `/api/mpesa/stk-push` — repeated calls spam a customer's handset with PIN
 prompts and burn Daraja quota. Also `/api/orders`, and Server Actions.
 
-Supabase Auth rate-limits sign-in attempts, so credential stuffing is partly
-covered. Nothing else is.
+Firebase Auth rate-limits sign-in attempts per IP and per account, so credential
+stuffing is partly covered. Nothing else is.
 
 #### 4. No audit log of admin actions
 
@@ -408,25 +514,30 @@ shown to customers drifts from reality, and overselling is possible.
 or payment time — reserving at payment risks selling an item twice while a PIN
 prompt is pending.
 
-#### 6. Salon bookings are not wired up
+#### 6. A stale claim outlives a revoked admin
 
-`salon_bookings`, its RLS policies and `lib/supabase/salon.ts` all exist, but
-`/salon` is still the waitlist UI. Not a defect — it needs availability and
-scheduling decisions. The schema is ready.
+`is_admin()` accepts the `admin` claim from the token. Revoking admin by editing
+`profiles.role` alone leaves the claim valid until the token is re-minted — up to
+an hour. `setAdminClaim()` calls `revokeRefreshTokens()` to close that window, so
+use it rather than a direct table update.
+
+**Fix if this needs to be exact:** pass `checkRevoked: true` to `verifyIdToken()`
+on admin paths, at the cost of a network round trip per request.
 
 ### Low
 
 #### 7. No guest checkout
 
 `createOrder()` requires a session and the RLS insert policy requires
-`user_id = auth.uid()`. Deliberate — it makes order history and loyalty points
+`user_id = app_uid()`. Deliberate — it makes order history and loyalty points
 coherent — but it is a conversion cost.
 
-#### 8. Seed image URLs are borrowed and will expire
+#### 8. Preset avatar URLs are borrowed and will expire
 
-`supabase/seed.sql` and `lib/dev-fixtures.ts` point at
-`lh3.googleusercontent.com` URLs carried over from the original hardcoded
-catalogue. Not Kelmon's, not permanent. Replace with real photography.
+`lib/avatars.ts` points at `lh3.googleusercontent.com` URLs carried over from the
+original design mockups. Not Kelmon's, and not permanent. The seeded product
+catalogue that shared this problem is gone — products are uploaded to the
+`product-images` bucket now — so this is the last of it.
 
 #### 9. `TransactionDesc` length cap is a guess
 
@@ -435,8 +546,11 @@ catalogue. Not Kelmon's, not permanent. Replace with real photography.
 
 #### 10. No automated tests
 
-Verification so far has been manual: typecheck, build, route smoke tests, and the
-dev-auth guard checks above.
+Verification so far has been manual: typecheck, build, and route smoke tests.
+
+The highest-risk untested surface is now the token path: a wrong `role` claim, an
+expired cookie, or a missing Third Party Auth entry all present as "signed in but
+sees nothing", and nothing currently catches a regression there.
 
 **Highest-value tests first:**
 

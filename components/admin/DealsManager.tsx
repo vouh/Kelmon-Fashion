@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { EmptyState, formatDateTime } from "@/components/admin/ui";
 import { createDeal, deleteDeal } from "@/app/admin/actions";
+import { uploadDealImage } from "@/lib/supabase/storage";
 import type { DealRow } from "@/lib/supabase/types";
 
 const inputClass =
@@ -20,6 +21,22 @@ export default function DealsManager({ deals }: { deals: DealRow[] }) {
   const [code, setCode] = useState("");
   const [discount, setDiscount] = useState("");
   const [endsAt, setEndsAt] = useState("");
+  const [uploading, setUploading] = useState(false);
+
+  /** Uploads to the deal-images bucket and fills the field with the result. */
+  async function handleUpload(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    setError(null);
+    setUploading(true);
+    try {
+      setImage(await uploadDealImage(file));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUploading(false);
+    }
+  }
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -95,12 +112,28 @@ export default function DealsManager({ deals }: { deals: DealRow[] }) {
             onChange={(e) => setEndsAt(e.target.value)}
             className={inputClass}
           />
-          <input
-            value={image}
-            onChange={(e) => setImage(e.target.value)}
-            placeholder="Image URL (optional)"
-            className={`${inputClass} sm:col-span-2`}
-          />
+          <div className="space-y-2 sm:col-span-2">
+            <input
+              value={image}
+              onChange={(e) => setImage(e.target.value)}
+              placeholder="Image URL (optional)"
+              className={inputClass}
+            />
+            <label className="flex cursor-pointer items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/40 transition hover:text-white/70">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploading}
+                onChange={(e) => {
+                  void handleUpload(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <span className="material-symbols-outlined text-base">upload</span>
+              {uploading ? "Uploading…" : "Or upload an image (max 5MB)"}
+            </label>
+          </div>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}

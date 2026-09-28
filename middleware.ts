@@ -1,99 +1,57 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { DEV_SESSION_COOKIE, isDevAdmin, isDevAuthEnabled } from "@/lib/dev-auth";
+import { ID_TOKEN_COOKIE, peekIdToken } from "@/lib/firebase/cookie";
 
 /**
- * Refreshes the Supabase session cookie on every request, and gates /admin.
+ * First-pass gate for /admin, plus the redirect away from /signin for users who
+ * are already signed in.
  *
- * The old admin/admin-auth.js did this client-side: it injected a full-screen
- * overlay, waited for Firebase's auth-changed event, then compared the email
- * against a hardcoded list. The page HTML still shipped to the browser. Here
- * the check happens before any admin markup is rendered.
+ * **Not the authorisation boundary.** Middleware runs on the Edge runtime,
+ * where the Firebase Admin SDK cannot load, so the token is only decoded here,
+ * never verified. A forged cookie gets past this and is then stopped twice:
+ * app/admin/layout.tsx verifies the signature with the Admin SDK before any
+ * admin markup renders, and Postgres RLS rejects every query the forged claim
+ * would have unlocked.
+ *
+ * What this does buy is the redirect happening before a page is rendered at
+ * all, which is what the old client-side admin/admin-auth.js overlay could not
+ * do — it shipped the admin HTML to the browser and then hid it.
  */
-export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request });
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  // Without Supabase configured, fall back to the development session cookie so
-  // /admin can still be reviewed locally. See lib/dev-auth.ts for the guards
-  // that keep this out of production.
-  if (!url || !anonKey) {
-    if (request.nextUrl.pathname.startsWith("/admin")) {
-      const devSession = request.cookies.get(DEV_SESSION_COOKIE)?.value;
-
-      if (isDevAdmin(devSession)) {
-        return response;
-      }
-
-      const redirect = request.nextUrl.clone();
-      redirect.pathname = isDevAuthEnabled() ? "/signin" : "/";
-      if (isDevAuthEnabled()) {
-        redirect.searchParams.set("next", request.nextUrl.pathname);
-        redirect.searchParams.set("error", "Sign in with an admin email to continue.");
-      } else {
-        redirect.searchParams.set("error", "supabase-not-configured");
-      }
-      return NextResponse.redirect(redirect);
-    }
-    return response;
-  }
-
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
-        cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options)
-        );
-      },
-    },
-  });
-
-  // Touch getUser() so an expired access token is refreshed and the new cookie
-  // is written onto the response.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const token = peekIdToken(request.cookies.get(ID_TOKEN_COOKIE)?.value);
+  const signedIn = token !== null && !token.expired;
 
   if (pathname.startsWith("/admin")) {
-    if (!user) {
+    if (!signedIn) {
+      // Includes the expired-token case: the client holds a Firebase refresh
+      // token, so /signin can mint a new ID token and send the user straight
+      // back to where they were headed.
       const redirect = request.nextUrl.clone();
       redirect.pathname = "/signin";
+      redirect.search = "";
       redirect.searchParams.set("next", pathname);
       return NextResponse.redirect(redirect);
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role !== "admin") {
+    if (!token.admin) {
       const redirect = request.nextUrl.clone();
       redirect.pathname = "/";
+      redirect.search = "";
       redirect.searchParams.set("error", "not-authorized");
       return NextResponse.redirect(redirect);
     }
   }
 
   // Signed-in users have no reason to see the sign-in page.
-  if (pathname === "/signin" && user) {
+  if (pathname === "/signin" && signedIn) {
+    const next = request.nextUrl.searchParams.get("next");
     const redirect = request.nextUrl.clone();
-    redirect.pathname = "/profile";
+    redirect.pathname = next?.startsWith("/") && !next.startsWith("//") ? next : "/profile";
     redirect.search = "";
     return NextResponse.redirect(redirect);
   }
 
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {

@@ -1,9 +1,14 @@
 /**
- * Database types matching supabase/migrations/0001_init.sql.
+ * Database types matching supabase/migrations/, 0001 through 0003.
  *
  * Hand-written so the app typechecks without a generation step. To regenerate
  * from the live schema instead:
  *   npx supabase gen types typescript --project-id <id> > lib/supabase/types.ts
+ *
+ * Identity columns — profiles.id, orders.user_id, reviews.user_id — are Firebase
+ * UIDs. They were uuids referencing auth.users until 0003 moved authentication
+ * to Firebase; they are `text` now, so the TypeScript `string` is unchanged but
+ * a uuid is no longer a valid value.
  */
 
 export type UserRole = "customer" | "admin";
@@ -19,7 +24,6 @@ export type OrderStatus =
 export type PaymentStatus = "unpaid" | "initiated" | "paid" | "failed";
 export type PaymentMethod = "mpesa" | "cod";
 export type OrderSource = "storefront" | "admin_direct";
-export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
 
 export type ProfileRow = {
   id: string;
@@ -89,33 +93,6 @@ export type OrderItemRow = {
   variant: string | null;
   image: string | null;
   category: string | null;
-}
-
-export type SalonServiceRow = {
-  id: string;
-  name: string;
-  description: string | null;
-  price: number;
-  duration: string | null;
-  icon: string | null;
-  image: string | null;
-  active: boolean;
-  created_at: string;
-}
-
-export type SalonBookingRow = {
-  id: string;
-  user_id: string | null;
-  service_id: string | null;
-  service_name: string;
-  customer_name: string;
-  phone: string;
-  scheduled_for: string | null;
-  notes: string | null;
-  total: number;
-  status: BookingStatus;
-  created_at: string;
-  updated_at: string;
 }
 
 export type ReviewRow = {
@@ -212,14 +189,15 @@ export type Database = {
         "order_id" | "name" | "price" | "quantity",
         OrderItemsRelationships
       >;
-      salon_services: Table<SalonServiceRow, "id" | "name" | "price">;
-      salon_bookings: Table<SalonBookingRow, "service_name" | "customer_name" | "phone">;
       reviews: Table<ReviewRow, "author_name" | "rating">;
       deals: Table<DealRow, "title">;
       updates: Table<UpdateRow, "title" | "body">;
     };
     Views: { [_ in never]: never };
     Functions: {
+      /** The caller's Firebase UID, from the JWT sub claim. */
+      app_uid: { Args: Record<string, never>; Returns: string | null };
+      app_is_admin_claim: { Args: Record<string, never>; Returns: boolean };
       is_admin: { Args: Record<string, never>; Returns: boolean };
       award_loyalty_points: { Args: { p_order_id: string }; Returns: number };
       redeem_loyalty_points: { Args: { p_points: number }; Returns: number };
@@ -231,7 +209,6 @@ export type Database = {
       payment_status: PaymentStatus;
       payment_method: PaymentMethod;
       order_source: OrderSource;
-      booking_status: BookingStatus;
     };
     CompositeTypes: { [_ in never]: never };
   };

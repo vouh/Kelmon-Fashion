@@ -1,11 +1,12 @@
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { productFromRow, type Product } from "@/lib/products";
-import { isDevAuthEnabled } from "@/lib/dev-auth";
-import { devProducts } from "@/lib/dev-fixtures";
+import type { ProductRow } from "@/lib/supabase/types";
 
 /**
- * Server-side product reads. These replace the hardcoded `shopProducts` /
- * `featuredProducts` arrays that used to live in lib/products.ts.
+ * Server-side product reads. The catalogue lives entirely in the `products`
+ * table — there is no hardcoded or sample data behind these any more, so an
+ * empty storefront means an empty table, and the fix is to add products in
+ * /admin/products.
  *
  * Every function degrades to an empty result when Supabase is unconfigured, so
  * the storefront renders (empty) instead of crashing on a fresh clone.
@@ -15,12 +16,6 @@ export async function getProducts(options?: {
   category?: string;
   limit?: number;
 }): Promise<Product[]> {
-  if (isDevAuthEnabled()) {
-    const list = options?.category && options.category !== "All"
-      ? devProducts.filter((p) => p.category === options.category)
-      : devProducts;
-    return options?.limit ? list.slice(0, options.limit) : list;
-  }
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
 
@@ -37,9 +32,16 @@ export async function getProducts(options?: {
     query = query.limit(options.limit);
   }
 
-  const { data, error } = await query;
+  let data: Awaited<typeof query>["data"];
+  let error: Awaited<typeof query>["error"];
+  try {
+    ({ data, error } = await query);
+  } catch (fetchError) {
+    console.warn("[products] getProducts request unavailable", fetchError);
+    return [];
+  }
   if (error) {
-    console.error("[products] getProducts:", error.message);
+    console.warn("[products] getProducts:", error.message);
     return [];
   }
   return (data ?? []).map(productFromRow);
@@ -47,20 +49,26 @@ export async function getProducts(options?: {
 
 /** Products worth putting on the homepage: badged first, then newest. */
 export async function getFeaturedProducts(limit = 6): Promise<Product[]> {
-  if (isDevAuthEnabled()) return devProducts.slice(0, limit);
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("active", true)
-    .not("badge", "is", null)
-    .order("rating", { ascending: false })
-    .limit(limit);
+  let data: ProductRow[] | null;
+  let error: { message: string } | null;
+  try {
+    ({ data, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("active", true)
+      .not("badge", "is", null)
+      .order("rating", { ascending: false })
+      .limit(limit));
+  } catch (fetchError) {
+    console.warn("[products] getFeaturedProducts request unavailable", fetchError);
+    return [];
+  }
 
   if (error) {
-    console.error("[products] getFeaturedProducts:", error.message);
+    console.warn("[products] getFeaturedProducts:", error.message);
     return [];
   }
 
@@ -80,18 +88,24 @@ export async function getFeaturedProducts(limit = 6): Promise<Product[]> {
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
-  if (isDevAuthEnabled()) return devProducts.find((p) => p.id === id) ?? null;
   if (!isSupabaseConfigured()) return null;
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  let data: ProductRow | null;
+  let error: { message: string } | null;
+  try {
+    ({ data, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle());
+  } catch (fetchError) {
+    console.warn("[products] getProductById request unavailable", fetchError);
+    return null;
+  }
 
   if (error) {
-    console.error("[products] getProductById:", error.message);
+    console.warn("[products] getProductById:", error.message);
     return null;
   }
   return data ? productFromRow(data) : null;
@@ -102,24 +116,26 @@ export async function getRelatedProducts(
   product: Pick<Product, "id" | "category">,
   limit = 6
 ): Promise<Product[]> {
-  if (isDevAuthEnabled()) {
-    return devProducts
-      .filter((p) => p.category === product.category && p.id !== product.id)
-      .slice(0, limit);
-  }
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("active", true)
-    .eq("category", product.category)
-    .neq("id", product.id)
-    .limit(limit);
+  let data: ProductRow[] | null;
+  let error: { message: string } | null;
+  try {
+    ({ data, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("active", true)
+      .eq("category", product.category)
+      .neq("id", product.id)
+      .limit(limit));
+  } catch (fetchError) {
+    console.warn("[products] getRelatedProducts request unavailable", fetchError);
+    return [];
+  }
 
   if (error) {
-    console.error("[products] getRelatedProducts:", error.message);
+    console.warn("[products] getRelatedProducts:", error.message);
     return [];
   }
   return (data ?? []).map(productFromRow);
@@ -127,17 +143,23 @@ export async function getRelatedProducts(
 
 /** Distinct categories that actually have active products. */
 export async function getCategories(): Promise<string[]> {
-  if (isDevAuthEnabled()) return [...new Set(devProducts.map((p) => p.category))].sort();
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("products")
-    .select("category")
-    .eq("active", true);
+  let data: Pick<ProductRow, "category">[] | null;
+  let error: { message: string } | null;
+  try {
+    ({ data, error } = await supabase
+      .from("products")
+      .select("category")
+      .eq("active", true));
+  } catch (fetchError) {
+    console.warn("[products] getCategories request unavailable", fetchError);
+    return [];
+  }
 
   if (error) {
-    console.error("[products] getCategories:", error.message);
+    console.warn("[products] getCategories:", error.message);
     return [];
   }
   return [...new Set((data ?? []).map((r) => r.category))].sort();
@@ -145,17 +167,23 @@ export async function getCategories(): Promise<string[]> {
 
 /** Admin view: includes inactive products. Relies on RLS for authorisation. */
 export async function getAllProductsForAdmin(): Promise<Product[]> {
-  if (isDevAuthEnabled()) return devProducts;
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .order("created_at", { ascending: false });
+  let data: ProductRow[] | null;
+  let error: { message: string } | null;
+  try {
+    ({ data, error } = await supabase
+      .from("products")
+      .select("*")
+      .order("created_at", { ascending: false }));
+  } catch (fetchError) {
+    console.warn("[products] getAllProductsForAdmin request unavailable", fetchError);
+    return [];
+  }
 
   if (error) {
-    console.error("[products] getAllProductsForAdmin:", error.message);
+    console.warn("[products] getAllProductsForAdmin:", error.message);
     return [];
   }
   return (data ?? []).map(productFromRow);
