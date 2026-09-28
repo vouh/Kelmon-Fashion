@@ -130,9 +130,15 @@ RLS is enabled on **every** table in `public`. With RLS on and no matching
 policy, the default is deny — so a table added without policies is inaccessible
 rather than open. That is the intended failure direction.
 
-Source: [`supabase/migrations/0003_firebase_auth.sql`](../supabase/migrations/0003_firebase_auth.sql),
-which restates every policy in full. 0001 is the original uuid-identity version
-and is superseded by it.
+Source: [`prisma/migrations/20260928120000_init/migration.sql`](../prisma/migrations/20260928120000_init/migration.sql),
+whose second half holds every policy, function and trigger. Prisma generates the
+first half (tables and columns) and cannot express any of the rest — so the
+security model is entirely hand-written, and entirely in one place.
+
+Prisma itself never runs at runtime. It connects directly to Postgres as the
+database owner, which means RLS does not apply to it; that is exactly why data
+access stays on supabase-js. See
+[data-model.md](data-model.md#who-owns-what).
 
 ### Identity
 

@@ -8,7 +8,13 @@ import { deleteProduct, setProductActive, upsertProduct } from "@/app/admin/acti
 import { uploadAll, uploadProductImage } from "@/lib/supabase/storage";
 import type { Product } from "@/lib/products";
 
-const BADGES = ["", "New", "Hot", "Sale"];
+/**
+ * The badge values products.badge accepts. Typed as a literal union rather than
+ * string[] so the <select> and the Zod schema in lib/validation cannot drift —
+ * adding a badge here without adding it there is now a type error.
+ */
+const BADGES = ["", "New", "Hot", "Sale"] as const;
+type Badge = (typeof BADGES)[number];
 
 const inputClass =
   "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-xs text-white placeholder:text-white/25 focus:border-purple-400/50 focus:outline-none";
@@ -35,7 +41,7 @@ interface Draft {
   sizes: string;
   colors: string;
   stock: string;
-  badge: string;
+  badge: Badge;
   active: boolean;
   /** True when editing an existing row, so the slug is locked. */
   existing: boolean;
@@ -71,7 +77,7 @@ function draftFrom(product: Product): Draft {
     sizes: (product.sizes ?? []).join(", "),
     colors: (product.colors ?? []).join(", "),
     stock: String(product.stock ?? 0),
-    badge: product.badge ?? "",
+    badge: (product.badge ?? "") as Badge,
     active: true,
     existing: true,
   };
@@ -145,7 +151,7 @@ export default function ProductsManager({
             .map((s) => s.trim())
             .filter(Boolean),
           stock: Number(draft.stock) || 0,
-          badge: draft.badge || null,
+          badge: draft.badge === "" ? null : draft.badge,
           active: draft.active,
         }),
       () => setDraft(null)
@@ -227,7 +233,7 @@ export default function ProductsManager({
               <label className={labelClass}>Badge</label>
               <select
                 value={draft.badge}
-                onChange={(e) => setDraft({ ...draft, badge: e.target.value })}
+                onChange={(e) => setDraft({ ...draft, badge: e.target.value as Badge })}
                 className={inputClass}
               >
                 {BADGES.map((b) => (

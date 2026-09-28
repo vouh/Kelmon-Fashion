@@ -1,0 +1,243 @@
+// ============================================================================
+// Kelmon Fashion — database schema
+//
+// Prisma owns the schema and the migrations, and nothing else. `prisma migrate`
+// is how the database changes shape; every read and write at runtime goes
+// through supabase-js.
+//
+// That boundary is a security decision, not a style one. Prisma connects
+// straight to Postgres over a connection string, so it runs as the database
+// owner and Row Level Security does not apply to it — `app_uid()` returns null
+// for every Prisma query. The Supabase anon key ships to the browser, so RLS is
+// the only thing standing between a visitor and the data; moving reads onto
+// Prisma would move authorisation back into app code, where one forgotten
+// `where` clause is a data leak.
+//
+// There is deliberately no Prisma Client and no generator block. The two server
+// paths that legitimately bypass RLS — the M-Pesa callback and profile creation
+// at sign-in — already use `createServiceClient()` in lib/supabase/server.ts.
+// A second RLS-bypassing data layer would be one more place to audit for no gain.
+//
+// Field names are snake_case rather than Prisma's camelCase convention, so a row
+// looks identical whether it came from here or from supabase-js. One shape to
+// remember instead of two, and `lib/supabase/types.ts` stays a direct mirror.
+//
+// What Prisma cannot express, and therefore lives as raw SQL appended to the
+// initial migration: CHECK constraints, partial indexes, functions, triggers,
+// RLS policies, and the storage buckets.
+// ============================================================================
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Connection URLs live in prisma.config.ts — Prisma 7 no longer accepts `url`
+// or `directUrl` here.
+
+// ── Enums ───────────────────────────────────────────────────────────────────
+
+enum user_role {
+  customer
+  admin
+}
+
+/// The union of EzyBite's status strings and Kelmon's original OrderStatus.
+/// Fulfilment only — payment state is tracked separately, so an order can be
+/// delivered + unpaid (cash on delivery not yet collected).
+enum order_status {
+  pending
+  awaiting_mpesa
+  confirmed
+  packed
+  delivered
+  cancelled
+}
+
+enum payment_status {
+  unpaid
+  initiated
+  paid
+  failed
+}
+
+enum payment_method {
+  mpesa
+  cod
+}
+
+enum order_source {
+  storefront
+  admin_direct
+}
+
+// ── Models ──────────────────────────────────────────────────────────────────
+
+/// One row per Firebase user. `id` IS the Firebase UID — a 28-character string,
+/// not a uuid — and there is no auth.users row behind it. Created by
+/// app/api/auth/session/route.ts on first sign-in.
+///
+/// `role` and `loyalty_points` are not client-writable; the
+/// guard_profile_columns() trigger raises if a client changes either.
+model Profile {
+  id             String    @id
+  email          String?
+  full_name      String?
+  phone          String?
+  campus         String?
+  avatar_url     String?
+  role           user_role @default(customer)
+  loyalty_points Int       @default(0)
+  created_at     DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime  @default(now()) @db.Timestamptz(6)
+
+  orders  Order[]
+  reviews Review[]
+
+  @@map("profiles")
+}
+
+/// `id` is a slug rather than a uuid so product URLs read well
+/// (/product/lv-speedy-bag).
+///
+/// `rating` and `review_count` are cached aggregates maintained by the
+/// sync_product_rating() trigger. Never write them by hand.
+model Product {
+  id             String   @id
+  name           String
+  description    String?
+  price          Decimal  @db.Decimal(10, 2)
+  original_price Decimal? @db.Decimal(10, 2)
+  category       String
+  images         String[] @default([])
+  sizes          String[] @default([])
+  colors         String[] @default([])
+  stock          Int      @default(0)
+  rating         Decimal  @default(0) @db.Decimal(2, 1)
+  review_count   Int      @default(0)
+  /// 'New' | 'Hot' | 'Sale' | null
+  badge          String?
+  /// false hides it from the storefront without deleting it
+  active         Boolean  @default(true)
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+
+  order_items OrderItem[]
+  reviews     Review[]
+
+  @@map("products")
+}
+
+/// `id` keeps the human-readable KM-XXXXX format from createOrderId().
+///
+/// `user_id` is nullable so guest and admin-direct (road sale) orders both work;
+/// `source` distinguishes them rather than a sentinel user id.
+model Order {
+  id             String         @id
+  user_id        String?
+  customer_name  String
+  phone          String
+  drop_point     String
+  campus         String?
+  notes          String?
+  payment_method payment_method @default(mpesa)
+  subtotal       Decimal        @db.Decimal(10, 2)
+  delivery_fee   Decimal        @default(0) @db.Decimal(10, 2)
+  total          Decimal        @db.Decimal(10, 2)
+  status         order_status   @default(pending)
+  payment_status payment_status @default(unpaid)
+  source         order_source   @default(storefront)
+
+  /// Carries a unique partial index — the callback looks an order up by this,
+  /// so a duplicate could mark the wrong order paid.
+  mpesa_checkout_request_id String?
+  mpesa_merchant_request_id String?
+  mpesa_receipt_number      String?
+  mpesa_result_desc         String?
+  /// Normalised to 2547…
+  mpesa_phone               String?
+
+  /// Idempotency flag for award_loyalty_points().
+  points_awarded Boolean @default(false)
+  points_earned  Int     @default(0)
+
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  user        Profile?    @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  order_items OrderItem[]
+
+  @@index([user_id, created_at(sort: Desc)], map: "orders_user_created_idx")
+  @@index([created_at(sort: Desc)], map: "orders_created_idx")
+  @@index([status], map: "orders_status_idx")
+  @@index([payment_status], map: "orders_payment_status_idx")
+  @@map("orders")
+}
+
+/// Line details are copied, not referenced: an order must stay an accurate
+/// receipt after the product is renamed, repriced or deleted.
+model OrderItem {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id   String
+  product_id String?
+  name       String
+  price      Decimal  @db.Decimal(10, 2)
+  quantity   Int
+  /// Size or colour chosen at checkout.
+  variant    String?
+  image      String?
+  category   String?
+
+  order   Order    @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [product_id], references: [id], onDelete: SetNull)
+
+  @@index([order_id], map: "order_items_order_idx")
+  @@map("order_items")
+}
+
+/// `author_name` is stored so a review keeps its byline after the account behind
+/// it is deleted. A unique partial index allows one review per user per product.
+model Review {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String?
+  product_id  String?
+  author_name String
+  rating      Int
+  body        String?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  user    Profile? @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  product Product? @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@index([product_id, created_at(sort: Desc)], map: "reviews_product_idx")
+  @@index([created_at(sort: Desc)], map: "reviews_created_idx")
+  @@map("reviews")
+}
+
+/// Content table: public read, admin write.
+model Deal {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title            String
+  description      String?
+  image            String?
+  code             String?
+  discount_percent Int?
+  starts_at        DateTime? @db.Timestamptz(6)
+  ends_at          DateTime? @db.Timestamptz(6)
+  active           Boolean   @default(true)
+  created_at       DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([created_at(sort: Desc)], map: "deals_created_idx")
+  @@map("deals")
+}
+
+/// Content table: public read, admin write.
+model Update {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title      String
+  body       String
+  tag        String?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([created_at(sort: Desc)], map: "updates_created_idx")
+  @@map("updates")
+}

@@ -3,6 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { createClient, isAdmin } from "@/lib/supabase/server";
 import type { OrderStatus, PaymentStatus } from "@/lib/supabase/types";
+import {
+  dealInputSchema,
+  directOrderSchema,
+  parseInput,
+  productInputSchema,
+  productSlugSchema,
+  updateInputSchema,
+  type ProductInput,
+} from "@/lib/validation/schemas";
 
 /**
  * Admin mutations as Server Actions.
@@ -11,8 +20,13 @@ import type { OrderStatus, PaymentStatus } from "@/lib/supabase/types";
  * fb_deleteOrder, fb_createDeal, fb_deleteDeal, fb_createUpdate,
  * fb_deleteUpdate, fb_deleteReview, fb_createDirectOrder, plus new product CRUD.
  *
- * Every action re-checks the admin role. RLS would reject a non-admin write
- * anyway, but failing here gives a clear error instead of a silent no-op.
+ * Two guards on every action, and neither is redundant:
+ *
+ *   * `requireAdmin()` — RLS would reject a non-admin write anyway, but failing
+ *     here gives a clear error instead of a silent no-op.
+ *   * A Zod parse of the input. These read like function calls in the editor,
+ *     which is exactly the trap: a Server Action is a POST endpoint that anyone
+ *     can invoke with any body, typed parameters notwithstanding.
  */
 
 async function requireAdmin() {
@@ -32,6 +46,29 @@ function fail(error: unknown): ActionResult {
   return { ok: false, error: error instanceof Error ? error.message : String(error) };
 }
 
+/** An id arriving from the client is still untrusted input. */
+function validSlug(id: unknown): string {
+  const parsed = parseInput(productSlugSchema, id);
+  if (!parsed.ok) throw new Error(parsed.error);
+  return parsed.data;
+}
+
+/** Row ids are uuids, and a malformed one should fail before reaching Postgres. */
+function validUuid(id: unknown): string {
+  if (typeof id !== "string" || !/^[0-9a-f-]{36}$/i.test(id)) {
+    throw new Error("Invalid id.");
+  }
+  return id;
+}
+
+/** Order ids are the human-readable KM-XXXXX form from createOrderId(). */
+function validOrderId(id: unknown): string {
+  if (typeof id !== "string" || !/^KM-[A-Z0-9]{4,20}$/.test(id)) {
+    throw new Error("Invalid order id.");
+  }
+  return id;
+}
+
 // ── Orders ──────────────────────────────────────────────────────────────────
 
 export async function updateOrderStatus(
@@ -40,7 +77,8 @@ export async function updateOrderStatus(
 ): Promise<ActionResult> {
   try {
     const supabase = await requireAdmin();
-    const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
+    const id = validOrderId(orderId);
+    const { error } = await supabase.from("orders").update({ status }).eq("id", id);
     if (error) throw new Error(error.message);
     revalidatePath("/admin/orders");
     revalidatePath("/admin");
@@ -56,10 +94,11 @@ export async function updatePaymentStatus(
 ): Promise<ActionResult> {
   try {
     const supabase = await requireAdmin();
+    const id = validOrderId(orderId);
     const { error } = await supabase
       .from("orders")
       .update({ payment_status: paymentStatus })
-      .eq("id", orderId);
+      .eq("id", id);
     if (error) throw new Error(error.message);
     revalidatePath("/admin/orders");
     revalidatePath("/admin/transactions");
@@ -73,8 +112,9 @@ export async function updatePaymentStatus(
 export async function deleteOrder(orderId: string): Promise<ActionResult> {
   try {
     const supabase = await requireAdmin();
+    const id = validOrderId(orderId);
     // order_items cascade via the FK.
-    const { error } = await supabase.from("orders").delete().eq("id", orderId);
+    const { error } = await supabase.from("orders").delete().eq("id", id);
     if (error) throw new Error(error.message);
     revalidatePath("/admin/orders");
     revalidatePath("/admin");
@@ -97,19 +137,26 @@ export async function createDirectOrder(input: {
 }): Promise<{ ok: true; orderId: string } | { ok: false; error: string }> {
   try {
     const supabase = await requireAdmin();
+
+    const parsed = parseInput(directOrderSchema, input);
+    if (!parsed.ok) return { ok: false, error: parsed.error };
+    const order = parsed.data;
+
     const orderId = `KM-${Date.now().toString(36).toUpperCase()}`;
 
     const { error } = await supabase.from("orders").insert({
       id: orderId,
       user_id: null,
-      customer_name: input.customerName,
-      phone: input.phone,
-      drop_point: input.dropPoint,
-      notes: input.notes ?? null,
+      customer_name: order.customerName,
+      // Normalised to 2547… by the schema, so it can be charged by STK push
+      // without further cleaning.
+      phone: order.phone,
+      drop_point: order.dropPoint,
+      notes: order.notes ?? null,
       payment_method: "mpesa",
-      subtotal: input.total,
+      subtotal: order.total,
       delivery_fee: 0,
-      total: input.total,
+      total: order.total,
       status: "pending",
       payment_status: "unpaid",
       source: "admin_direct",
@@ -127,52 +174,41 @@ export async function createDirectOrder(input: {
 
 // ── Products (new — no EzyBite equivalent) ──────────────────────────────────
 
-export interface ProductInput {
-  id: string;
-  name: string;
-  description?: string;
-  price: number;
-  originalPrice?: number | null;
-  category: string;
-  images: string[];
-  sizes: string[];
-  colors: string[];
-  stock: number;
-  badge?: string | null;
-  active: boolean;
-}
+// Inferred from the schema rather than declared separately, so the form's type
+// and the validation can never disagree about a field.
+export type { ProductInput };
 
 export async function upsertProduct(input: ProductInput): Promise<ActionResult> {
   try {
     const supabase = await requireAdmin();
 
-    if (!input.id.trim()) throw new Error("Product slug is required.");
-    if (!input.name.trim()) throw new Error("Product name is required.");
-    if (input.price <= 0) throw new Error("Price must be greater than zero.");
-    if (input.originalPrice && input.originalPrice < input.price) {
-      throw new Error("Original price must be higher than the sale price.");
-    }
+    // Replaces the hand-rolled checks that used to live here — same rules, plus
+    // the slug format, image URLs, array sizes and the "was" price comparison,
+    // each with its own message.
+    const parsed = parseInput(productInputSchema, input);
+    if (!parsed.ok) return { ok: false, error: parsed.error };
+    const product = parsed.data;
 
     const { error } = await supabase.from("products").upsert({
-      id: input.id.trim(),
-      name: input.name.trim(),
-      description: input.description?.trim() || null,
-      price: input.price,
-      original_price: input.originalPrice ?? null,
-      category: input.category,
-      images: input.images,
-      sizes: input.sizes,
-      colors: input.colors,
-      stock: input.stock,
-      badge: input.badge || null,
-      active: input.active,
+      id: product.id,
+      name: product.name,
+      description: product.description ?? null,
+      price: product.price,
+      original_price: product.originalPrice ?? null,
+      category: product.category,
+      images: product.images,
+      sizes: product.sizes,
+      colors: product.colors,
+      stock: product.stock,
+      badge: product.badge ?? null,
+      active: product.active,
     });
     if (error) throw new Error(error.message);
 
     revalidatePath("/admin/products");
     revalidatePath("/shop");
     revalidatePath("/");
-    revalidatePath(`/product/${input.id}`);
+    revalidatePath(`/product/${product.id}`);
     return ok();
   } catch (err) {
     return fail(err);
@@ -182,7 +218,8 @@ export async function upsertProduct(input: ProductInput): Promise<ActionResult> 
 export async function deleteProduct(id: string): Promise<ActionResult> {
   try {
     const supabase = await requireAdmin();
-    const { error } = await supabase.from("products").delete().eq("id", id);
+    const slug = validSlug(id);
+    const { error } = await supabase.from("products").delete().eq("id", slug);
     if (error) throw new Error(error.message);
     revalidatePath("/admin/products");
     revalidatePath("/shop");
@@ -196,7 +233,8 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
 export async function setProductActive(id: string, active: boolean): Promise<ActionResult> {
   try {
     const supabase = await requireAdmin();
-    const { error } = await supabase.from("products").update({ active }).eq("id", id);
+    const slug = validSlug(id);
+    const { error } = await supabase.from("products").update({ active }).eq("id", slug);
     if (error) throw new Error(error.message);
     revalidatePath("/admin/products");
     revalidatePath("/shop");
@@ -214,19 +252,24 @@ export async function createDeal(input: {
   image?: string;
   code?: string;
   discountPercent?: number | null;
+  startsAt?: string | null;
   endsAt?: string | null;
 }): Promise<ActionResult> {
   try {
     const supabase = await requireAdmin();
-    if (!input.title.trim()) throw new Error("Deal title is required.");
+
+    const parsed = parseInput(dealInputSchema, input);
+    if (!parsed.ok) return { ok: false, error: parsed.error };
+    const deal = parsed.data;
 
     const { error } = await supabase.from("deals").insert({
-      title: input.title.trim(),
-      description: input.description?.trim() || null,
-      image: input.image?.trim() || null,
-      code: input.code?.trim() || null,
-      discount_percent: input.discountPercent ?? null,
-      ends_at: input.endsAt || null,
+      title: deal.title,
+      description: deal.description ?? null,
+      image: deal.image || null,
+      code: deal.code ?? null,
+      discount_percent: deal.discountPercent ?? null,
+      starts_at: deal.startsAt ?? null,
+      ends_at: deal.endsAt ?? null,
       active: true,
     });
     if (error) throw new Error(error.message);
@@ -242,7 +285,7 @@ export async function createDeal(input: {
 export async function deleteDeal(id: string): Promise<ActionResult> {
   try {
     const supabase = await requireAdmin();
-    const { error } = await supabase.from("deals").delete().eq("id", id);
+    const { error } = await supabase.from("deals").delete().eq("id", validUuid(id));
     if (error) throw new Error(error.message);
     revalidatePath("/admin/deals");
     revalidatePath("/");
@@ -261,13 +304,15 @@ export async function createUpdate(input: {
 }): Promise<ActionResult> {
   try {
     const supabase = await requireAdmin();
-    if (!input.title.trim()) throw new Error("Title is required.");
-    if (!input.body.trim()) throw new Error("Body is required.");
+
+    const parsed = parseInput(updateInputSchema, input);
+    if (!parsed.ok) return { ok: false, error: parsed.error };
+    const update = parsed.data;
 
     const { error } = await supabase.from("updates").insert({
-      title: input.title.trim(),
-      body: input.body.trim(),
-      tag: input.tag?.trim() || null,
+      title: update.title,
+      body: update.body,
+      tag: update.tag ?? null,
     });
     if (error) throw new Error(error.message);
 
@@ -281,7 +326,7 @@ export async function createUpdate(input: {
 export async function deleteUpdate(id: string): Promise<ActionResult> {
   try {
     const supabase = await requireAdmin();
-    const { error } = await supabase.from("updates").delete().eq("id", id);
+    const { error } = await supabase.from("updates").delete().eq("id", validUuid(id));
     if (error) throw new Error(error.message);
     revalidatePath("/admin/updates");
     return ok();
@@ -295,7 +340,7 @@ export async function deleteUpdate(id: string): Promise<ActionResult> {
 export async function deleteReview(id: string): Promise<ActionResult> {
   try {
     const supabase = await requireAdmin();
-    const { error } = await supabase.from("reviews").delete().eq("id", id);
+    const { error } = await supabase.from("reviews").delete().eq("id", validUuid(id));
     if (error) throw new Error(error.message);
     revalidatePath("/admin/reviews");
     return ok();

@@ -4,24 +4,19 @@ import { deliveryFeeFor, cartSubtotal } from "@/lib/cart";
 import { createOrder } from "@/lib/supabase/orders";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getIdentity } from "@/lib/firebase/session";
-import type { PaymentMethod } from "@/lib/supabase/types";
-
-interface CreateOrderBody {
-  name: string;
-  phone: string;
-  dropPoint: string;
-  campus?: string;
-  payment: PaymentMethod;
-  notes?: string;
-  lines: CartLine[];
-}
+import { createOrderSchema, parseInput } from "@/lib/validation/schemas";
 
 /**
  * Creates an order for the signed-in user.
  *
- * Money is recomputed here from the submitted line prices and the delivery-fee
- * rule; the client's subtotal/total are ignored. The previous version stored
- * whatever totals the request supplied.
+ * Two things this route refuses to trust, in order:
+ *
+ *   1. The shape of the request — `createOrderSchema` parses it, so a malformed
+ *      body is one 400 naming the field rather than a failure further in.
+ *   2. The money in it. Every line is re-priced against the `products` table and
+ *      the delivery fee is recomputed, so the schema having accepted a `price`
+ *      changes nothing. An earlier version stored whatever totals the browser
+ *      sent, which meant the amount owed was under client control.
  */
 export async function POST(request: Request) {
   try {
@@ -32,17 +27,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = (await request.json()) as CreateOrderBody;
+    let raw: unknown;
+    try {
+      raw = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Expected a JSON body." }, { status: 400 });
+    }
 
-    if (!body.name?.trim() || !body.phone?.trim() || !body.dropPoint?.trim()) {
-      return NextResponse.json(
-        { error: "Name, phone and drop point are required." },
-        { status: 400 }
-      );
+    const parsed = parseInput(createOrderSchema, raw);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
     }
-    if (!body.lines?.length) {
-      return NextResponse.json({ error: "Your cart is empty." }, { status: 400 });
-    }
+    const body = parsed.data;
 
     if (!(await getIdentity())) {
       return NextResponse.json({ error: "You must be signed in to order." }, { status: 401 });
@@ -51,7 +47,7 @@ export async function POST(request: Request) {
     const supabase = await createClient();
 
     // Re-price against the catalogue so a tampered client price can't stick.
-    const ids = [...new Set(body.lines.map((l) => l.productId))];
+    const ids = [...new Set(body.lines.map((line) => line.productId))];
     const { data: products, error: productError } = await supabase
       .from("products")
       .select("id, name, price, category, images, active")
@@ -61,7 +57,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: productError.message }, { status: 500 });
     }
 
-    const catalogue = new Map((products ?? []).map((p) => [p.id, p]));
+    const catalogue = new Map((products ?? []).map((product) => [product.id, product]));
     const lines: CartLine[] = [];
 
     for (const line of body.lines) {
@@ -72,13 +68,13 @@ export async function POST(request: Request) {
           { status: 409 }
         );
       }
-      const quantity = Math.max(1, Math.floor(Number(line.quantity) || 1));
+      // Name, price, image and category all come from the row, not the request.
       lines.push({
         productId: product.id,
         name: product.name,
         price: Number(product.price),
         image: product.images?.[0] ?? line.image,
-        quantity,
+        quantity: line.quantity,
         variant: line.variant,
         category: product.category,
       });
@@ -88,12 +84,14 @@ export async function POST(request: Request) {
     const deliveryFee = deliveryFeeFor(subtotal);
 
     const orderId = await createOrder({
-      customerName: body.name.trim(),
-      phone: body.phone.trim(),
-      dropPoint: body.dropPoint.trim(),
-      campus: body.campus?.trim(),
-      notes: body.notes?.trim(),
-      paymentMethod: body.payment === "cod" ? "cod" : "mpesa",
+      customerName: body.name,
+      // Already normalised to 2547… by the schema, which is the only form
+      // Safaricom accepts — so the STK push needs no further cleaning.
+      phone: body.phone,
+      dropPoint: body.dropPoint,
+      campus: body.campus,
+      notes: body.notes,
+      paymentMethod: body.payment,
       lines,
       subtotal,
       deliveryFee,

@@ -136,14 +136,21 @@ lib/
   products.ts         Product type, row mapper, formatKes
   cart.ts             cart maths, delivery fee, variant options
   avatars.ts  logo.ts
+  validation/
+    schemas.ts        Zod schemas for every untrusted boundary
 middleware.ts         /admin gate
 styles/design.css     design tokens
-supabase/
-  migrations/0001_init.sql
-  migrations/0002_remove_salon.sql
-  migrations/0003_firebase_auth.sql
-  seed.sql
+prisma/
+  schema.prisma       tables, columns, relations
+  migrations/         generated DDL + hand-written RLS, functions, buckets
+  seed.sql            first-admin grant. No catalogue
+prisma.config.ts      connection URLs, dotenv loading
 ```
+
+Prisma owns the schema and nothing else — there is no Prisma Client here. It
+connects straight to Postgres, so RLS does not apply to it; putting reads on it
+would move authorisation out of the database and into app code. See
+[decision 7](#7-prisma-for-schema-only-supabase-js-for-data).
 
 `lib/firebase/session.ts` and `lib/firebase/cookie.ts` are split for a reason:
 middleware runs on the Edge runtime, where the Admin SDK's Node crypto cannot
@@ -765,6 +772,14 @@ Template: `.env.example`. Copy to `.env.local`.
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | `https://<ref>.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | Public by design — RLS protects data |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | Needed by sign-in and M-Pesa. **Bypasses RLS. Never `NEXT_PUBLIC_`** |
+| `DIRECT_URL` | migrations | Port 5432. What `prisma migrate` uses |
+| `DATABASE_URL` | no | Port 6543, pooled. Fallback only — nothing connects directly at runtime |
+
+Both connection strings come from **Project Settings → Database → Connection
+string**, and both contain the database password, so neither may carry a
+`NEXT_PUBLIC_` prefix. Migrations need the direct 5432 endpoint: they take
+advisory locks and run DDL in a transaction, which pgbouncer's transaction pooling
+on 6543 cannot support.
 
 ### Firebase
 
@@ -864,16 +879,18 @@ There is no offline mode and no sample data: an empty catalogue is an empty
 4. **Supabase → Authentication → Third Party Auth** — add your Firebase project
    id. Skipping this is the single most confusing failure mode: sign-in works and
    then nothing loads.
-5. **Schema** —
+5. **Schema** — add the two connection strings from Supabase → Project Settings →
+   Database, then apply the migration:
    ```bash
-   npx supabase link --project-ref <ref>
-   npx supabase db push
+   # DIRECT_URL   = ...pooler host:5432/postgres   (migrations)
+   # DATABASE_URL = ...pooler host:6543/postgres   (pooled)
+   npm run db:migrate
    ```
 6. **First admin** — put your email in `ADMIN_EMAILS`, restart, and sign in. The
    claim and `profiles.role` are both written on that sign-in. Then open
    `/admin/products` and add your first product.
 
-`supabase/seed.sql` only grants admin by email; it contains no catalogue.
+`prisma/seed.sql` only grants admin by email; it contains no catalogue.
 
 ### M-Pesa locally
 
@@ -1258,8 +1275,8 @@ with `profiles` mirroring it.
 
 **Option C.** It satisfies the requirement without reintroducing what decision 1
 was actually objecting to. Authorisation still lives in the schema; only the
-issuer of the token changed. The work is a migration (`0003_firebase_auth.sql`)
-plus an `accessToken` callback on two Supabase clients.
+issuer of the token changed. The work is a migration plus an `accessToken`
+callback on two Supabase clients.
 
 ### Consequences
 
@@ -1284,6 +1301,77 @@ the common case.
 - **ID tokens expire in an hour**, so a cold load after a longer absence renders
   as signed out until the client posts a fresh one. `/admin` bounces through
   `/signin`, which does exactly that.
+
+---
+
+## 7. Prisma for schema only, supabase-js for data
+
+**Accepted · 2026-09-28**
+
+### Context
+
+Migrations were hand-written SQL files applied by pasting them into the Supabase
+dashboard. That works, but there is no record of what has been applied, no way to
+tell whether an environment is current, and nothing stopping two files from being
+run out of order. A schema tool was wanted so that applying a change is one
+command.
+
+Prisma and Zod were the requested tools. The question Prisma raises is not whether
+to adopt it but how far to let it in, because **Prisma bypasses Row Level
+Security**. It connects directly to Postgres over a connection string and runs as
+the database owner, so `app_uid()` returns null for every query it makes.
+
+### Options
+
+**A. Prisma for everything — schema and data access.** The conventional way to use
+it. But the Supabase anon key ships to the browser, so RLS is not defence in depth
+here, it is the access control. Moving reads to Prisma means every route handler
+and Server Action becomes responsible for its own `where user_id = …`, and one
+omission is a data leak that no policy catches. It would also duplicate the
+authorisation rules: once in SQL for anything still using supabase-js, once in
+TypeScript.
+
+**B. Prisma for schema and migrations; supabase-js for data.** Prisma generates the
+DDL from `schema.prisma`; everything it cannot express — RLS policies, functions,
+triggers, CHECK constraints, partial indexes, storage buckets — is hand-written in
+the same migration file. Runtime access stays on supabase-js, carrying the
+Firebase token, subject to RLS.
+
+**C. Keep hand-written SQL, add Zod only.** No new dependency, but also none of
+what was asked for: no applied-migration history and no one-command apply.
+
+### Decision
+
+**Option B.** `npm run db:migrate` is the one command; authorisation stays in the
+database where it holds regardless of which code path runs.
+
+There is deliberately **no `@prisma/client` dependency** and no `generator` block.
+Prisma 7's client also requires a driver adapter, which would have meant adding
+`@prisma/adapter-pg` and `pg` to build a second RLS-bypassing data path for two
+routes that already have one in `createServiceClient()`.
+
+### Consequences
+
+**Good** — migration history is tracked and `npm run db:status` answers "is this
+environment current?"; the DDL is generated from the schema so tables and columns
+cannot drift; `schema.prisma` is a readable map of the data model; RLS remains the
+single authorisation boundary.
+
+**Accepted** —
+
+- **The migration file has two halves with different rules.** The generated DDL
+  must never be hand-edited; the hand-written half must never be regenerated.
+  Getting that backwards silently loses either a column or every policy. It is
+  labelled in the file, in data-model.md, and here.
+- **Prisma is blind to most of what matters.** It does not know the policies,
+  functions or triggers exist, so `prisma migrate diff` against a live database
+  will always report them as drift. Do not "fix" that.
+- **snake_case field names**, against Prisma convention, so a row looks the same
+  whether it came from Prisma or supabase-js.
+- **Two connection strings** to configure, and the pooled one is the wrong choice
+  for migrations in a way that fails confusingly.
+- **Prisma 7 moved connection URLs into `prisma.config.ts`** and stopped
+  auto-loading dotenv files, so that config file does both.
 
 ---
 

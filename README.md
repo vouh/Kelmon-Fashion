@@ -79,6 +79,8 @@ preserved in the first Git commit, so nothing removed is lost.
 | Framework | Next.js 15, App Router, TypeScript |
 | Styling | Tailwind CSS v3 + CSS custom properties |
 | Database | Supabase Postgres with Row Level Security |
+| Schema & migrations | Prisma — `npm run db:migrate`. No Prisma Client: it would bypass RLS |
+| Validation | Zod at every request and Server Action boundary |
 | Auth | Firebase Auth — Google + email/password — as a Supabase third-party provider |
 | File storage | Supabase Storage — `product-images`, `deal-images`, `avatars` |
 | Payments | M-Pesa STK Push (Safaricom Daraja) |
@@ -184,16 +186,26 @@ fails authorisation before RLS is even reached.
 
 ### 6. Apply the schema
 
-Paste each file in [`supabase/migrations/`](supabase/migrations/) into the
-dashboard SQL editor in numerical order, or:
+Prisma owns the schema. Add the two connection strings from **Project Settings →
+Database → Connection string**, then apply the migration:
 
-```bash
-npx supabase link --project-ref <your-project-ref>
-npx supabase db push
+```
+DIRECT_URL=postgresql://postgres.<ref>:<password>@<host>:5432/postgres
+DATABASE_URL=postgresql://postgres.<ref>:<password>@<host>:6543/postgres
 ```
 
-0001 creates the schema, 0002 drops the salon tables, and 0003 moves identity to
-Firebase and restates every RLS policy. Where 0001 and 0003 disagree, 0003 wins.
+```bash
+npm run db:status    # what has been applied
+npm run db:migrate   # apply it
+```
+
+`DIRECT_URL` is the port-5432 connection; migrations need a real session for
+advisory locks and transactional DDL, which the pooled 6543 endpoint cannot give.
+
+The migration has two halves. Prisma generates the tables and columns from
+`prisma/schema.prisma`; the rest — RLS policies, functions, triggers, CHECK
+constraints, partial indexes and the three storage buckets — is hand-written,
+because Prisma cannot express any of it.
 
 ### 7. Sign in, then add your catalogue
 
@@ -203,7 +215,7 @@ not hot-reload — then sign in with the email you put in `ADMIN_EMAILS`. The
 `/admin` opens.
 
 Add products at `/admin/products`, images included; they upload straight to the
-`product-images` bucket. `supabase/seed.sql` contains no catalogue — only an
+`product-images` bucket. `prisma/seed.sql` contains no catalogue — only an
 optional admin grant by email, for promoting someone who has already signed in.
 
 ### M-Pesa in development
@@ -262,13 +274,14 @@ lib/
   mpesa.ts          STK Push
   products.ts       Product type, row mapper, formatKes
   cart.ts           cart maths, delivery fee, variant options
+  validation/       Zod schemas for every untrusted boundary
 middleware.ts       /admin gate (decode only — see security.md)
 styles/design.css   design tokens
-supabase/
-  migrations/0001_init.sql
-  migrations/0002_remove_salon.sql
-  migrations/0003_firebase_auth.sql
-  seed.sql
+prisma/
+  schema.prisma     tables, columns, relations
+  migrations/       generated DDL + hand-written RLS, functions, buckets
+  seed.sql          first-admin grant, no catalogue
+prisma.config.ts    connection URLs, dotenv loading
 docs/
   architecture.md   front end, back end, API, integrations, decisions
   data-model.md     tables, functions, migrations
@@ -354,7 +367,7 @@ Trust boundaries, RLS policies and open risks: [docs/security.md](docs/security.
 
 | Document | Covers |
 |---|---|
-| [docs/architecture.md](docs/architecture.md) | **Everything about the front end and back end** — routes, components, providers, styling, middleware, data layer, full API reference, Server Actions, M-Pesa, Firebase Auth setup, environment, local setup, deployment, and all six design decisions |
+| [docs/architecture.md](docs/architecture.md) | **Everything about the front end and back end** — routes, components, providers, styling, middleware, data layer, full API reference, Server Actions, M-Pesa, Firebase Auth setup, environment, local setup, deployment, and all seven design decisions |
 | [docs/data-model.md](docs/data-model.md) | Every table, column, constraint, function and trigger; migrations and the TypeScript mirror |
 | [docs/security.md](docs/security.md) | Trust boundaries, authorisation layers, RLS policies table by table, and 11 open risks with fixes |
 | [design.md](design.md) | Colours, typography, spacing, components, theming |

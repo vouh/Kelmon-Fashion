@@ -7,6 +7,7 @@ import {
 } from "@/lib/firebase/admin";
 import { ID_TOKEN_COOKIE, ID_TOKEN_MAX_AGE } from "@/lib/firebase/cookie";
 import { createServiceClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { parseInput, sessionRequestSchema } from "@/lib/validation/schemas";
 
 /**
  * Bridges the Firebase session in the browser to the server and to Supabase.
@@ -38,15 +39,24 @@ export async function POST(request: Request) {
     );
   }
 
-  let idToken: string | undefined;
+  let raw: unknown;
   try {
-    ({ idToken } = (await request.json()) as { idToken?: string });
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: "Expected a JSON body." }, { status: 400 });
   }
 
+  // Shape check only — three base64url segments. It turns a junk body into a 400
+  // without the Admin SDK doing crypto first, and decides nothing about trust.
+  const parsed = parseInput(sessionRequestSchema, raw);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
+  }
+  const { idToken } = parsed.data;
+
+  // This is the line that actually establishes identity.
   const decoded = await verifyIdToken(idToken);
-  if (!decoded || !idToken) {
+  if (!decoded) {
     return NextResponse.json({ error: "Invalid or expired token." }, { status: 401 });
   }
 

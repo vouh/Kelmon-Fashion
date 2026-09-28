@@ -45,9 +45,11 @@ function readCredentials():
   // Shape 2: the three fields separately. Dotenv keeps "\n" literal, so the
   // private key arrives as one line and has to be unescaped before use.
   const projectId =
-    process.env.FIREBASE_PROJECT_ID ?? process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+    process.env.FIREBASE_PROJECT_ID ??
+    process.env.FIREBASE_ADMIN_PROJECT_ID ??
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL ?? process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY ?? process.env.FIREBASE_ADMIN_PRIVATE_KEY;
 
   if (!projectId || !clientEmail || !privateKey) return null;
 
@@ -72,7 +74,7 @@ export function getAdminApp(): App {
   if (!credentials) {
     throw new Error(
       "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT_JSON, or " +
-        "FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY."
+        "FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY (or their FIREBASE_ADMIN_* equivalents)."
     );
   }
 
