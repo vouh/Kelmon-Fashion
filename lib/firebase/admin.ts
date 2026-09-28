@@ -1,5 +1,6 @@
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth, type Auth, type DecodedIdToken } from "firebase-admin/auth";
+import { getFirestore, type Firestore } from "firebase-admin/firestore";
 
 /**
  * Firebase Admin SDK — the trusted half of authentication.
@@ -80,6 +81,11 @@ export function getAdminApp(): App {
 
 export function getAdminAuth(): Auth {
   return getAuth(getAdminApp());
+}
+
+export function getAdminFirestore(): Firestore | null {
+  if (!isFirebaseAdminConfigured()) return null;
+  return getFirestore(getAdminApp());
 }
 
 /**

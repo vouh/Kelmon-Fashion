@@ -3,6 +3,7 @@ import type { ProductRow } from "@/lib/supabase/types";
 export type NavItem =
   | "home"
   | "shop"
+  | "salon"
   | "cart"
   | "orders"
   | "profile"

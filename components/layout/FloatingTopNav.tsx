@@ -16,6 +16,7 @@ interface FloatingTopNavProps {
 const navLinks: { href: string; label: string; key: NavItem }[] = [
   { href: "/", label: "Home", key: "home" },
   { href: "/shop", label: "Shop", key: "shop" },
+  { href: "/salon", label: "Salon", key: "salon" },
   { href: "/about", label: "About", key: "about" },
   { href: "/contact", label: "Contact", key: "contact" },
 ];
