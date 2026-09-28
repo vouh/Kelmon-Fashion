@@ -2,6 +2,9 @@
   "name": "kelmon-fashion",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "description": "Kelmon — campus fashion and beauty platform",
   "scripts": {
     "dev": "next dev",
