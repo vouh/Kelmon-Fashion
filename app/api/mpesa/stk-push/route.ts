@@ -6,7 +6,8 @@ import {
   missingMpesaConfig,
   normalizeKenyanPhone,
 } from "@/lib/mpesa";
-import { createClient } from "@/lib/supabase/server";
+import { createCallerClient } from "@/lib/supabase/server";
+import { getIdentity } from "@/lib/firebase/session";
 import { updateOrderByIdAsService } from "@/lib/supabase/orders";
 
 interface StkPushBody {
@@ -45,19 +46,25 @@ export async function POST(request: Request) {
       );
     }
 
-    // RLS scopes this read to the caller's own orders (or any order for an admin),
-    // so this doubles as the authorisation check.
-    const supabase = await createClient();
+    const identity = await getIdentity();
+    if (!identity) {
+      return NextResponse.json({ error: "Your session has expired. Please sign in again." }, { status: 401 });
+    }
+
+    // With a live ID token RLS scopes this read to the caller's own orders (or
+    // any order for an admin). On the session-cookie fallback RLS is bypassed,
+    // so the owner check below does that job instead.
+    const supabase = await createCallerClient(identity);
     const { data: order, error } = await supabase
       .from("orders")
-      .select("id, total, payment_status")
+      .select("id, total, payment_status, user_id")
       .eq("id", orderId)
       .maybeSingle();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    if (!order) {
+    if (!order || (order.user_id !== identity.uid && !identity.admin)) {
       return NextResponse.json({ error: "Order not found." }, { status: 404 });
     }
     if (order.payment_status === "paid") {

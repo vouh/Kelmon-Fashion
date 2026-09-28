@@ -1,6 +1,7 @@
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth, type Auth, type DecodedIdToken } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { PROTECTED_SUPER_ADMIN_EMAILS, isProtectedAccount } from "@/lib/auth/protected-accounts";
 
 /**
  * Firebase Admin SDK — the trusted half of authentication.
@@ -111,6 +112,24 @@ export async function verifyIdToken(
   }
 }
 
+/** Mints a two-week Firebase session cookie from a verified ID token. */
+export async function createSessionCookie(idToken: string, maxAgeSeconds: number): Promise<string> {
+  return getAdminAuth().createSessionCookie(idToken, { expiresIn: maxAgeSeconds * 1000 });
+}
+
+/** Verifies a session cookie. Null for absent, expired or invalid, as above. */
+export async function verifySessionCookie(
+  cookie: string | undefined,
+  checkRevoked = false
+): Promise<DecodedIdToken | null> {
+  if (!cookie || !isFirebaseAdminConfigured()) return null;
+  try {
+    return await getAdminAuth().verifySessionCookie(cookie, checkRevoked);
+  } catch {
+    return null;
+  }
+}
+
 // ── Custom claims ───────────────────────────────────────────────────────────
 
 /**
@@ -128,12 +147,16 @@ export interface KelmonClaims {
   admin?: boolean;
 }
 
-/** Emails granted admin on first sign-in, so the first admin can exist at all. */
+/**
+ * Emails granted admin on sign-in, so the first admin can exist at all. The
+ * protected super admins are always included, whatever ADMIN_EMAILS says.
+ */
 export function bootstrapAdminEmails(): string[] {
-  return (process.env.ADMIN_EMAILS ?? "")
+  const fromEnv = (process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean);
+  return [...new Set([...PROTECTED_SUPER_ADMIN_EMAILS, ...fromEnv])];
 }
 
 /**
@@ -160,10 +183,25 @@ export async function syncClaims(
 
 /** Grants or revokes admin. Used by the admin panel's user management. */
 export async function setAdminClaim(uid: string, admin: boolean): Promise<void> {
+  if (!admin) await assertNotProtected(uid);
   await getAdminAuth().setCustomUserClaims(uid, { role: "authenticated", admin });
   // Force every existing token to be re-minted so the change takes effect now
   // rather than whenever the current hour-long token happens to expire.
   await getAdminAuth().revokeRefreshTokens(uid);
+}
+
+/** Throws for the protected super admins, before anything destructive runs. */
+export async function assertNotProtected(uid: string): Promise<void> {
+  const user = await getAdminAuth().getUser(uid);
+  if (isProtectedAccount(user.email)) {
+    throw new Error("This super admin account is protected and cannot be removed or demoted.");
+  }
+}
+
+/** Deletes a Firebase account, refusing the protected super admins. */
+export async function deleteAuthUser(uid: string): Promise<void> {
+  await assertNotProtected(uid);
+  await getAdminAuth().deleteUser(uid);
 }
 
 export async function findUidByEmail(email: string): Promise<string | null> {

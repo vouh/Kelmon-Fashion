@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ID_TOKEN_COOKIE, peekIdToken } from "@/lib/firebase/cookie";
+import { ID_TOKEN_COOKIE, SESSION_COOKIE, peekIdToken } from "@/lib/firebase/cookie";
 
 /**
  * First-pass gate for /admin, plus the redirect away from /signin for users who
@@ -18,7 +18,13 @@ import { ID_TOKEN_COOKIE, peekIdToken } from "@/lib/firebase/cookie";
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const token = peekIdToken(request.cookies.get(ID_TOKEN_COOKIE)?.value);
+  // The live ID token if there is one, else the two-week session cookie — both
+  // JWTs, so the same unverified peek reads either.
+  const idToken = peekIdToken(request.cookies.get(ID_TOKEN_COOKIE)?.value);
+  const token =
+    idToken && !idToken.expired
+      ? idToken
+      : peekIdToken(request.cookies.get(SESSION_COOKIE)?.value);
   const signedIn = token !== null && !token.expired;
 
   if (pathname.startsWith("/admin")) {
@@ -42,11 +48,15 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Signed-in users have no reason to see the sign-in page.
-  if (pathname === "/signin" && signedIn) {
+  // Signed-in users have no reason to see the sign-in page. Admins land on the
+  // dashboard; everyone else on their account. Only on a real navigation: the
+  // router.refresh() AuthProvider fires right after sign-in is an RSC fetch,
+  // and redirecting it would yank an admin off the "where to?" prompt.
+  if (pathname === "/signin" && signedIn && request.headers.get("RSC") !== "1") {
     const next = request.nextUrl.searchParams.get("next");
     const redirect = request.nextUrl.clone();
-    redirect.pathname = next?.startsWith("/") && !next.startsWith("//") ? next : "/profile";
+    redirect.pathname =
+      next?.startsWith("/") && !next.startsWith("//") ? next : token.admin ? "/admin" : "/profile";
     redirect.search = "";
     return NextResponse.redirect(redirect);
   }

@@ -49,15 +49,30 @@ interface AuthContextValue {
   user: User | null;
   profile: ProfileRow | null;
   isAdmin: boolean;
-  signInWithGoogle: () => Promise<void>;
-  signInWithEmail: (email: string, password: string) => Promise<void>;
-  signUpWithEmail: (email: string, password: string, fullName: string) => Promise<void>;
+  /** One of the protected super admins in lib/auth/protected-accounts.ts. */
+  isSuperAdmin: boolean;
+  signInWithGoogle: () => Promise<SignInResult>;
+  signInWithEmail: (email: string, password: string) => Promise<SignInResult>;
+  signUpWithEmail: (email: string, password: string, fullName: string) => Promise<SignInResult>;
   signOut: () => Promise<void>;
   updateProfile: (
     patch: Partial<Pick<ProfileRow, "full_name" | "phone" | "campus" | "avatar_url">>
   ) => Promise<void>;
   refreshProfile: () => Promise<void>;
+  /**
+   * Makes sure the server's cookies hold a live token before a request that
+   * needs one (placing an order). Resolves false when nobody is signed in.
+   */
+  ensureSession: () => Promise<boolean>;
 }
+
+/** The role the server settled on for the account that just signed in. */
+export interface SignInResult {
+  admin: boolean;
+  superAdmin: boolean;
+}
+
+const NO_ROLE: SignInResult = { admin: false, superAdmin: false };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -93,6 +108,10 @@ export function authErrorMessage(error: unknown): string {
     return "That sign-in method is not enabled for this project yet.";
   if (code.includes("auth/unauthorized-domain"))
     return "This domain is not authorised in the Firebase console.";
+  if (code.includes("auth/expired-action-code"))
+    return "This reset link has expired. Request a new one.";
+  if (code.includes("auth/invalid-action-code"))
+    return "This reset link is invalid or has already been used. Request a new one.";
 
   return raw || "Something went wrong. Please try again.";
 }
@@ -104,6 +123,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(configured);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [role, setRole] = useState<SignInResult>(NO_ROLE);
+
+  /** Why the last session sync failed, or null when it succeeded. */
+  const syncError = useRef<string | null>(null);
 
   /** The uid the server was last told about, so a refresh only fires on change. */
   const syncedUid = useRef<string | null>(null);
@@ -121,11 +144,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(data ?? null);
   }, []);
 
-  /** Mirrors the current token into the server's cookie. */
-  const syncSession = useCallback(async (next: User | null) => {
+  /**
+   * Mirrors the current token into the server's cookie, and returns the role
+   * the server decided on — the custom claims are written there, so it is the
+   * one place that knows them before the client's token catches up.
+   */
+  const syncSession = useCallback(async (next: User | null): Promise<SignInResult> => {
     if (!next) {
       await fetch("/api/auth/session", { method: "DELETE" }).catch(() => {});
-      return;
+      setRole(NO_ROLE);
+      return NO_ROLE;
     }
 
     const post = (idToken: string) =>
@@ -136,15 +164,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
     const response = await post(await next.getIdToken());
-    if (!response.ok) return;
+    if (!response.ok) {
+      const { error } = (await response.json().catch(() => ({}))) as { error?: string };
+      syncError.current = error ?? `Could not start your session (HTTP ${response.status}).`;
+      setRole(NO_ROLE);
+      return NO_ROLE;
+    }
+    syncError.current = null;
 
-    const { refreshRequired } = (await response.json()) as { refreshRequired?: boolean };
-    if (refreshRequired) {
+    const body = (await response.json()) as {
+      admin?: boolean;
+      superAdmin?: boolean;
+      refreshRequired?: boolean;
+    };
+    if (body.refreshRequired) {
       // The server wrote a custom claim, which the token just sent predates.
       // Force a new one so Postgres actually sees it, and store that instead.
       // This settles in one extra round: the second sync finds nothing to write.
       await post(await next.getIdToken(true));
     }
+
+    const result = { admin: body.admin === true, superAdmin: body.superAdmin === true };
+    setRole(result);
+    return result;
   }, []);
 
   useEffect(() => {
@@ -180,6 +222,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [configured, syncSession, loadProfile, router]);
 
+  // A tab left in the background (or a laptop asleep) can outlive the hour-long
+  // cookie without Firebase's refresh timer firing. Re-sync when the tab comes
+  // back; getIdToken() hands back the cached token unless it is near expiry.
+  useEffect(() => {
+    if (!configured) return;
+    const onVisible = () => {
+      const current = getFirebaseAuth().currentUser;
+      if (document.visibilityState === "visible" && current) void syncSession(current);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [configured, syncSession]);
+
+  const ensureSession = useCallback(async () => {
+    if (!configured) return false;
+    const auth = getFirebaseAuth();
+    // Firebase restores the user from IndexedDB asynchronously on page load.
+    await auth.authStateReady();
+    if (!auth.currentUser) return false;
+    await syncSession(auth.currentUser);
+    // Signed in to Firebase but the server refused the token: sending the user
+    // back to /signin would just loop, so surface why instead.
+    if (syncError.current) throw new Error(syncError.current);
+    return true;
+  }, [configured, syncSession]);
+
   const requireAuth = useCallback(() => {
     if (!configured) {
       throw new Error("Firebase is not configured. Add credentials to .env.local");
@@ -193,14 +261,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     provider.setCustomParameters({ prompt: "select_account" });
     // A popup rather than a redirect: it keeps the caller on the page, so there
     // is no OAuth landing route to maintain and no code to exchange.
-    await signInWithPopup(auth, provider);
-  }, [requireAuth]);
+    const credential = await signInWithPopup(auth, provider);
+    // Synced here as well as in onIdTokenChanged so the caller learns the role
+    // (and the cookie carries the admin claim) before it decides where to go.
+    return syncSession(credential.user);
+  }, [requireAuth, syncSession]);
 
   const signInWithEmail = useCallback(
     async (email: string, password: string) => {
-      await signInWithEmailAndPassword(requireAuth(), email, password);
+      const credential = await signInWithEmailAndPassword(requireAuth(), email, password);
+      return syncSession(credential.user);
     },
-    [requireAuth]
+    [requireAuth, syncSession]
   );
 
   const signUpWithEmail = useCallback(
@@ -209,7 +281,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Set it on the Firebase user too, so the name is in the ID token's `name`
       // claim and /api/auth/session can seed profiles.full_name from it.
       await updateFirebaseProfile(credential.user, { displayName: fullName });
-      await syncSession(credential.user);
+      return syncSession(credential.user);
     },
     [requireAuth, syncSession]
   );
@@ -217,6 +289,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     await firebaseSignOut(requireAuth());
     setProfile(null);
+    setRole(NO_ROLE);
     await fetch("/api/auth/session", { method: "DELETE" }).catch(() => {});
     router.refresh();
   }, [requireAuth, router]);
@@ -239,25 +312,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       user,
       profile,
-      isAdmin: profile?.role === "admin",
+      isAdmin: role.admin || profile?.role === "admin",
+      isSuperAdmin: role.superAdmin,
       signInWithGoogle,
       signInWithEmail,
       signUpWithEmail,
       signOut,
       updateProfile,
       refreshProfile,
+      ensureSession,
     }),
     [
       configured,
       loading,
       user,
       profile,
+      role,
       signInWithGoogle,
       signInWithEmail,
       signUpWithEmail,
       signOut,
       updateProfile,
       refreshProfile,
+      ensureSession,
     ]
   );
 

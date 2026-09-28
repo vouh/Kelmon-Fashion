@@ -1,4 +1,9 @@
-import { createClient, createServiceClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import {
+  createCallerClient,
+  createClient,
+  createServiceClient,
+  isSupabaseConfigured,
+} from "@/lib/supabase/server";
 import type { CartLine } from "@/lib/cart";
 import type { Database, OrderItemRow, OrderRow, PaymentMethod } from "@/lib/supabase/types";
 import { getIdentity } from "@/lib/firebase/session";
@@ -46,7 +51,9 @@ export async function createOrder(input: NewOrderInput): Promise<string> {
   const identity = await getIdentity();
   if (!identity) throw new Error("You must be signed in to place an order.");
 
-  const supabase = await createClient();
+  // Scoped by hand: user_id comes from the verified identity, and status and
+  // payment_status are pinned below exactly as the RLS insert policy requires.
+  const supabase = await createCallerClient(identity);
   const id = createOrderId();
 
   const { error: orderError } = await supabase.from("orders").insert({
@@ -96,7 +103,8 @@ export async function getUserOrders(): Promise<OrderWithItems[]> {
   const identity = await getIdentity();
   if (!identity) return [];
 
-  const supabase = await createClient();
+  // Scoped by the .eq("user_id") below, which the service fallback relies on.
+  const supabase = await createCallerClient(identity);
   const { data, error } = await supabase
     .from("orders")
     .select("*, order_items(*)")

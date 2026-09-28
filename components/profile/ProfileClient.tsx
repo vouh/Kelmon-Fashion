@@ -52,7 +52,7 @@ function pointsForOrder(total: number): number {
 
 export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
   const { itemCount } = useCart();
-  const { user, profile, loading, updateProfile } = useAuth();
+  const { user, profile, loading, updateProfile, isAdmin, isSuperAdmin } = useAuth();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
@@ -333,6 +333,17 @@ export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
                   </p>
                 )}
                 {email && <p className="mt-3 text-sm text-primary">{email}</p>}
+                {isAdmin && (
+                  <a
+                    href="/admin"
+                    className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white shadow-md shadow-primary/25 transition hover:bg-primary/90"
+                  >
+                    <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                      admin_panel_settings
+                    </span>
+                    {isSuperAdmin ? "Super admin dashboard" : "Admin dashboard"}
+                  </a>
+                )}
                 {phone && <p className="mt-1 text-sm text-on-surface-variant">{phone}</p>}
                 {savedFlash && (
                   <p className="mt-2 text-xs text-secondary" role="status">

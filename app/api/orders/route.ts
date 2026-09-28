@@ -41,7 +41,10 @@ export async function POST(request: Request) {
     const body = parsed.data;
 
     if (!(await getIdentity())) {
-      return NextResponse.json({ error: "You must be signed in to order." }, { status: 401 });
+      return NextResponse.json(
+        { error: "Your session has expired. Please sign in again to order." },
+        { status: 401 }
+      );
     }
 
     const supabase = await createClient();

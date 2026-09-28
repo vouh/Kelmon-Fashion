@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
+import { useAuth } from "@/components/providers/AuthProvider";
 import { useCart } from "@/components/providers/CartProvider";
 import { FREE_DELIVERY_THRESHOLD } from "@/lib/cart";
 import { formatKes } from "@/lib/products";
@@ -22,6 +23,7 @@ const inputClass =
 export default function CheckoutPage() {
   const router = useRouter();
   const { lines, subtotal, deliveryFee, total, clearCart, itemCount } = useCart();
+  const { ensureSession } = useAuth();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [dropPoint, setDropPoint] = useState(DROP_POINTS[0]);
@@ -59,6 +61,13 @@ export default function CheckoutPage() {
     setSubmitting(true);
 
     try {
+      // Refresh the server's cookie first, so an hour-old tab doesn't get a 401
+      // from someone who is plainly still signed in.
+      if (!(await ensureSession())) {
+        router.push("/signin?next=/checkout");
+        return;
+      }
+
       const orderRes = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -74,6 +83,11 @@ export default function CheckoutPage() {
           total,
         }),
       });
+
+      if (orderRes.status === 401) {
+        router.push("/signin?next=/checkout");
+        return;
+      }
 
       const orderData = (await orderRes.json()) as { orderId?: string; error?: string };
       if (!orderRes.ok || !orderData.orderId) {

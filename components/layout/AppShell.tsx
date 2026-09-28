@@ -1,5 +1,6 @@
 "use client";
 
+import AdminReturnBar from "@/components/layout/AdminReturnBar";
 import BottomNav from "@/components/layout/BottomNav";
 import FloatingTopNav from "@/components/layout/FloatingTopNav";
 import Footer from "@/components/layout/Footer";
@@ -22,6 +23,7 @@ export default function AppShell({ children, activeNav, hideBottomNav = false }:
         {children}
         <Footer />
       </div>
+      <AdminReturnBar />
       {!hideBottomNav && <BottomNav active={activeNav} cartCount={itemCount} />}
     </>
   );

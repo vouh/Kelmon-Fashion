@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getEmailSettings, resend } from "@/lib/email/resend";
+import { contactMessageEmail, siteOrigin } from "@/lib/email/templates";
 
 export const runtime = "nodejs";
 
@@ -8,20 +9,6 @@ const MAX_MESSAGE_LENGTH = 5_000;
 
 function asTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>'"]/g, (character) => {
-    const entities: Record<string, string> = {
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      "'": "&#39;",
-      '"': "&quot;",
-    };
-
-    return entities[character];
-  });
 }
 
 export async function POST(request: Request) {
@@ -57,18 +44,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Your message is too long." }, { status: 400 });
   }
 
-  const safeName = escapeHtml(`${firstName} ${lastName}`);
-  const safeEmail = escapeHtml(email);
-  const safePhone = escapeHtml(phone || "Not provided");
-  const safeMessage = escapeHtml(message).replace(/\r?\n/g, "<br />");
-
   const { error } = await resend.emails.send({
     from: settings.from,
     to: settings.contactRecipients,
     replyTo: email,
-    subject: `New Kelmon contact message from ${firstName} ${lastName}`,
-    text: `Name: ${firstName} ${lastName}\nEmail: ${email}\nPhone: ${phone || "Not provided"}\n\nMessage:\n${message}`,
-    html: `<main><h1>New Kelmon contact message</h1><p><strong>Name:</strong> ${safeName}</p><p><strong>Email:</strong> ${safeEmail}</p><p><strong>Phone:</strong> ${safePhone}</p><hr /><p>${safeMessage}</p></main>`,
+    ...contactMessageEmail({ firstName, lastName, email, phone, message }, siteOrigin(request)),
   });
 
   if (error) {

@@ -23,7 +23,7 @@ next-env.d.ts
 .vercel
 
 # ── Supabase CLI ───────────────────────────────────────────────────────────
-# Local stack state. Migrations and seed.sql ARE tracked.
+# Local stack state. Migrations ARE tracked.
 supabase/.branches/
 supabase/.temp/
 supabase/logs/

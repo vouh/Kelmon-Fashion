@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
-import { verifyIdToken } from "@/lib/firebase/admin";
-import { ID_TOKEN_COOKIE } from "@/lib/firebase/cookie";
+import { verifyIdToken, verifySessionCookie } from "@/lib/firebase/admin";
+import { ID_TOKEN_COOKIE, SESSION_COOKIE } from "@/lib/firebase/cookie";
 
 /**
  * The server's verified view of who is signed in.
@@ -9,10 +9,11 @@ import { ID_TOKEN_COOKIE } from "@/lib/firebase/cookie";
  * module is the half that verifies it, so it may only be imported from Node
  * runtime code — server components, route handlers, server actions.
  *
- * One consequence to know about: ID tokens expire after an hour, so a cold page
- * load by someone who has been away longer renders as signed out until the
- * client refreshes the cookie. AuthProvider posts a fresh token on mount, and
- * middleware bounces protected routes through /signin, which does the same.
+ * Identity comes from the hour-long ID token when it is still live, and from
+ * the two-week session cookie otherwise, so someone who was away longer than an
+ * hour is still recognised. `source` says which: only a live ID token reaches
+ * Supabase, so code that needs RLS on a "session" identity must scope its
+ * queries itself (see createCallerClient in lib/supabase/server.ts).
  */
 export interface Identity {
   uid: string;
@@ -20,6 +21,7 @@ export interface Identity {
   name: string | null;
   picture: string | null;
   admin: boolean;
+  source: "token" | "session";
 }
 
 /** The raw ID token, for handing to Supabase. Not verified by this function. */
@@ -28,9 +30,15 @@ export async function getIdTokenCookie(): Promise<string | undefined> {
   return store.get(ID_TOKEN_COOKIE)?.value;
 }
 
-/** The verified caller, or null when the token is absent, expired or invalid. */
+/** The verified caller, or null when neither cookie holds a valid credential. */
 export async function getIdentity(): Promise<Identity | null> {
-  const decoded = await verifyIdToken(await getIdTokenCookie());
+  let source: Identity["source"] = "token";
+  let decoded = await verifyIdToken(await getIdTokenCookie());
+  if (!decoded) {
+    const store = await cookies();
+    decoded = await verifySessionCookie(store.get(SESSION_COOKIE)?.value);
+    source = "session";
+  }
   if (!decoded) return null;
 
   return {
@@ -39,5 +47,6 @@ export async function getIdentity(): Promise<Identity | null> {
     name: (decoded.name as string | undefined) ?? null,
     picture: (decoded.picture as string | undefined) ?? null,
     admin: decoded.admin === true,
+    source,
   };
 }

@@ -17,5 +17,6 @@ export function getEmailSettings() {
     from,
     contactRecipients,
     isConfigured: Boolean(resend && from && contactRecipients.length > 0),
+    canSendToCustomers: Boolean(resend && from),
   };
 }

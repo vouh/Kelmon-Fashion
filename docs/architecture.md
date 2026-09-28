@@ -143,7 +143,6 @@ styles/design.css     design tokens
 prisma/
   schema.prisma       tables, columns, relations
   migrations/         generated DDL + hand-written RLS, functions, buckets
-  seed.sql            first-admin grant. No catalogue
 prisma.config.ts      connection URLs, dotenv loading
 ```
 
@@ -890,8 +889,6 @@ There is no offline mode and no sample data: an empty catalogue is an empty
    claim and `profiles.role` are both written on that sign-in. Then open
    `/admin/products` and add your first product.
 
-`prisma/seed.sql` only grants admin by email; it contains no catalogue.
-
 ### M-Pesa locally
 
 ```bash
@@ -925,7 +922,7 @@ long as middleware is supported — the `/admin` gate lives there.
 
 ### Checklist
 
-- [ ] Migration applied; seed run; RLS verified
+- [ ] Migrations applied; RLS verified
 - [ ] First admin granted
 - [ ] All environment variables set, service-role key **not** `NEXT_PUBLIC_`
 - [ ] `NEXT_PUBLIC_SITE_URL` is the real origin

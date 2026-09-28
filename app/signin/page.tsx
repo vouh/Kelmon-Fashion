@@ -5,7 +5,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
-import { useAuth, authErrorMessage } from "@/components/providers/AuthProvider";
+import {
+  useAuth,
+  authErrorMessage,
+  type SignInResult,
+} from "@/components/providers/AuthProvider";
 import { useToast } from "@/components/ui/Toast";
 import logo from "@/lib/logo";
 
@@ -17,27 +21,50 @@ function SignInForm() {
   const { signInWithGoogle, signInWithEmail, signUpWithEmail, configured } = useAuth();
   const { toast } = useToast();
 
-  const nextPath = params.get("next") ?? "/profile";
+  const requestedNext = params.get("next");
+  const nextPath =
+    requestedNext?.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/profile";
   const initialError = params.get("error");
 
   const [mode, setMode] = useState<Mode>("signin");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState<"google" | "email" | null>(null);
   const [error, setError] = useState<string | null>(
     initialError ? decodeURIComponent(initialError) : null
   );
+  /** Set once an admin signs in, which swaps the form for the destination prompt. */
+  const [adminRole, setAdminRole] = useState<SignInResult | null>(null);
+
+  /**
+   * Sends the user on by role. Admins headed for /admin go straight there; any
+   * other admin sign-in gets asked whether to open the dashboard or carry on
+   * as a customer, since both are legitimate reasons to sign in.
+   */
+  function routeAfterSignIn(result: SignInResult) {
+    if (result.admin && !requestedNext?.startsWith("/admin")) {
+      setAdminRole(result);
+      return;
+    }
+    router.push(result.admin ? (requestedNext ?? "/admin") : nextPath);
+    router.refresh();
+  }
+
+  function go(path: string) {
+    router.push(path);
+    router.refresh();
+  }
 
   async function handleGoogle() {
     setError(null);
     setBusy("google");
     try {
       // A popup, so the caller stays on this page and finishes below.
-      await signInWithGoogle();
+      const result = await signInWithGoogle();
       toast("Welcome!");
-      router.push(nextPath);
-      router.refresh();
+      routeAfterSignIn(result);
     } catch (err) {
       setError(authErrorMessage(err));
     } finally {
@@ -51,21 +78,31 @@ function SignInForm() {
     setBusy("email");
 
     try {
+      let result: SignInResult;
       if (mode === "signup") {
         if (!fullName.trim()) throw new Error("Please enter your name.");
-        await signUpWithEmail(email.trim(), password, fullName.trim());
+        result = await signUpWithEmail(email.trim(), password, fullName.trim());
         toast("Account created. Welcome to Kelmon!");
       } else {
-        await signInWithEmail(email.trim(), password);
+        result = await signInWithEmail(email.trim(), password);
         toast("Welcome back!");
       }
-      router.push(nextPath);
-      router.refresh();
+      routeAfterSignIn(result);
     } catch (err) {
       setError(authErrorMessage(err));
     } finally {
       setBusy(null);
     }
+  }
+
+  if (adminRole) {
+    return (
+      <AdminDestinationPrompt
+        superAdmin={adminRole.superAdmin}
+        onAdmin={() => go("/admin")}
+        onCustomer={() => go(nextPath)}
+      />
+    );
   }
 
   return (
@@ -165,8 +202,26 @@ function SignInForm() {
         </label>
         <label className="block">
           <span className="mb-1.5 flex items-center justify-between text-sm font-semibold text-on-surface"><span>Password</span>{mode === "signup" && <span className="font-normal text-on-surface-variant">6+ characters</span>}</span>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete={mode === "signup" ? "new-password" : "current-password"} minLength={6} required className="w-full rounded-2xl border border-outline/50 bg-surface px-4 py-3.5 text-body-md text-on-surface outline-none transition placeholder:text-on-surface-variant/60 focus:border-primary focus:ring-4 focus:ring-primary/10" />
+          <div className="relative">
+            <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete={mode === "signup" ? "new-password" : "current-password"} minLength={6} required className="w-full rounded-2xl border border-outline/50 bg-surface py-3.5 pl-4 pr-12 text-body-md text-on-surface outline-none transition placeholder:text-on-surface-variant/60 focus:border-primary focus:ring-4 focus:ring-primary/10" />
+            <button
+              type="button"
+              onClick={() => setShowPassword((shown) => !shown)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
+              className="absolute inset-y-0 right-1.5 my-auto flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
+              <span className="material-symbols-outlined text-[20px]">{showPassword ? "visibility_off" : "visibility"}</span>
+            </button>
+          </div>
         </label>
+        {mode === "signin" && (
+          <div className="-mt-1 text-right">
+            <Link href="/forgot-password" className="text-sm font-semibold text-primary underline-offset-4 hover:underline">
+              Forgot password?
+            </Link>
+          </div>
+        )}
 
         <button
           type="submit"
@@ -203,6 +258,76 @@ function SignInForm() {
         </Link>
         .
       </p>
+    </div>
+  );
+}
+
+/** Shown to admins after sign-in: dashboard, or the store as a customer sees it. */
+function AdminDestinationPrompt({
+  superAdmin,
+  onAdmin,
+  onCustomer,
+}: {
+  superAdmin: boolean;
+  onAdmin: () => void;
+  onCustomer: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-labelledby="admin-destination-title"
+      className="relative w-full overflow-hidden rounded-[2rem] border border-primary/20 bg-white/90 p-6 shadow-[0_24px_70px_rgba(91,42,128,0.18)] backdrop-blur sm:p-9 dark:bg-surface/90"
+    >
+      <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-secondary/25 blur-2xl" />
+
+      <div className="relative flex flex-col items-center text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <span className="material-symbols-outlined text-[34px]">admin_panel_settings</span>
+        </div>
+        <span className="mt-5 rounded-full bg-primary/10 px-3 py-1 font-label-caps text-[10px] uppercase tracking-[0.2em] text-primary">
+          {superAdmin ? "Super admin" : "Admin"}
+        </span>
+        <h1 id="admin-destination-title" className="mt-3 font-display-md text-3xl text-on-surface">
+          Where would you like to go?
+        </h1>
+        <p className="mt-2 max-w-sm text-body-md leading-relaxed text-on-surface-variant">
+          You can switch between the two at any time.
+        </p>
+      </div>
+
+      <div className="relative mt-7 space-y-3">
+        <button
+          type="button"
+          onClick={onAdmin}
+          autoFocus
+          className="group flex w-full items-center gap-4 rounded-2xl bg-primary px-5 py-4 text-left text-on-primary shadow-lg shadow-primary/25 transition hover:-translate-y-0.5 hover:bg-primary/90"
+        >
+          <span className="material-symbols-outlined text-2xl">dashboard</span>
+          <span className="flex-1">
+            <span className="block font-button-text text-button-text">Admin dashboard</span>
+            <span className="block text-sm opacity-80">Orders, products, payments</span>
+          </span>
+          <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">
+            arrow_forward
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={onCustomer}
+          className="group flex w-full items-center gap-4 rounded-2xl border border-outline/60 bg-surface px-5 py-4 text-left text-on-surface transition hover:bg-surface-container-high"
+        >
+          <span className="material-symbols-outlined text-2xl text-primary">person</span>
+          <span className="flex-1">
+            <span className="block font-button-text text-button-text">Continue as a customer</span>
+            <span className="block text-sm text-on-surface-variant">
+              See the store and your account as users do
+            </span>
+          </span>
+          <span className="material-symbols-outlined text-on-surface-variant transition-transform group-hover:translate-x-1">
+            arrow_forward
+          </span>
+        </button>
+      </div>
     </div>
   );
 }

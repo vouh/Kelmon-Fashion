@@ -60,10 +60,11 @@ export default function AdminShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { profile, signOut } = useAuth();
+  const { profile, isSuperAdmin, signOut } = useAuth();
   const [open, setOpen] = useState(false);
 
   const email = profile?.email ?? adminEmail ?? "Admin";
+  const roleLabel = isSuperAdmin ? "Super Admin" : "Administrator";
 
   /** Ends the Firebase session and clears the server cookie, then goes home. */
   async function handleSignOut() {
@@ -106,7 +107,16 @@ export default function AdminShell({
         <span className="text-[10px] font-black uppercase tracking-widest text-white/60">
           {title}
         </span>
-        <ThemeToggle />
+        <div className="flex items-center gap-1">
+          <Link
+            href="/profile"
+            aria-label="Preview user account"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-purple-300 hover:text-white"
+          >
+            <span className="material-symbols-outlined text-lg">visibility</span>
+          </Link>
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* Sidebar */}
@@ -169,13 +179,19 @@ export default function AdminShell({
                 {email}
               </p>
               <p className="mt-0.5 text-[8px] uppercase tracking-widest text-white/30">
-                Administrator
+                {roleLabel}
               </p>
             </div>
           </div>
           <Link
+            href="/profile"
+            className="mt-1 flex items-center gap-1.5 rounded-lg bg-purple-500/10 px-2 py-1.5 text-[10px] font-bold text-purple-300 transition-all hover:bg-purple-500/20"
+          >
+            <span className="material-symbols-outlined text-xs">visibility</span> Preview User Account
+          </Link>
+          <Link
             href="/"
-            className="mt-1 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-bold text-white/40 transition-all hover:bg-white/5 hover:text-purple-300"
+            className="mt-0.5 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-bold text-white/40 transition-all hover:bg-white/5 hover:text-purple-300"
           >
             <span className="material-symbols-outlined text-xs">open_in_new</span> View Site
           </Link>
@@ -211,6 +227,10 @@ export default function AdminShell({
 
           <div className="ml-auto flex items-center gap-3">
             {actions}
+            <Link href="/profile" className="admin-preview" title="See the store as a customer does">
+              <span className="material-symbols-outlined text-base">visibility</span>
+              Preview user account
+            </Link>
             <button type="button" className="admin-workspace" aria-label="Current workspace">
               <span className="min-w-0 text-left">
                 <span className="block text-[9px] font-black uppercase tracking-widest text-[#c5a059]">Workspace</span>
@@ -230,7 +250,7 @@ export default function AdminShell({
               </div>
               <div className="max-w-[145px]">
                 <p className="truncate text-xs font-black text-white">{email}</p>
-                <p className="truncate text-[10px] text-white/50">Administrator</p>
+                <p className="truncate text-[10px] text-white/50">{roleLabel}</p>
               </div>
             </div>
             <button

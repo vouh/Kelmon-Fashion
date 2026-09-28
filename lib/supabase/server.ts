@@ -41,6 +41,20 @@ export function createServiceClient(): SupabaseClient<Database> {
   });
 }
 
+/**
+ * A client for the caller's own rows. With a live ID token that is the normal
+ * RLS client. When only the session cookie is left (the ID token expired while
+ * the tab was closed), Supabase would see an anonymous request, so this falls
+ * back to the service role — **callers must scope every query to identity.uid
+ * themselves**, since RLS no longer does it for them.
+ */
+export async function createCallerClient(identity: Identity): Promise<SupabaseClient<Database>> {
+  if (identity.source === "token" || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return createClient();
+  }
+  return createServiceClient();
+}
+
 export function isSupabaseConfigured(): boolean {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY

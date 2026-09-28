@@ -20,6 +20,21 @@ export const ID_TOKEN_COOKIE = "kelmon-token";
 /** An ID token's lifetime. The client refreshes well before this. */
 export const ID_TOKEN_MAX_AGE = 60 * 60;
 
+/**
+ * A Firebase session cookie, which is what keeps the server knowing who you
+ * are between visits. The ID token above dies after an hour — close the tab,
+ * come back the next day, and the server would treat a user the browser still
+ * shows as signed in as anonymous. This one lasts two weeks (Firebase's
+ * maximum) and is verified with the Admin SDK just like the ID token.
+ *
+ * It cannot replace the ID token: Supabase rejects its issuer. So the ID token
+ * still carries RLS, and this carries identity.
+ */
+export const SESSION_COOKIE = "kelmon-session";
+
+/** Two weeks, the longest Firebase allows for a session cookie. */
+export const SESSION_MAX_AGE = 60 * 60 * 24 * 14;
+
 export interface TokenPeek {
   sub: string;
   email: string | null;

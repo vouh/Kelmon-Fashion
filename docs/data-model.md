@@ -464,13 +464,13 @@ prisma/
   migrations/
     migration_lock.toml               provider = postgresql
     20260928120000_init/migration.sql generated DDL + everything Prisma can't express
-  seed.sql                            first-admin grant. No catalogue
+    20260928200000_protected_super_admins/migration.sql
+                                      super admins that can't be deleted or demoted
 prisma.config.ts                      connection URLs and dotenv loading
 ```
 
-`seed.sql` deliberately contains **no products**. Catalogue content is entered
-through `/admin/products`, so an empty storefront means an empty table rather than
-a fixture that never ran.
+Catalogue content is entered through `/admin/products`, so an empty storefront
+means an empty table.
 
 ### Applying
 
@@ -481,12 +481,6 @@ npm run db:migrate    # prisma migrate deploy
 
 Both need `DIRECT_URL` (or `DATABASE_URL`) set — see
 [architecture.md](architecture.md#environment-variables).
-
-Then, only if you need to promote someone who has already signed in:
-
-```bash
-psql "$DIRECT_URL" -f prisma/seed.sql
-```
 
 ### Two connection URLs
 

@@ -215,8 +215,7 @@ not hot-reload — then sign in with the email you put in `ADMIN_EMAILS`. The
 `/admin` opens.
 
 Add products at `/admin/products`, images included; they upload straight to the
-`product-images` bucket. `prisma/seed.sql` contains no catalogue — only an
-optional admin grant by email, for promoting someone who has already signed in.
+`product-images` bucket.
 
 ### M-Pesa in development
 
@@ -280,7 +279,6 @@ styles/design.css   design tokens
 prisma/
   schema.prisma     tables, columns, relations
   migrations/       generated DDL + hand-written RLS, functions, buckets
-  seed.sql          first-admin grant, no catalogue
 prisma.config.ts    connection URLs, dotenv loading
 docs/
   architecture.md   front end, back end, API, integrations, decisions
