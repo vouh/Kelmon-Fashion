@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/AuthProvider";
@@ -62,6 +62,8 @@ export default function AdminShell({
   const router = useRouter();
   const { profile, isSuperAdmin, signOut } = useAuth();
   const [open, setOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
 
   const email = profile?.email ?? adminEmail ?? "Admin";
   const roleLabel = isSuperAdmin ? "Super Admin" : "Administrator";
@@ -84,7 +86,12 @@ export default function AdminShell({
     .sort((a, b) => b.length - a.length)[0];
 
   return (
-    <div className="kelmon-admin min-h-screen">
+    <div
+      className="kelmon-admin min-h-screen"
+      style={{
+        "--admin-sidebar-width": sidebarCollapsed ? "4rem" : "11rem",
+      } as CSSProperties}
+    >
       {/* Mobile overlay */}
       {open && (
         <div
@@ -110,10 +117,10 @@ export default function AdminShell({
         <div className="flex items-center gap-1">
           <Link
             href="/profile"
-            aria-label="Preview user account"
+            aria-label="Open user dashboard"
             className="flex h-7 w-7 items-center justify-center rounded-lg text-purple-300 hover:text-white"
           >
-            <span className="material-symbols-outlined text-lg">visibility</span>
+            <span className="material-symbols-outlined text-lg">switch_account</span>
           </Link>
           <ThemeToggle />
         </div>
@@ -121,15 +128,15 @@ export default function AdminShell({
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 z-40 flex h-screen w-44 flex-col border-r border-white/5 bg-zinc-950 transition-transform duration-300 md:translate-x-0 ${
+        className={`fixed left-0 top-0 z-40 flex h-screen w-44 flex-col border-r border-white/5 bg-zinc-950 transition-[transform,width] duration-300 md:!w-[var(--admin-sidebar-width)] md:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center gap-2.5 border-b border-white/5 px-3 py-3">
+        <div className={`flex items-center gap-2.5 border-b border-white/5 px-3 py-3 ${sidebarCollapsed ? "md:justify-center" : ""}`}>
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-purple-400/30 bg-purple-400/15 text-[11px] font-black text-purple-300">
             K
           </span>
-          <div>
+          <div className={sidebarCollapsed ? "md:hidden" : ""}>
             <p className="text-xs font-black leading-none text-white">Kelmon</p>
             <p className="mt-0.5 text-[8px] font-black uppercase tracking-widest text-purple-400/60">
               Admin Panel
@@ -138,7 +145,7 @@ export default function AdminShell({
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
-          <p className="mb-1.5 mt-1 px-2 text-[8px] font-black uppercase tracking-widest text-white/20">
+          <p className={`mb-1.5 mt-1 px-2 text-[8px] font-black uppercase tracking-widest text-white/20 ${sidebarCollapsed ? "md:hidden" : ""}`}>
             Navigation
           </p>
           {PAGES.map((page) => {
@@ -149,6 +156,8 @@ export default function AdminShell({
                 href={page.href}
                 onClick={() => setOpen(false)}
                 className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all ${
+                  sidebarCollapsed ? "md:justify-center" : ""
+                } ${
                   active
                     ? "admin-active bg-purple-600 text-white shadow shadow-purple-600/40"
                     : "text-white/50 hover:bg-white/5 hover:text-white"
@@ -161,20 +170,20 @@ export default function AdminShell({
                 >
                   {page.icon}
                 </span>
-                <span>{page.label}</span>
+                <span className={sidebarCollapsed ? "md:hidden" : ""}>{page.label}</span>
               </Link>
             );
           })}
         </nav>
 
         <div className="border-t border-white/5 px-2 py-2">
-          <div className="flex items-center gap-2 rounded-lg px-2 py-1.5">
+          <div className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${sidebarCollapsed ? "md:justify-center" : ""}`}>
             <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple-400/20">
               <span className="material-symbols-outlined text-xs text-purple-300">
                 admin_panel_settings
               </span>
             </div>
-            <div className="min-w-0">
+            <div className={`min-w-0 ${sidebarCollapsed ? "md:hidden" : ""}`}>
               <p className="truncate text-[10px] font-bold leading-none text-white">
                 {email}
               </p>
@@ -184,40 +193,40 @@ export default function AdminShell({
             </div>
           </div>
           <Link
-            href="/profile"
-            className="mt-1 flex items-center gap-1.5 rounded-lg bg-purple-500/10 px-2 py-1.5 text-[10px] font-bold text-purple-300 transition-all hover:bg-purple-500/20"
-          >
-            <span className="material-symbols-outlined text-xs">visibility</span> Preview User Account
-          </Link>
-          <Link
             href="/"
-            className="mt-0.5 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-bold text-white/40 transition-all hover:bg-white/5 hover:text-purple-300"
+            className={`mt-0.5 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-bold text-white/40 transition-all hover:bg-white/5 hover:text-purple-300 ${sidebarCollapsed ? "md:justify-center" : ""}`}
+            title="View site"
           >
-            <span className="material-symbols-outlined text-xs">open_in_new</span> View Site
+            <span className="material-symbols-outlined text-xs">open_in_new</span>
+            <span className={sidebarCollapsed ? "md:hidden" : ""}>View Site</span>
           </Link>
           <button
             type="button"
             onClick={() => void handleSignOut()}
-            className="mt-0.5 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-bold text-red-400/60 transition-all hover:bg-red-500/5 hover:text-red-400"
+            className={`mt-0.5 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-bold text-red-400/60 transition-all hover:bg-red-500/5 hover:text-red-400 ${sidebarCollapsed ? "md:justify-center" : ""}`}
+            title="Sign out"
           >
-            <span className="material-symbols-outlined text-xs">logout</span> Sign Out
+            <span className="material-symbols-outlined text-xs">logout</span>
+            <span className={sidebarCollapsed ? "md:hidden" : ""}>Sign Out</span>
           </button>
         </div>
       </aside>
 
       {/* Page body */}
-      <div className="flex min-h-screen flex-col pt-11 md:pl-44 md:pt-0">
+      <div className="flex min-h-screen flex-col pt-11 md:!pl-[var(--admin-sidebar-width)] md:pt-0 transition-[padding] duration-300">
         <div className="admin-command-bar sticky top-0 z-20 hidden h-[68px] items-center border-b px-6 md:flex">
           <div className="flex items-center gap-3">
             <button
               type="button"
-              aria-label="Open navigation"
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               className="admin-command-icon"
-              onClick={() => setOpen((value) => !value)}
+              onClick={() => setSidebarCollapsed((value) => !value)}
             >
-              <span className="material-symbols-outlined text-xl">menu</span>
+              <span className="material-symbols-outlined text-xl">
+                {sidebarCollapsed ? "menu" : "menu_open"}
+              </span>
             </button>
-            <span className="text-lg text-[var(--kelmon-text-disabled)]">‹</span>
             <label className="admin-command-search">
               <span className="material-symbols-outlined text-[18px]">search</span>
               <input aria-label="Search admin pages" placeholder="Search pages…" />
@@ -227,17 +236,53 @@ export default function AdminShell({
 
           <div className="ml-auto flex items-center gap-3">
             {actions}
-            <Link href="/profile" className="admin-preview" title="See the store as a customer does">
-              <span className="material-symbols-outlined text-base">visibility</span>
-              Preview user account
-            </Link>
-            <button type="button" className="admin-workspace" aria-label="Current workspace">
-              <span className="min-w-0 text-left">
-                <span className="block text-[9px] font-black uppercase tracking-widest text-[#c5a059]">Workspace</span>
-                <span className="block truncate text-xs font-extrabold text-white">{title}</span>
-              </span>
-              <span className="material-symbols-outlined text-base">expand_more</span>
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                className="admin-workspace"
+                aria-label="Switch workspace"
+                aria-expanded={workspaceOpen}
+                aria-haspopup="menu"
+                onClick={() => setWorkspaceOpen((value) => !value)}
+              >
+                <span className="min-w-0 text-left">
+                  <span className="block text-[9px] font-black uppercase tracking-widest text-[#c5a059]">Workspace</span>
+                  <span className="block truncate text-xs font-extrabold text-white">Admin dashboard</span>
+                </span>
+                <span className="material-symbols-outlined text-base">expand_more</span>
+              </button>
+              {workspaceOpen ? (
+                <div
+                  role="menu"
+                  className="absolute right-0 top-[calc(100%+8px)] z-50 w-52 overflow-hidden rounded-xl border border-[var(--kelmon-border-default)] bg-[var(--kelmon-bg-elevated)] p-1.5 shadow-xl"
+                >
+                  <Link
+                    href="/admin"
+                    role="menuitem"
+                    onClick={() => setWorkspaceOpen(false)}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-bold text-[var(--kelmon-text-primary)] transition-colors hover:bg-[var(--kelmon-purple-muted)]"
+                  >
+                    <span className="material-symbols-outlined text-base text-primary">admin_panel_settings</span>
+                    <span>
+                      <span className="block">Admin dashboard</span>
+                      <span className="mt-0.5 block text-[10px] font-medium text-[var(--kelmon-text-secondary)]">Orders, products and payments</span>
+                    </span>
+                  </Link>
+                  <Link
+                    href="/profile"
+                    role="menuitem"
+                    onClick={() => setWorkspaceOpen(false)}
+                    className="mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-bold text-[var(--kelmon-text-primary)] transition-colors hover:bg-[var(--kelmon-purple-muted)]"
+                  >
+                    <span className="material-symbols-outlined text-base text-primary">person</span>
+                    <span>
+                      <span className="block">User dashboard</span>
+                      <span className="mt-0.5 block text-[10px] font-medium text-[var(--kelmon-text-secondary)]">Profile, orders and account</span>
+                    </span>
+                  </Link>
+                </div>
+              ) : null}
+            </div>
             <button type="button" aria-label="Notifications" className="admin-command-icon">
               <span className="material-symbols-outlined text-xl">notifications</span>
             </button>
