@@ -3,7 +3,6 @@ import type { ProductRow } from "@/lib/supabase/types";
 export type NavItem =
   | "home"
   | "shop"
-  | "salon"
   | "cart"
   | "orders"
   | "profile"
@@ -31,6 +30,8 @@ export interface Product {
   images?: string[];
   sizes?: string[];
   colors?: string[];
+  /** Colour name → photo shown when that colour is picked. */
+  colorImages?: Record<string, string>;
   stock?: number;
 }
 
@@ -58,18 +59,10 @@ export function productFromRow(row: ProductRow): Product {
     images: row.images ?? [],
     sizes: row.sizes ?? [],
     colors: row.colors ?? [],
+    colorImages: row.color_images ?? {},
     stock: row.stock,
   };
 }
-
-/**
- * Starter categories, offered in the admin product form while `products` is
- * still empty and getCategories() has nothing to derive a list from. Category
- * is free text, so this is a convenience, not a constraint — and the storefront
- * never uses it, because a filter chip should only appear for a category that
- * has something in it.
- */
-export const categories = ["Bags", "Perfumes", "Fashion", "Nails"];
 
 export function formatKes(amount: number): string {
   return `KES ${amount.toLocaleString("en-KE")}`;

@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
+import { MpesaPayModal, MpesaStatus, useMpesaPayment } from "@/components/payments/MpesaPayment";
 import { formatKes } from "@/lib/products";
 
 /**
@@ -20,6 +21,9 @@ export interface StoredOrder {
   payment: string;
   total: number;
   status: string;
+  paymentStatus: string;
+  /** Plain-language reason for the last failed M-Pesa attempt. */
+  failureReason: string | null;
   lines: { name: string; quantity: number; price: number }[];
 }
 
@@ -57,7 +61,9 @@ export default function OrdersClient({ orders = [] }: { orders?: StoredOrder[] }
             </p>
             <p className="font-body-md text-body-md text-on-surface-variant">
               {latest.payment === "mpesa"
-                ? "We’ll confirm M-Pesa and deliver to your campus drop point."
+                ? latest.paymentStatus === "paid"
+                  ? "Payment received — we’ll deliver to your campus drop point."
+                  : "We’re waiting for M-Pesa to confirm your payment."
                 : "Pay on delivery at your selected drop point."}
             </p>
             <Link
@@ -95,7 +101,9 @@ export default function OrdersClient({ orders = [] }: { orders?: StoredOrder[] }
                 </p>
                 <p className="font-label-caps text-label-caps text-secondary uppercase tracking-wider">
                   {order.status.replace("_", " ")}
+                  {order.payment === "mpesa" && ` · ${PAYMENT_LABELS[order.paymentStatus] ?? order.paymentStatus}`}
                 </p>
+                {canPay(order) && <PayAgain order={order} />}
               </li>
             ))}
           </ul>
@@ -126,5 +134,69 @@ export default function OrdersClient({ orders = [] }: { orders?: StoredOrder[] }
         </div>
       </main>
     </AppShell>
+  );
+}
+
+const PAYMENT_LABELS: Record<string, string> = {
+  unpaid: "Not paid",
+  initiated: "Awaiting M-Pesa",
+  paid: "Paid",
+  failed: "Payment failed",
+};
+
+function canPay(order: StoredOrder): boolean {
+  return (
+    order.payment === "mpesa" &&
+    order.status !== "cancelled" &&
+    (order.paymentStatus === "unpaid" || order.paymentStatus === "failed")
+  );
+}
+
+/** Retry for an M-Pesa order whose payment failed or never went through. */
+function PayAgain({ order }: { order: StoredOrder }) {
+  const router = useRouter();
+  const { state, pay, reset } = useMpesaPayment();
+  const [phone, setPhone] = useState(order.phone);
+  const formRef = useRef<HTMLFormElement>(null);
+  const busy = state.phase === "sending" || state.phase === "waiting";
+
+  const onPay = async (e: FormEvent) => {
+    e.preventDefault();
+    const outcome = await pay(order.id, phone.trim());
+    if (outcome === "paid") router.refresh();
+  };
+
+  return (
+    <div className="space-y-2 pt-2">
+      {state.phase === "idle" && order.failureReason && (
+        <MpesaStatus state={{ phase: "failed", reason: order.failureReason }} />
+      )}
+      <MpesaPayModal
+        state={state}
+        amount={order.total}
+        phone={phone.trim()}
+        onClose={reset}
+        onRetry={() => formRef.current?.requestSubmit()}
+      />
+      {state.phase !== "paid" && (
+        <form ref={formRef} onSubmit={onPay} className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="tel"
+            inputMode="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            aria-label="M-Pesa phone number"
+            className="flex-1 h-10 px-3 rounded-lg bg-surface-container border border-white/10 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container/50"
+          />
+          <button
+            type="submit"
+            disabled={busy}
+            className="h-10 px-5 rounded-lg btn-primary text-white text-sm font-semibold disabled:opacity-60"
+          >
+            {busy ? "Waiting for M-Pesa…" : `Pay ${formatKes(order.total)} with M-Pesa`}
+          </button>
+        </form>
+      )}
+    </div>
   );
 }

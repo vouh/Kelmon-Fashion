@@ -87,11 +87,16 @@ model Profile {
   avatar_url     String?
   role           user_role @default(customer)
   loyalty_points Int       @default(0)
+  /// When the customer accepted the Terms of Service and Privacy Policy, and
+  /// which version (the policies' effective date, see lib/legal.ts).
+  terms_accepted_at DateTime? @db.Timestamptz(6)
+  terms_version     String?
   created_at     DateTime  @default(now()) @db.Timestamptz(6)
   updated_at     DateTime  @default(now()) @db.Timestamptz(6)
 
   orders  Order[]
   reviews Review[]
+  likes   ProductLike[]
 
   @@map("profiles")
 }
@@ -111,6 +116,8 @@ model Product {
   images         String[] @default([])
   sizes          String[] @default([])
   colors         String[] @default([])
+  /// Colour name → photo URL, e.g. {"Black": "https://…"}. Optional per colour.
+  color_images   Json     @default("{}")
   stock          Int      @default(0)
   rating         Decimal  @default(0) @db.Decimal(2, 1)
   review_count   Int      @default(0)
@@ -123,8 +130,36 @@ model Product {
 
   order_items OrderItem[]
   reviews     Review[]
+  likes       ProductLike[]
 
   @@map("products")
+}
+
+/// A customer liking a product (the heart on the product page). The raw
+/// signal for recommendations.
+model ProductLike {
+  user_id    String
+  product_id String
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  user    Profile @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, product_id])
+  @@index([product_id], map: "product_likes_product_idx")
+  @@index([user_id, created_at(sort: Desc)], map: "product_likes_user_created_idx")
+  @@map("product_likes")
+}
+
+/// `products.category` stays free text; this table is the list admins pick from
+/// and decides which categories appear as filter chips on /shop.
+model Category {
+  name           String   @id
+  show_in_filter Boolean  @default(false)
+  sort_order     Int      @default(0)
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("categories")
 }
 
 /// `id` keeps the human-readable KM-XXXXX format from createOrderId().
@@ -153,6 +188,11 @@ model Order {
   mpesa_merchant_request_id String?
   mpesa_receipt_number      String?
   mpesa_result_desc         String?
+  /// Safaricom ResultCode from the last callback (0 = paid).
+  mpesa_result_code         Int?
+  /// When the live STK prompt was sent; claimed atomically so a second
+  /// prompt can't be sent while one is still open (double-charge guard).
+  mpesa_requested_at        DateTime? @db.Timestamptz(6)
   /// Normalised to 2547…
   mpesa_phone               String?
 
@@ -160,11 +200,20 @@ model Order {
   points_awarded Boolean @default(false)
   points_earned  Int     @default(0)
 
+  /// Flipped by the orders_deduct_stock trigger when the order becomes paid,
+  /// so stock comes off exactly once. Never written by app code.
+  stock_deducted Boolean @default(false)
+
+  /// Set by the orders_set_paid_at trigger when the order becomes paid.
+  paid_at DateTime? @db.Timestamptz(6)
+
   created_at DateTime @default(now()) @db.Timestamptz(6)
   updated_at DateTime @default(now()) @db.Timestamptz(6)
 
-  user        Profile?    @relation(fields: [user_id], references: [id], onDelete: SetNull)
-  order_items OrderItem[]
+  user             Profile?         @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  order_items      OrderItem[]
+  payment_failures PaymentFailure[]
+  mpesa_requests   MpesaRequest[]
 
   @@index([user_id, created_at(sort: Desc)], map: "orders_user_created_idx")
   @@index([created_at(sort: Desc)], map: "orders_created_idx")
@@ -240,4 +289,121 @@ model Update {
 
   @@index([created_at(sort: Desc)], map: "updates_created_idx")
   @@map("updates")
+}
+
+/// Cards shown in the editable homepage carousel. Kept separate from products
+/// so campaign imagery and copy never change the store catalogue.
+model HomepageDrop {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  price      Decimal  @db.Decimal(10, 2)
+  category   String
+  image      String
+  active     Boolean  @default(true)
+  sort_order Int      @default(0)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([active, sort_order], map: "homepage_drops_active_sort_idx")
+  @@map("homepage_drops")
+}
+
+/// One row per failed M-Pesa attempt, written by the callback with the service
+/// role. The order row only keeps the latest result, so this is the history.
+model PaymentFailure {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id            String?
+  checkout_request_id String?
+  result_code         Int?
+  result_desc         String?
+  /// Customer-facing explanation, e.g. "Wrong M-Pesa PIN entered."
+  reason              String
+  phone               String?
+  amount              Decimal? @db.Decimal(10, 2)
+  created_at          DateTime @default(now()) @db.Timestamptz(6)
+
+  order Order? @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@index([created_at(sort: Desc)], map: "payment_failures_created_idx")
+  @@map("payment_failures")
+}
+
+/// Admin-editable settings as key/value JSON, e.g. `contact_recipients`
+/// (string[] of up to 4 addresses that receive contact-form emails).
+model SiteSetting {
+  key        String   @id
+  value      Json
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("site_settings")
+}
+
+/// Every contact-form submission, kept even if the notification email fails.
+model ContactMessage {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  first_name String
+  last_name  String
+  email      String
+  phone      String?
+  message    String
+  read       Boolean  @default(false)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([created_at(sort: Desc)], map: "contact_messages_created_idx")
+  @@map("contact_messages")
+}
+
+/// Log of emails sent from /admin/communications.
+model EmailCampaign {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subject         String
+  body            String
+  /// 'all_customers' | 'customers_with_orders' | 'custom'
+  audience        String
+  recipient_count Int      @default(0)
+  failed_count    Int      @default(0)
+  sent_by         String?
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([created_at(sort: Desc)], map: "email_campaigns_created_idx")
+  @@map("email_campaigns")
+}
+
+/// The admin notification feed. Written by database triggers (new orders,
+/// payments, failed payments, low stock, contact messages).
+model AdminNotification {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// 'order' | 'payment' | 'payment_failed' | 'stock' | 'message' | 'system'
+  type       String
+  title      String
+  body       String?
+  link       String?
+  read       Boolean  @default(false)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([created_at(sort: Desc)], map: "admin_notifications_created_idx")
+  @@map("admin_notifications")
+}
+
+/// Every STK prompt sent for an order. The callback resolves orders through
+/// this, so paying an older prompt still lands on the right order; a second
+/// payment for an already-paid order is kept and flagged `duplicate` for refund.
+model MpesaRequest {
+  checkout_request_id String   @id
+  merchant_request_id String?
+  order_id            String
+  phone               String?
+  amount              Decimal  @db.Decimal(10, 2)
+  /// 'pending' | 'paid' | 'failed'
+  status              String   @default("pending")
+  result_code         Int?
+  result_desc         String?
+  receipt             String?
+  duplicate           Boolean  @default(false)
+  created_at          DateTime @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime @default(now()) @db.Timestamptz(6)
+
+  order Order @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@index([order_id, created_at(sort: Desc)], map: "mpesa_requests_order_idx")
+  @@map("mpesa_requests")
 }

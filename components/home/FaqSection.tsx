@@ -2,8 +2,8 @@ import Image from "next/image";
 
 const faqs = [
   {
-    q: "How fast is campus delivery?",
-    a: "Orders placed before 3 PM are delivered same-day to UoN hostels and gates. Later orders arrive the next morning.",
+    q: "How does delivery work?",
+    a: "For your convenience, we arrange delivery directly with you. Most orders arrive within 1–3 days.",
   },
   {
     q: "Are your products original?",

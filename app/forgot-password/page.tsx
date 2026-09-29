@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import Image from "next/image";
 import AppShell from "@/components/layout/AppShell";
+import { useAuthModal } from "@/components/auth/AuthModal";
 import logo from "@/lib/logo";
 
 export default function ForgotPasswordPage() {
+  const { openAuth } = useAuthModal();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -106,9 +107,13 @@ export default function ForgotPasswordPage() {
 
           <p className="relative mt-6 text-center text-body-md text-on-surface-variant">
             Remembered it?{" "}
-            <Link href="/signin" className="font-semibold text-primary underline-offset-4 hover:underline">
+            <button
+              type="button"
+              onClick={() => openAuth()}
+              className="font-semibold text-primary underline-offset-4 hover:underline"
+            >
               Back to sign in
-            </Link>
+            </button>
           </p>
         </div>
       </section>

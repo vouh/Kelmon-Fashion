@@ -1,6 +1,8 @@
 import "server-only";
 
-import logo from "@/lib/logo";
+import { PRODUCTION_SITE_URL } from "@/lib/seo";
+
+const PUBLIC_SITE = PRODUCTION_SITE_URL;
 
 const brand = {
   purple: "#8e44ad",
@@ -32,11 +34,18 @@ export function escapeHtml(value: string): string {
 }
 
 /**
- * Never derived from the request's Host header in production: an attacker could
- * forge it and have a link meant for someone else point at their own site.
+ * Local dev links back to the dev server; production always links to the live
+ * store. Never derived from the request's Host header in production: an attacker
+ * could forge it and have a link meant for someone else point at their own site.
  */
-export function siteOrigin(request: Request): string | null {
+export function siteOrigin(request: Request): string {
   if (process.env.NODE_ENV !== "production") return new URL(request.url).origin;
+  return PRODUCTION_SITE_URL;
+}
+
+/** siteOrigin for emails sent outside a request (payment callbacks, announcements). */
+export function configuredSiteOrigin(): string | null {
+  if (process.env.NODE_ENV === "production") return PRODUCTION_SITE_URL;
   return process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, "") || null;
 }
 
@@ -54,12 +63,10 @@ interface LayoutOptions {
 }
 
 export function emailLayout({ origin, preheader, eyebrow, heading, bodyHtml, cta, footnoteHtml }: LayoutOptions): string {
-  const logoUrl = origin ? `${origin}${logo.src}` : null;
-  const siteLink = origin ?? "https://kelmon.co.ke";
+  const siteLink = origin ?? PUBLIC_SITE;
 
-  const logoCell = logoUrl
-    ? `<img src="${logoUrl}" width="56" height="56" alt="Kelmon" style="display:block;width:56px;height:56px;border:0;border-radius:16px;background:${brand.surface};" />`
-    : `<div style="font-family:${serif};font-size:26px;font-weight:700;color:${brand.surface};">K</div>`;
+  // Text, not an image: many inboxes block or fail to load remote images.
+  const logoCell = `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="56" height="56" align="center" valign="middle" style="width:56px;height:56px;border-radius:16px;background:${brand.surface};font-family:${serif};font-size:30px;font-weight:700;line-height:56px;color:${brand.purple};">K</td></tr></table>`;
 
   const ctaBlock = cta
     ? `<tr><td style="padding:30px 40px 0;">
@@ -94,7 +101,7 @@ export function emailLayout({ origin, preheader, eyebrow, heading, bodyHtml, cta
               <td style="vertical-align:middle;">${logoCell}</td>
               <td style="vertical-align:middle;padding-left:14px;">
                 <div style="font-family:${serif};font-size:24px;font-weight:700;color:#ffffff;letter-spacing:0.5px;">Kelmon</div>
-                <div style="font-family:${sans};font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:${brand.gold};padding-top:2px;">Fashion &middot; Beauty &middot; Salon</div>
+                <div style="font-family:${sans};font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:${brand.gold};padding-top:2px;">Fashion &middot; Beauty</div>
               </td>
             </tr></table>
           </td></tr>
@@ -117,7 +124,6 @@ export function emailLayout({ origin, preheader, eyebrow, heading, bodyHtml, cta
             <a href="${siteLink}" style="font-family:${serif};font-size:15px;font-weight:700;color:${brand.purple};text-decoration:none;">Kelmon</a><br />
             Campus fashion &amp; beauty, delivered in Kenya.<br />
             <a href="${siteLink}/shop" style="color:${brand.faint};">Shop</a> &nbsp;&middot;&nbsp;
-            <a href="${siteLink}/salon" style="color:${brand.faint};">Salon</a> &nbsp;&middot;&nbsp;
             <a href="${siteLink}/contact" style="color:${brand.faint};">Contact</a>
           </td></tr>
 
@@ -177,6 +183,84 @@ export function contactMessageEmail(
         `</table>` +
         `<div style="padding:18px 20px;border-radius:18px;background:${brand.bg};border-left:4px solid ${brand.gold};color:${brand.text};">${escapeHtml(message.message).replace(/\r?\n/g, "<br />")}</div>`,
       footnoteHtml: "Reply to this email to answer them directly.",
+    }),
+  };
+}
+
+function formatKesPlain(amount: number): string {
+  return `KES ${Number(amount).toLocaleString("en-KE")}`;
+}
+
+export function paymentReceivedEmail(
+  order: { id: string; total: number; receipt: string | null },
+  origin: string | null,
+) {
+  const ordersUrl = `${origin ?? PUBLIC_SITE}/orders`;
+  const receiptLine = order.receipt ? ` M-Pesa receipt: ${order.receipt}.` : "";
+  return {
+    subject: `Payment received — order ${order.id}`,
+    text:
+      `We received your M-Pesa payment of ${formatKesPlain(order.total)} for order ${order.id}.${receiptLine}\n\n` +
+      `We're getting it ready. Track it here: ${ordersUrl}`,
+    html: emailLayout({
+      origin,
+      preheader: `Payment of ${formatKesPlain(order.total)} received for order ${order.id}.`,
+      eyebrow: "Payment received",
+      heading: "Thank you — you're paid up",
+      bodyHtml:
+        `We received your M-Pesa payment of <strong>${escapeHtml(formatKesPlain(order.total))}</strong> for order <strong>${escapeHtml(order.id)}</strong>.` +
+        (order.receipt ? ` Your M-Pesa receipt is <strong>${escapeHtml(order.receipt)}</strong>.` : "") +
+        " We're getting your order ready now.",
+      cta: { label: "Track your order", url: ordersUrl },
+    }),
+  };
+}
+
+export function paymentFailedEmail(
+  order: { id: string; total: number; reason: string },
+  origin: string | null,
+) {
+  const ordersUrl = `${origin ?? PUBLIC_SITE}/orders`;
+  return {
+    subject: `Payment not completed — order ${order.id}`,
+    text:
+      `Your M-Pesa payment of ${formatKesPlain(order.total)} for order ${order.id} did not go through.\n\n` +
+      `Reason: ${order.reason}\n\nNo money was taken. You can try again from your orders page: ${ordersUrl}`,
+    html: emailLayout({
+      origin,
+      preheader: `Your payment for order ${order.id} did not go through: ${order.reason}`,
+      eyebrow: "Payment failed",
+      heading: "Your payment didn't go through",
+      bodyHtml:
+        `Your M-Pesa payment of <strong>${escapeHtml(formatKesPlain(order.total))}</strong> for order <strong>${escapeHtml(order.id)}</strong> was not completed.` +
+        `<div style="margin-top:16px;padding:14px 18px;border-radius:14px;background:${brand.bg};border-left:4px solid ${brand.gold};color:${brand.text};"><strong>Reason:</strong> ${escapeHtml(order.reason)}</div>`,
+      cta: { label: "Try again", url: ordersUrl },
+      footnoteHtml: "No money was taken from your M-Pesa account for this attempt.",
+    }),
+  };
+}
+
+/** A message written by an admin in /admin/communications. Body is plain text. */
+export function announcementEmail(
+  message: { subject: string; body: string },
+  origin: string | null,
+) {
+  const paragraphs = message.body
+    .trim()
+    .split(/\r?\n\s*\r?\n/)
+    .map((p) => `<p style="margin:0 0 14px;">${escapeHtml(p).replace(/\r?\n/g, "<br />")}</p>`)
+    .join("");
+
+  return {
+    subject: message.subject,
+    text: message.body,
+    html: emailLayout({
+      origin,
+      preheader: message.body.slice(0, 120),
+      eyebrow: "From Kelmon",
+      heading: message.subject,
+      bodyHtml: paragraphs,
+      cta: { label: "Visit the shop", url: `${origin ?? PUBLIC_SITE}/shop` },
     }),
   };
 }

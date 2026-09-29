@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     const ids = [...new Set(body.lines.map((line) => line.productId))];
     const { data: products, error: productError } = await supabase
       .from("products")
-      .select("id, name, price, category, images, active")
+      .select("id, name, price, category, images, active, stock")
       .in("id", ids);
 
     if (productError) {
@@ -62,12 +62,30 @@ export async function POST(request: Request) {
 
     const catalogue = new Map((products ?? []).map((product) => [product.id, product]));
     const lines: CartLine[] = [];
+    // Summed per product, since two variants of one item share its stock.
+    const requested = new Map<string, number>();
 
     for (const line of body.lines) {
       const product = catalogue.get(line.productId);
       if (!product || !product.active) {
         return NextResponse.json(
           { error: `"${line.name}" is no longer available.` },
+          { status: 409 }
+        );
+      }
+      const wanted = (requested.get(product.id) ?? 0) + line.quantity;
+      requested.set(product.id, wanted);
+      if (wanted > product.stock) {
+        // `stockIssue` lets the checkout offer to trim the cart to what's left.
+        const available = Math.max(product.stock, 0);
+        return NextResponse.json(
+          {
+            error:
+              available === 0
+                ? `"${product.name}" is sold out.`
+                : `Only ${available} of "${product.name}" left in stock — your cart has ${wanted}.`,
+            stockIssue: { productId: product.id, name: product.name, available },
+          },
           { status: 409 }
         );
       }

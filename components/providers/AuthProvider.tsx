@@ -23,6 +23,7 @@ import {
 import { getFirebaseAuth, isFirebaseConfigured } from "@/lib/firebase/client";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import type { ProfileRow } from "@/lib/supabase/types";
+import { TERMS_VERSION } from "@/lib/legal";
 
 /**
  * Firebase Authentication for the whole app, with the server kept in step.
@@ -59,6 +60,12 @@ interface AuthContextValue {
     patch: Partial<Pick<ProfileRow, "full_name" | "phone" | "campus" | "avatar_url">>
   ) => Promise<void>;
   refreshProfile: () => Promise<void>;
+  /**
+   * Records that the signed-in user accepted the current Terms of Service and
+   * Privacy Policy. Only fills an empty record, so re-signing in never moves
+   * the original acceptance date. Best effort: never throws.
+   */
+  acceptTerms: () => Promise<void>;
   /**
    * Makes sure the server's cookies hold a live token before a request that
    * needs one (placing an order). Resolves false when nobody is signed in.
@@ -163,10 +170,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ idToken }),
       });
 
-    const response = await post(await next.getIdToken());
+    let response = await post(await next.getIdToken());
+    // A 404 or 5xx with no JSON body is the platform, not this route: a dev
+    // server mid-recompile, or a cold serverless start. One short retry clears
+    // it instead of showing the customer a raw status code.
+    if (response.status === 404 || response.status >= 500) {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      response = await post(await next.getIdToken());
+    }
     if (!response.ok) {
       const { error } = (await response.json().catch(() => ({}))) as { error?: string };
-      syncError.current = error ?? `Could not start your session (HTTP ${response.status}).`;
+      syncError.current =
+        error ??
+        (response.status === 404 || response.status >= 500
+          ? "We couldn't reach the server to sign you in. Please check your connection and try again."
+          : `Could not start your session (HTTP ${response.status}).`);
       setRole(NO_ROLE);
       return NO_ROLE;
     }
@@ -243,7 +261,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!auth.currentUser) return false;
     await syncSession(auth.currentUser);
     // Signed in to Firebase but the server refused the token: sending the user
-    // back to /signin would just loop, so surface why instead.
+    // back to sign-in would just loop, so surface why instead.
     if (syncError.current) throw new Error(syncError.current);
     return true;
   }, [configured, syncSession]);
@@ -306,6 +324,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfile = useCallback(() => loadProfile(user?.uid), [loadProfile, user?.uid]);
 
+  const acceptTerms = useCallback(async () => {
+    // Read from Firebase directly: right after sign-up, `user` state may not
+    // have caught up yet.
+    const uid = configured ? getFirebaseAuth().currentUser?.uid : undefined;
+    if (!uid || !isSupabaseConfigured()) return;
+    try {
+      const { error } = await createClient()
+        .from("profiles")
+        .update({ terms_accepted_at: new Date().toISOString(), terms_version: TERMS_VERSION })
+        .eq("id", uid)
+        .is("terms_accepted_at", null);
+      if (error) console.warn("[auth] acceptTerms:", error.message);
+    } catch (err) {
+      console.warn("[auth] acceptTerms:", err);
+    }
+  }, [configured]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       configured,
@@ -320,6 +355,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       updateProfile,
       refreshProfile,
+      acceptTerms,
       ensureSession,
     }),
     [
@@ -334,6 +370,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       updateProfile,
       refreshProfile,
+      acceptTerms,
       ensureSession,
     ]
   );

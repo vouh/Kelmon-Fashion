@@ -29,6 +29,15 @@ const nextConfig: NextConfig = {
   },
   // Hide the Next.js "N" / DevTools bubble in the corner
   devIndicators: false,
+  // The site opens on the shop; the editorial home page lives at /home.
+  // Sign-in is a modal now, so old /signin links open it over the shop
+  // (query params such as ?next= pass through).
+  async redirects() {
+    return [
+      { source: "/", destination: "/shop", permanent: false },
+      { source: "/signin", destination: "/shop?auth=signin", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

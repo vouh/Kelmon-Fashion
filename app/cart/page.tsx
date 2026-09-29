@@ -4,12 +4,19 @@ import Link from "next/link";
 import Image from "next/image";
 import AppShell from "@/components/layout/AppShell";
 import { useCart } from "@/components/providers/CartProvider";
-import { FREE_DELIVERY_THRESHOLD } from "@/lib/cart";
+import { useToast } from "@/components/ui/Toast";
+import { FREE_DELIVERY_THRESHOLD, quantityOfProduct } from "@/lib/cart";
 import { formatKes } from "@/lib/products";
 
 export default function CartPage() {
   const { lines, itemCount, subtotal, deliveryFee, total, setQuantity, removeItem, clearCart } =
     useCart();
+  const { toast } = useToast();
+
+  const remove = (productId: string, variant: string | undefined, name: string) => {
+    removeItem(productId, variant);
+    toast(`Removed ${name} from your cart`);
+  };
 
   return (
     <AppShell activeNav="cart">
@@ -67,7 +74,7 @@ export default function CartPage() {
                     />
                   </Link>
 
-                  <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5 pr-6">
+                  <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
                     <div>
                       <h3 className="text-sm font-semibold text-on-surface truncate">{item.name}</h3>
                       <p className="text-xs text-on-surface-variant mt-0.5">
@@ -79,15 +86,25 @@ export default function CartPage() {
                       </p>
                     </div>
 
-                    <div className="mt-2 flex items-center justify-end">
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        aria-label={`Remove ${item.name} from cart`}
+                        onClick={() => remove(item.productId, item.variant, item.name)}
+                        className="inline-flex h-9 items-center gap-1 rounded-full border border-error/25 px-3 text-xs font-semibold text-error transition-colors hover:bg-error/10"
+                      >
+                        <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                          delete
+                        </span>
+                        Remove
+                      </button>
                       <div className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 border border-primary/15 px-1 py-0.5">
                         <button
                           type="button"
                           aria-label="Decrease quantity"
-                          onClick={() =>
-                            setQuantity(item.productId, item.variant, item.quantity - 1)
-                          }
-                          className="w-8 h-8 flex items-center justify-center text-primary rounded-full hover:bg-primary/15"
+                          disabled={item.quantity <= 1}
+                          onClick={() => setQuantity(item.productId, item.variant, item.quantity - 1)}
+                          className="w-8 h-8 flex items-center justify-center rounded-full text-primary hover:bg-primary/15 disabled:opacity-35 disabled:hover:bg-transparent"
                         >
                           <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
                             remove
@@ -102,10 +119,14 @@ export default function CartPage() {
                         <button
                           type="button"
                           aria-label="Increase quantity"
+                          disabled={
+                            typeof item.stock === "number" &&
+                            quantityOfProduct(lines, item.productId) >= item.stock
+                          }
                           onClick={() =>
                             setQuantity(item.productId, item.variant, item.quantity + 1)
                           }
-                          className="w-8 h-8 flex items-center justify-center text-primary rounded-full hover:bg-primary/15"
+                          className="w-8 h-8 flex items-center justify-center text-primary rounded-full hover:bg-primary/15 disabled:opacity-30 disabled:hover:bg-transparent"
                         >
                           <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
                             add
@@ -114,17 +135,6 @@ export default function CartPage() {
                       </div>
                     </div>
                   </div>
-
-                  <button
-                    type="button"
-                    aria-label={`Remove ${item.name}`}
-                    onClick={() => removeItem(item.productId, item.variant)}
-                    className="absolute top-2.5 right-2.5 w-8 h-8 flex items-center justify-center text-primary/70 hover:text-error transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                      close
-                    </span>
-                  </button>
                 </div>
               ))}
             </div>

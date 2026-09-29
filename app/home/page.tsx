@@ -1,22 +1,31 @@
 import Link from "next/link";
 import AppShell from "@/components/layout/AppShell";
 import Reveal from "@/components/ui/Reveal";
-import HeroShowcase from "@/components/home/HeroShowcase";
+import FullScreenHeroBanners from "@/components/home/FullScreenHeroBanners";
 import CircleCollection from "@/components/home/CircleCollection";
 import FeatureProductCard from "@/components/shop/FeatureProductCard";
 import { getProducts } from "@/lib/supabase/products";
+import { getHomepageDrops } from "@/lib/supabase/content";
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata = pageMetadata({
+  title: "Campus Fashion, Perfumes & Bags",
+  description:
+    "Kelmon brings campus fashion and beauty to Kenyan students: new-drop handbags, signature perfumes, men's colognes and accessories, delivered to your campus.",
+  path: "/home",
+});
 
 const brandStrip = ["Chanel", "Dior", "Louis Vuitton", "Gucci", "YSL", "Prada", "Armani"];
 
 export default async function HomePage() {
-  const shopProducts = await getProducts();
+  const [shopProducts, homepageDrops] = await Promise.all([getProducts(), getHomepageDrops()]);
 
   const gridProducts = shopProducts.slice(0, 8);
 
   return (
-    <AppShell activeNav="home">
+    <AppShell activeNav="home" underNav>
       <main className="flex-grow bg-background">
-        <HeroShowcase products={shopProducts.slice(0, 6)} />
+        <FullScreenHeroBanners />
 
         {/* Brand strip */}
         <div className="bg-primary py-4 overflow-hidden" aria-hidden="true">
@@ -33,7 +42,7 @@ export default async function HomePage() {
         </div>
 
         <Reveal>
-          <CircleCollection products={shopProducts} />
+          <CircleCollection products={homepageDrops.length ? homepageDrops : shopProducts} />
         </Reveal>
 
         {/* Our Features — reference product grid */}

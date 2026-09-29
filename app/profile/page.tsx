@@ -1,6 +1,9 @@
 import AppShell from "@/components/layout/AppShell";
 import ProfileClient, { type ProfileOrder } from "@/components/profile/ProfileClient";
 import { getUserOrders } from "@/lib/supabase/orders";
+import { PRIVATE_PAGE } from "@/lib/seo";
+
+export const metadata = { title: "My Account", ...PRIVATE_PAGE };
 
 /**
  * Depends on the caller's session, so it can never be prerendered — the order

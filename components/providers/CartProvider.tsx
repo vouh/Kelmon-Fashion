@@ -15,6 +15,7 @@ import {
   cartSubtotal,
   deliveryFeeFor,
   lineFromProduct,
+  quantityOfProduct,
   type CartLine,
 } from "@/lib/cart";
 
@@ -26,10 +27,13 @@ interface CartContextValue {
   subtotal: number;
   deliveryFee: number;
   total: number;
-  addItem: (product: Product, quantity?: number, variant?: string) => void;
+  /** Returns how many were actually added — fewer than asked when stock runs out. */
+  addItem: (product: Product, quantity?: number, variant?: string) => number;
   setQuantity: (productId: string, variant: string | undefined, quantity: number) => void;
   removeItem: (productId: string, variant?: string) => void;
   clearCart: () => void;
+  /** Trims a product's lines (last added first) so the cart holds at most `available`. */
+  fitToStock: (productId: string, available: number) => void;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -60,20 +64,32 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(lines));
   }, [lines, hydrated]);
 
-  const addItem = useCallback((product: Product, quantity = 1, variant?: string) => {
-    setLines((prev) => {
+  // The cap is computed from `lines` at call time so the caller learns how
+  // many were really added (and can say "only 2 left").
+  const addItem = useCallback(
+    (product: Product, quantity = 1, variant?: string) => {
       const key = cartLineKey(product.id, variant);
-      const existing = prev.find((l) => cartLineKey(l.productId, l.variant) === key);
-      if (existing) {
-        return prev.map((l) =>
-          cartLineKey(l.productId, l.variant) === key
-            ? { ...l, quantity: l.quantity + quantity }
-            : l
-        );
-      }
-      return [...prev, lineFromProduct(product, quantity, variant)];
-    });
-  }, []);
+      const inCart = quantityOfProduct(lines, product.id);
+      const room =
+        typeof product.stock === "number" ? Math.max(product.stock - inCart, 0) : quantity;
+      const added = Math.min(quantity, room);
+      if (added <= 0) return 0;
+
+      setLines((prev) => {
+        const existing = prev.find((l) => cartLineKey(l.productId, l.variant) === key);
+        if (existing) {
+          return prev.map((l) =>
+            cartLineKey(l.productId, l.variant) === key
+              ? { ...l, quantity: l.quantity + added, stock: product.stock ?? l.stock }
+              : l
+          );
+        }
+        return [...prev, lineFromProduct(product, added, variant)];
+      });
+      return added;
+    },
+    [lines]
+  );
 
   const setQuantity = useCallback((productId: string, variant: string | undefined, quantity: number) => {
     setLines((prev) => {
@@ -81,9 +97,29 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       if (quantity <= 0) {
         return prev.filter((l) => cartLineKey(l.productId, l.variant) !== key);
       }
+      const line = prev.find((l) => cartLineKey(l.productId, l.variant) === key);
+      const cap =
+        typeof line?.stock === "number"
+          ? Math.max(line.stock - quantityOfProduct(prev, productId, key), 1)
+          : quantity;
       return prev.map((l) =>
-        cartLineKey(l.productId, l.variant) === key ? { ...l, quantity } : l
+        cartLineKey(l.productId, l.variant) === key ? { ...l, quantity: Math.min(quantity, cap) } : l
       );
+    });
+  }, []);
+
+  const fitToStock = useCallback((productId: string, available: number) => {
+    setLines((prev) => {
+      let excess = quantityOfProduct(prev, productId) - Math.max(available, 0);
+      if (excess <= 0) return prev;
+      const next = [...prev];
+      for (let i = next.length - 1; i >= 0 && excess > 0; i--) {
+        if (next[i].productId !== productId) continue;
+        const take = Math.min(excess, next[i].quantity);
+        next[i] = { ...next[i], quantity: next[i].quantity - take, stock: available };
+        excess -= take;
+      }
+      return next.filter((l) => l.quantity > 0);
     });
   }, []);
 
@@ -110,8 +146,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setQuantity,
       removeItem,
       clearCart,
+      fitToStock,
     }),
-    [lines, itemCount, subtotal, deliveryFee, total, addItem, setQuantity, removeItem, clearCart]
+    [lines, itemCount, subtotal, deliveryFee, total, addItem, setQuantity, removeItem, clearCart, fitToStock]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

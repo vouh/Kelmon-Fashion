@@ -4,6 +4,14 @@ import AppShell from "@/components/layout/AppShell";
 import FaqSection from "@/components/home/FaqSection";
 import { formatKes } from "@/lib/products";
 import { getProducts } from "@/lib/supabase/products";
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata = pageMetadata({
+  title: "About Us",
+  description:
+    "Meet Kelmon — a Kenyan fashion and beauty store for students who show up. Curated bags, perfumes and accessories, checked, packed and delivered with care.",
+  path: "/about",
+});
 
 const whyPoints = [
   "Looks that stay with you all day — no mid-fit flop.",
@@ -22,7 +30,7 @@ export default async function AboutPage() {
     shopProducts[0]?.image ??
     FALLBACK_IMAGE;
   const faqImage =
-    shopProducts.find((p) => p.category === "Fashion")?.image ??
+    shopProducts.find((p) => p.category === "Accessories")?.image ??
     shopProducts[0]?.image ??
     FALLBACK_IMAGE;
 
@@ -30,16 +38,6 @@ export default async function AboutPage() {
     <AppShell activeNav="about">
       <main className="flex-grow">
         <section className="px-margin-mobile md:px-margin-desktop pt-8 md:pt-12 pb-xl">
-          <p className="font-label-caps text-label-caps text-primary uppercase tracking-widest mb-2">
-            About Kelmon
-          </p>
-          <h1 className="font-display-lg text-display-md md:text-display-lg text-on-surface mb-4 max-w-2xl">
-            Your glam era starts here
-          </h1>
-          <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mb-10">
-            Beauty · Fashion · Glamour — for youth who show up and get it delivered.
-          </p>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center mb-xl">
             <div className="relative aspect-[4/3] overflow-hidden rounded-3xl rounded-tl-[90px] border border-primary/20 bg-surface-container">
               <Image

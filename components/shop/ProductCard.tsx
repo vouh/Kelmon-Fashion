@@ -38,7 +38,7 @@ export default function ProductCard({ product, compact = false }: ProductCardPro
           </h3>
         </Link>
         <div className="mt-1.5 flex justify-center">
-          <StarRating rating={product.rating} />
+          <StarRating />
         </div>
         <p className="mt-1.5 text-[13px] font-semibold text-primary">
           {product.originalPrice != null && (

@@ -8,6 +8,7 @@ import { confirmPasswordReset, verifyPasswordResetCode } from "firebase/auth";
 import AppShell from "@/components/layout/AppShell";
 import { useAuth, authErrorMessage } from "@/components/providers/AuthProvider";
 import { useToast } from "@/components/ui/Toast";
+import { useAuthModal } from "@/components/auth/AuthModal";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import logo from "@/lib/logo";
 
@@ -21,6 +22,7 @@ function ResetPasswordForm() {
   const params = useSearchParams();
   const { configured, signInWithEmail } = useAuth();
   const { toast } = useToast();
+  const { openAuth } = useAuthModal();
 
   const oobCode = params.get("oobCode");
 
@@ -86,7 +88,7 @@ function ResetPasswordForm() {
       router.refresh();
     } catch {
       toast("Password updated. Please sign in.");
-      router.push("/signin");
+      openAuth({ next: "/profile" });
     }
   }
 
@@ -153,9 +155,13 @@ function ResetPasswordForm() {
       )}
 
       <p className="relative mt-6 text-center text-body-md text-on-surface-variant">
-        <Link href="/signin" className="font-semibold text-primary underline-offset-4 hover:underline">
+        <button
+          type="button"
+          onClick={() => openAuth({ next: "/profile" })}
+          className="font-semibold text-primary underline-offset-4 hover:underline"
+        >
           Back to sign in
-        </Link>
+        </button>
       </p>
     </div>
   );

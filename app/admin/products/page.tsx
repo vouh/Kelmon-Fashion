@@ -1,7 +1,7 @@
 import AdminShell from "@/components/admin/AdminShell";
 import ProductsManager from "@/components/admin/ProductsManager";
-import { getAllProductsForAdmin, getCategories } from "@/lib/supabase/products";
-import { categories as fallbackCategories } from "@/lib/products";
+import { getAllProductsForAdmin } from "@/lib/supabase/products";
+import { getAllCategories } from "@/lib/supabase/categories";
 import { getAdminEmail } from "@/lib/supabase/server";
 
 export const metadata = { title: "Products — Kelmon Admin" };
@@ -11,12 +11,12 @@ export const metadata = { title: "Products — Kelmon Admin" };
  * Fashion inventory needs sizes, colors and stock, so this is built from scratch.
  */
 export default async function AdminProductsPage() {
-  const [products, liveCategories] = await Promise.all([
+  const [products, categoryRows] = await Promise.all([
     getAllProductsForAdmin(),
-    getCategories(),
+    getAllCategories(),
   ]);
 
-  const categories = liveCategories.length ? liveCategories : fallbackCategories;
+  const categories = categoryRows.map((c) => c.name);
 
   const adminEmail = await getAdminEmail();
 

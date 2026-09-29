@@ -29,6 +29,7 @@ export default function SearchOverlay({ open, onClose }: SearchOverlayProps) {
       .from("products")
       .select("*")
       .eq("active", true)
+      .gt("stock", 0)
       .then(({ data, error }) => {
         if (!active) return;
         if (error) {

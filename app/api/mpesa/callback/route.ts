@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { awardLoyaltyPoints, updateOrderByCheckoutId } from "@/lib/supabase/orders";
+import { applyPaymentFailure, applyPaymentSuccess } from "@/lib/payments";
 
 /**
  * Safaricom STK callback.
@@ -47,41 +47,36 @@ export async function POST(request: Request) {
       `[mpesa-callback] checkout=${CheckoutRequestID} code=${ResultCode} desc=${ResultDesc}`
     );
 
-    if (ResultCode === 0) {
+    if (Number(ResultCode) === 0) {
       const items = CallbackMetadata?.Item ?? [];
       const receipt = metaValue(items, "MpesaReceiptNumber");
-      const payerPhone = metaValue(items, "PhoneNumber");
 
-      const orderId = await updateOrderByCheckoutId(CheckoutRequestID, {
-        status: "confirmed",
-        payment_status: "paid",
-        mpesa_receipt_number: receipt,
-        mpesa_result_desc: ResultDesc,
-        ...(payerPhone ? { mpesa_phone: payerPhone } : {}),
+      // Marks the order paid; the orders_deduct_stock trigger takes the items
+      // off the shelf in the same write, then points are awarded and the
+      // customer is emailed.
+      const orderId = await applyPaymentSuccess(CheckoutRequestID, {
+        receipt,
+        phone: metaValue(items, "PhoneNumber"),
+        resultDesc: ResultDesc,
       });
 
       if (!orderId) {
-        console.warn("[mpesa-callback] no order for checkout id", CheckoutRequestID);
+        console.warn("[mpesa-callback] no pending order for checkout id", CheckoutRequestID);
         return ack("ACK - order not found");
       }
-
-      // Award points after the order is marked paid. The SQL function is
-      // idempotent, so a duplicate callback cannot double-award.
-      const points = await awardLoyaltyPoints(orderId);
-      console.log(`[mpesa-callback] order ${orderId} PAID (${receipt}), +${points} pts`);
-
+      console.log(`[mpesa-callback] order ${orderId} PAID (${receipt})`);
       return ack("Success");
     }
 
-    // Failed or cancelled: mark the payment failed but leave the order pending
-    // so the customer can retry, matching the old callback's behaviour.
-    await updateOrderByCheckoutId(CheckoutRequestID, {
-      status: "pending",
-      payment_status: "failed",
-      mpesa_result_desc: ResultDesc,
+    // Failed or cancelled (wrong PIN, timeout, insufficient funds…): logged to
+    // payment_failures, order left pending for a retry, customer emailed.
+    const failure = await applyPaymentFailure(CheckoutRequestID, {
+      resultCode: Number(ResultCode),
+      resultDesc: ResultDesc,
     });
-
-    console.log(`[mpesa-callback] payment failed (${ResultCode}): ${ResultDesc}`);
+    console.log(
+      `[mpesa-callback] payment failed (${ResultCode}): ${failure?.reason ?? ResultDesc}`
+    );
     return ack("Success");
   } catch (err) {
     // Swallow and ACK — a 500 here would trigger Safaricom's retry loop.

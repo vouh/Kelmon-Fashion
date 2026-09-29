@@ -34,6 +34,8 @@ export type ProfileRow = {
   avatar_url: string | null;
   role: UserRole;
   loyalty_points: number;
+  terms_accepted_at: string | null;
+  terms_version: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -48,6 +50,8 @@ export type ProductRow = {
   images: string[];
   sizes: string[];
   colors: string[];
+  /** Colour name → photo URL. Colours without an entry keep the current photo. */
+  color_images: Record<string, string>;
   stock: number;
   rating: number;
   review_count: number;
@@ -76,9 +80,15 @@ export type OrderRow = {
   mpesa_merchant_request_id: string | null;
   mpesa_receipt_number: string | null;
   mpesa_result_desc: string | null;
+  mpesa_result_code: number | null;
+  mpesa_requested_at: string | null;
   mpesa_phone: string | null;
   points_awarded: boolean;
   points_earned: number;
+  /** Set by the orders_deduct_stock trigger; never written by app code. */
+  stock_deducted: boolean;
+  /** Set by the orders_set_paid_at trigger; never written by app code. */
+  paid_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -118,11 +128,110 @@ export type DealRow = {
   created_at: string;
 }
 
+export type CategoryRow = {
+  name: string;
+  show_in_filter: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export type ProductLikeRow = {
+  user_id: string;
+  product_id: string;
+  created_at: string;
+}
+
+export type MpesaRequestRow = {
+  checkout_request_id: string;
+  merchant_request_id: string | null;
+  order_id: string;
+  phone: string | null;
+  amount: number;
+  status: "pending" | "paid" | "failed";
+  result_code: number | null;
+  result_desc: string | null;
+  receipt: string | null;
+  duplicate: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PaymentFailureRow = {
+  id: string;
+  order_id: string | null;
+  checkout_request_id: string | null;
+  result_code: number | null;
+  result_desc: string | null;
+  reason: string;
+  phone: string | null;
+  amount: number | null;
+  created_at: string;
+}
+
+export type SiteSettingRow = {
+  key: string;
+  value: unknown;
+  updated_at: string;
+}
+
+export type ContactMessageRow = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  message: string;
+  read: boolean;
+  created_at: string;
+}
+
+export type EmailAudience = "all_customers" | "customers_with_orders" | "custom";
+
+export type EmailCampaignRow = {
+  id: string;
+  subject: string;
+  body: string;
+  audience: EmailAudience;
+  recipient_count: number;
+  failed_count: number;
+  sent_by: string | null;
+  created_at: string;
+}
+
+export type NotificationType =
+  | "order"
+  | "payment"
+  | "payment_failed"
+  | "stock"
+  | "message"
+  | "system";
+
+export type AdminNotificationRow = {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string | null;
+  link: string | null;
+  read: boolean;
+  created_at: string;
+}
+
 export type UpdateRow = {
   id: string;
   title: string;
   body: string;
   tag: string | null;
+  created_at: string;
+}
+
+export type HomepageDropRow = {
+  id: string;
+  name: string;
+  price: number;
+  category: string;
+  image: string;
+  active: boolean;
+  sort_order: number;
   created_at: string;
 }
 
@@ -180,6 +289,7 @@ export type Database = {
     Tables: {
       profiles: Table<ProfileRow, "id">;
       products: Table<ProductRow, "id" | "name" | "price" | "category">;
+      categories: Table<CategoryRow, "name">;
       orders: Table<
         OrderRow,
         "id" | "customer_name" | "phone" | "drop_point" | "subtotal" | "total"
@@ -190,8 +300,19 @@ export type Database = {
         OrderItemsRelationships
       >;
       reviews: Table<ReviewRow, "author_name" | "rating">;
+      product_likes: Table<ProductLikeRow, "user_id" | "product_id">;
       deals: Table<DealRow, "title">;
       updates: Table<UpdateRow, "title" | "body">;
+      homepage_drops: Table<HomepageDropRow, "name" | "price" | "category" | "image">;
+      payment_failures: Table<PaymentFailureRow, "reason">;
+      mpesa_requests: Table<MpesaRequestRow, "checkout_request_id" | "order_id" | "amount">;
+      site_settings: Table<SiteSettingRow, "key" | "value">;
+      contact_messages: Table<
+        ContactMessageRow,
+        "first_name" | "last_name" | "email" | "message"
+      >;
+      email_campaigns: Table<EmailCampaignRow, "subject" | "body" | "audience">;
+      admin_notifications: Table<AdminNotificationRow, "type" | "title">;
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -202,6 +323,10 @@ export type Database = {
       award_loyalty_points: { Args: { p_order_id: string }; Returns: number };
       redeem_loyalty_points: { Args: { p_points: number }; Returns: number };
       cancel_order: { Args: { p_order_id: string }; Returns: undefined };
+      adjust_product_stock: {
+        Args: { p_product_id: string; p_delta: number };
+        Returns: number | null;
+      };
     };
     Enums: {
       user_role: UserRole;

@@ -69,7 +69,7 @@ export default function ProductCarousel({ products, autoPlayMs = 5000 }: Product
                   {p.category}
                 </p>
                 <h3 className="font-headline-lg text-headline-lg text-on-surface">{p.name}</h3>
-                <StarRating rating={p.rating} reviewCount={p.reviewCount} size="md" />
+                <StarRating reviewCount={p.reviewCount} size="md" />
                 <p className="font-headline-sm text-headline-sm text-secondary">{formatKes(p.price)}</p>
                 <div className="flex flex-wrap gap-3 pt-2">
                   <Link

@@ -2,10 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, isAdmin } from "@/lib/supabase/server";
-import type { OrderStatus, PaymentStatus } from "@/lib/supabase/types";
+import type {
+  OrderItemRow,
+  OrderRow,
+  OrderStatus,
+  PaymentFailureRow,
+  PaymentStatus,
+} from "@/lib/supabase/types";
 import {
   dealInputSchema,
   directOrderSchema,
+  homepageDropInputSchema,
   parseInput,
   productInputSchema,
   productSlugSchema,
@@ -103,9 +110,68 @@ export async function updatePaymentStatus(
     revalidatePath("/admin/orders");
     revalidatePath("/admin/transactions");
     revalidatePath("/admin");
+    // Marking an order paid takes its items off the shelf (orders_deduct_stock).
+    if (paymentStatus === "paid") {
+      revalidatePath("/admin/products");
+      revalidatePath("/shop");
+      revalidatePath("/home");
+    }
     return ok();
   } catch (err) {
     return fail(err);
+  }
+}
+
+export interface OrderDetails {
+  order: OrderRow;
+  items: OrderItemRow[];
+  /** The account that placed the order, when it came from a signed-in customer. */
+  account: { fullName: string | null; email: string | null } | null;
+  /** Failed M-Pesa attempts on this order, newest first. */
+  failures: Pick<PaymentFailureRow, "id" | "reason" | "phone" | "amount" | "created_at">[];
+}
+
+export async function getOrderDetails(
+  orderId: string
+): Promise<{ ok: true; details: OrderDetails } | { ok: false; error: string }> {
+  try {
+    const supabase = await requireAdmin();
+    const id = validOrderId(orderId);
+
+    const [orderRes, itemsRes, failuresRes] = await Promise.all([
+      supabase.from("orders").select("*").eq("id", id).maybeSingle(),
+      supabase.from("order_items").select("*").eq("order_id", id),
+      supabase
+        .from("payment_failures")
+        .select("id, reason, phone, amount, created_at")
+        .eq("order_id", id)
+        .order("created_at", { ascending: false }),
+    ]);
+    if (orderRes.error) throw new Error(orderRes.error.message);
+    if (!orderRes.data) throw new Error("Order not found.");
+    const order = orderRes.data;
+
+    let account: OrderDetails["account"] = null;
+    if (order.user_id) {
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", order.user_id)
+        .maybeSingle();
+      if (data) account = { fullName: data.full_name, email: data.email };
+    }
+
+    return {
+      ok: true,
+      details: {
+        order,
+        items: itemsRes.data ?? [],
+        account,
+        failures: failuresRes.data ?? [],
+      },
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -134,6 +200,7 @@ export async function createDirectOrder(input: {
   dropPoint: string;
   total: number;
   notes?: string;
+  item?: { productId?: string; name: string; price: number; quantity: number };
 }): Promise<{ ok: true; orderId: string } | { ok: false; error: string }> {
   try {
     const supabase = await requireAdmin();
@@ -141,6 +208,19 @@ export async function createDirectOrder(input: {
     const parsed = parseInput(directOrderSchema, input);
     if (!parsed.ok) return { ok: false, error: parsed.error };
     const order = parsed.data;
+    const item = order.item;
+
+    let product: { images: string[]; category: string } | null = null;
+    if (item?.productId) {
+      const { data, error: productError } = await supabase
+        .from("products")
+        .select("images, category")
+        .eq("id", item.productId)
+        .maybeSingle();
+      if (productError) throw new Error(productError.message);
+      if (!data) throw new Error("That product no longer exists. Pick another or type it in.");
+      product = data;
+    }
 
     const orderId = `KM-${Date.now().toString(36).toUpperCase()}`;
 
@@ -162,6 +242,24 @@ export async function createDirectOrder(input: {
       source: "admin_direct",
     });
     if (error) throw new Error(error.message);
+
+    if (item) {
+      const { error: itemError } = await supabase.from("order_items").insert({
+        order_id: orderId,
+        // No product_id marks a typed-in item: it takes no stock and shows as
+        // "reconcile" in the orders list.
+        product_id: item.productId ?? null,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        image: product?.images[0] ?? null,
+        category: product?.category ?? null,
+      });
+      if (itemError) {
+        await supabase.from("orders").delete().eq("id", orderId);
+        throw new Error(itemError.message);
+      }
+    }
 
     revalidatePath("/admin/orders");
     revalidatePath("/admin");
@@ -199,15 +297,24 @@ export async function upsertProduct(input: ProductInput): Promise<ActionResult> 
       images: product.images,
       sizes: product.sizes,
       colors: product.colors,
+      color_images: product.colorImages,
       stock: product.stock,
       badge: product.badge ?? null,
       active: product.active,
     });
     if (error) throw new Error(error.message);
 
+    // A category typed into the form joins the list, hidden from the shop
+    // filter until switched on in /admin/categories.
+    const { error: categoryError } = await supabase
+      .from("categories")
+      .upsert({ name: product.category, sort_order: 100 }, { onConflict: "name", ignoreDuplicates: true });
+    if (categoryError) console.warn("[upsertProduct] category not recorded:", categoryError.message);
+
     revalidatePath("/admin/products");
+    revalidatePath("/admin/categories");
     revalidatePath("/shop");
-    revalidatePath("/");
+    revalidatePath("/home");
     revalidatePath(`/product/${product.id}`);
     return ok();
   } catch (err) {
@@ -223,7 +330,7 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
     if (error) throw new Error(error.message);
     revalidatePath("/admin/products");
     revalidatePath("/shop");
-    revalidatePath("/");
+    revalidatePath("/home");
     return ok();
   } catch (err) {
     return fail(err);
@@ -238,6 +345,148 @@ export async function setProductActive(id: string, active: boolean): Promise<Act
     if (error) throw new Error(error.message);
     revalidatePath("/admin/products");
     revalidatePath("/shop");
+    return ok();
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+// ── Categories ──────────────────────────────────────────────────────────────
+
+function validCategoryName(name: unknown): string {
+  const trimmed = typeof name === "string" ? name.trim().replace(/\s+/g, " ") : "";
+  if (!trimmed) throw new Error("Category name is required.");
+  if (trimmed.length > 60) throw new Error("Category name must be 60 characters or fewer.");
+  return trimmed;
+}
+
+function revalidateCategories() {
+  revalidatePath("/admin/categories");
+  revalidatePath("/admin/products");
+  revalidatePath("/shop");
+}
+
+export async function createCategory(name: string, showInFilter: boolean): Promise<ActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    const categoryName = validCategoryName(name);
+
+    const { data: existing, error: listError } = await supabase
+      .from("categories")
+      .select("name, sort_order");
+    if (listError) throw new Error(listError.message);
+
+    if (existing?.some((c) => c.name.toLowerCase() === categoryName.toLowerCase())) {
+      throw new Error(`"${categoryName}" already exists.`);
+    }
+
+    const nextOrder = Math.max(0, ...(existing ?? []).map((c) => c.sort_order)) + 1;
+    const { error } = await supabase
+      .from("categories")
+      .insert({ name: categoryName, show_in_filter: Boolean(showInFilter), sort_order: nextOrder });
+    if (error) throw new Error(error.message);
+
+    revalidateCategories();
+    return ok();
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function setCategoryInFilter(name: string, show: boolean): Promise<ActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    const { error } = await supabase
+      .from("categories")
+      .update({ show_in_filter: Boolean(show) })
+      .eq("name", validCategoryName(name));
+    if (error) throw new Error(error.message);
+    revalidateCategories();
+    return ok();
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/** Swaps a category with its neighbour, then renumbers so orders stay distinct. */
+export async function moveCategory(name: string, direction: "up" | "down"): Promise<ActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    const categoryName = validCategoryName(name);
+
+    const { data, error: listError } = await supabase
+      .from("categories")
+      .select("name")
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true });
+    if (listError) throw new Error(listError.message);
+
+    const names = (data ?? []).map((c) => c.name);
+    const index = names.indexOf(categoryName);
+    const target = direction === "up" ? index - 1 : index + 1;
+    if (index === -1 || target < 0 || target >= names.length) return ok();
+
+    [names[index], names[target]] = [names[target], names[index]];
+    for (const [i, n] of names.entries()) {
+      const { error } = await supabase.from("categories").update({ sort_order: i + 1 }).eq("name", n);
+      if (error) throw new Error(error.message);
+    }
+
+    revalidateCategories();
+    return ok();
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function deleteCategory(name: string): Promise<ActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    const categoryName = validCategoryName(name);
+
+    const { count, error: countError } = await supabase
+      .from("products")
+      .select("id", { count: "exact", head: true })
+      .eq("category", categoryName);
+    if (countError) throw new Error(countError.message);
+    if (count) {
+      throw new Error(
+        `${count} product${count === 1 ? " is" : "s are"} still in "${categoryName}". Move ${count === 1 ? "it" : "them"} to another category first.`
+      );
+    }
+
+    const { error } = await supabase.from("categories").delete().eq("name", categoryName);
+    if (error) throw new Error(error.message);
+
+    revalidateCategories();
+    return ok();
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/**
+ * Takes stock off (negative delta) or puts it back, e.g. for a sale made
+ * outside the site. Atomic in Postgres and floored at zero. A product at zero
+ * drops out of the shop until it is restocked.
+ */
+export async function adjustProductStock(id: string, delta: number): Promise<ActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    const slug = validSlug(id);
+    if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 10_000) {
+      throw new Error("Enter a whole number of items.");
+    }
+    const { data, error } = await supabase.rpc("adjust_product_stock", {
+      p_product_id: slug,
+      p_delta: delta,
+    });
+    if (error) throw new Error(error.message);
+    if (data === null) throw new Error("Product not found.");
+    revalidatePath("/admin/products");
+    revalidatePath("/shop");
+    revalidatePath("/home");
+    revalidatePath(`/product/${slug}`);
     return ok();
   } catch (err) {
     return fail(err);
@@ -275,7 +524,7 @@ export async function createDeal(input: {
     if (error) throw new Error(error.message);
 
     revalidatePath("/admin/deals");
-    revalidatePath("/");
+    revalidatePath("/home");
     return ok();
   } catch (err) {
     return fail(err);
@@ -288,7 +537,58 @@ export async function deleteDeal(id: string): Promise<ActionResult> {
     const { error } = await supabase.from("deals").delete().eq("id", validUuid(id));
     if (error) throw new Error(error.message);
     revalidatePath("/admin/deals");
-    revalidatePath("/");
+    revalidatePath("/home");
+    return ok();
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+// ── Homepage drops ─────────────────────────────────────────────────────────
+
+export async function upsertHomepageDrop(input: {
+  id?: string;
+  name: string;
+  price: number;
+  category: string;
+  image: string;
+  active: boolean;
+}): Promise<ActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    const parsed = parseInput(homepageDropInputSchema, input);
+    if (!parsed.ok) return { ok: false, error: parsed.error };
+    const drop = parsed.data;
+
+    if (drop.id) {
+      const { error } = await supabase
+        .from("homepage_drops")
+        .update({ name: drop.name, price: drop.price, category: drop.category, image: drop.image, active: drop.active })
+        .eq("id", validUuid(drop.id));
+      if (error) throw new Error(error.message);
+    } else {
+      const { data, error: listError } = await supabase.from("homepage_drops").select("sort_order");
+      if (listError) throw new Error(listError.message);
+      const sortOrder = Math.max(0, ...(data ?? []).map((row) => row.sort_order)) + 1;
+      const { error } = await supabase.from("homepage_drops").insert({ ...drop, sort_order: sortOrder });
+      if (error) throw new Error(error.message);
+    }
+
+    revalidatePath("/home");
+    revalidatePath("/admin/homepage-drops");
+    return ok();
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function deleteHomepageDrop(id: string): Promise<ActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    const { error } = await supabase.from("homepage_drops").delete().eq("id", validUuid(id));
+    if (error) throw new Error(error.message);
+    revalidatePath("/home");
+    revalidatePath("/admin/homepage-drops");
     return ok();
   } catch (err) {
     return fail(err);

@@ -5,7 +5,13 @@ import {
   isSupabaseConfigured,
 } from "@/lib/supabase/server";
 import type { CartLine } from "@/lib/cart";
-import type { Database, OrderItemRow, OrderRow, PaymentMethod } from "@/lib/supabase/types";
+import type {
+  Database,
+  OrderItemRow,
+  OrderRow,
+  PaymentFailureRow,
+  PaymentMethod,
+} from "@/lib/supabase/types";
 import { getIdentity } from "@/lib/firebase/session";
 
 /** Columns an order update may touch (excludes created_at/updated_at). */
@@ -152,31 +158,6 @@ export async function getAllOrders(): Promise<OrderWithItems[]> {
   return (data ?? []) as OrderWithItems[];
 }
 
-/**
- * Looks up an order by its M-Pesa CheckoutRequestID and applies a patch.
- * Uses the service-role client because the Safaricom callback arrives with no
- * user session. Ports the Firestore write in api/callback.js.
- */
-export async function updateOrderByCheckoutId(
-  checkoutRequestId: string,
-  patch: OrderPatch
-): Promise<string | null> {
-  const supabase = createServiceClient();
-
-  const { data, error } = await supabase
-    .from("orders")
-    .update(patch)
-    .eq("mpesa_checkout_request_id", checkoutRequestId)
-    .select("id")
-    .maybeSingle();
-
-  if (error) {
-    console.error("[orders] updateOrderByCheckoutId:", error.message);
-    return null;
-  }
-  return data?.id ?? null;
-}
-
 /** Service-role patch by order id, for the STK push initiation path. */
 export async function updateOrderByIdAsService(
   id: string,
@@ -198,4 +179,25 @@ export async function awardLoyaltyPoints(orderId: string): Promise<number> {
     return 0;
   }
   return data ?? 0;
+}
+
+/**
+ * Every failed M-Pesa attempt, newest first. Admin-only by RLS. One row per
+ * attempt, so an order that failed twice and then paid still shows here.
+ */
+export async function getPaymentFailures(limit = 500): Promise<PaymentFailureRow[]> {
+  if (!isSupabaseConfigured()) return [];
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("payment_failures")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("[orders] getPaymentFailures:", error.message);
+    return [];
+  }
+  return data ?? [];
 }

@@ -1,23 +1,31 @@
 import AppShell from "@/components/layout/AppShell";
 import ContactForm from "@/components/contact/ContactForm";
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata = pageMetadata({
+  title: "Contact Us",
+  description:
+    "Questions about an order, stock or delivery? Contact Kelmon by message or WhatsApp — we reply fast.",
+  path: "/contact",
+});
 
 const contactDetails = [
   {
     icon: "location_on",
     label: "Pickup",
-    value: "Nairobi · flexible drop & pickup points",
+    value: "Nairobi & Embu · flexible drop & pickup points",
   },
   {
     icon: "call",
     label: "Phone / WhatsApp",
-    value: "+254 700 000 000",
-    href: "https://wa.me/254700000000",
+    value: "0794 640 214",
+    href: "https://wa.me/254794640214",
   },
   {
-    icon: "mail",
-    label: "Email",
-    value: "hello@kelmon.co.ke",
-    href: "mailto:hello@kelmon.co.ke",
+    icon: "call",
+    label: "Phone",
+    value: "0741 739 262",
+    href: "tel:+254741739262",
   },
   {
     icon: "schedule",
@@ -37,10 +45,6 @@ export default function ContactPage() {
           <h1 className="font-display-lg text-display-md md:text-display-lg text-on-surface mb-3 max-w-2xl">
             Get in touch
           </h1>
-          <p className="font-body-lg text-body-lg text-on-surface-variant max-w-xl mb-12">
-            Orders, delivery questions, or product support — we&apos;re here for it.
-          </p>
-
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-start">
             <div className="space-y-8">
               <div>
@@ -78,10 +82,10 @@ export default function ContactPage() {
               <div className="bg-primary text-white p-6 md:p-8">
                 <h3 className="font-display-lg text-lg mb-2">Prefer WhatsApp?</h3>
                 <p className="text-white/85 text-sm leading-relaxed mb-5">
-                  Fastest way to check stock and delivery slots.
+                  Contact us any time on WhatsApp to check stock and delivery slots.
                 </p>
                 <a
-                  href="https://wa.me/254700000000"
+                  href="https://wa.me/254794640214"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex h-11 px-7 rounded-full bg-white text-primary text-[11px] font-semibold uppercase tracking-[0.14em] items-center gap-2 hover:bg-white/90 transition-colors"

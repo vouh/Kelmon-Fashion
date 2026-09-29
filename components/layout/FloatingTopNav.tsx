@@ -5,6 +5,8 @@ import Image from "next/image";
 import { useState } from "react";
 import ThemeToggle from "@/components/layout/ThemeToggle";
 import SearchOverlay from "@/components/layout/SearchOverlay";
+import { useAuthModal } from "@/components/auth/AuthModal";
+import { useAuth } from "@/components/providers/AuthProvider";
 import logo from "@/lib/logo";
 import type { NavItem } from "@/lib/products";
 
@@ -14,15 +16,17 @@ interface FloatingTopNavProps {
 }
 
 const navLinks: { href: string; label: string; key: NavItem }[] = [
-  { href: "/", label: "Home", key: "home" },
+  { href: "/home", label: "Home", key: "home" },
   { href: "/shop", label: "Shop", key: "shop" },
-  { href: "/salon", label: "Salon", key: "salon" },
   { href: "/about", label: "About", key: "about" },
   { href: "/contact", label: "Contact", key: "contact" },
 ];
 
 export default function FloatingTopNav({ activeNav, cartCount = 0 }: FloatingTopNavProps) {
   const [searchOpen, setSearchOpen] = useState(false);
+  const { user, loading } = useAuth();
+  const { openAuth } = useAuthModal();
+  const signedOut = !loading && !user;
 
   return (
     <>
@@ -90,19 +94,32 @@ export default function FloatingTopNav({ activeNav, cartCount = 0 }: FloatingTop
                 </span>
               )}
             </Link>
-            <Link
-              href="/profile"
-              aria-label="Profile"
-              className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
-                activeNav === "profile"
-                  ? "bg-primary text-white"
-                  : "text-primary hover:bg-primary/10"
-              }`}
-            >
-              <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
-                account_circle
-              </span>
-            </Link>
+            {signedOut ? (
+              <button
+                type="button"
+                onClick={() => openAuth()}
+                aria-label="Sign in"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-primary hover:bg-primary/10 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
+                  account_circle
+                </span>
+              </button>
+            ) : (
+              <Link
+                href="/profile"
+                aria-label="Profile"
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+                  activeNav === "profile"
+                    ? "bg-primary text-white"
+                    : "text-primary hover:bg-primary/10"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
+                  account_circle
+                </span>
+              </Link>
+            )}
           </div>
         </div>
       </header>

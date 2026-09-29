@@ -1,10 +1,10 @@
 import type { MetadataRoute } from "next";
+import { SITE_URL } from "@/lib/seo";
 
 /**
  * Replaces the static robots.txt, which still advertised EzyBite's Netlify
  * sitemap. Set NEXT_PUBLIC_SITE_URL in production so the sitemap link is right.
  */
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://kelmon.co.ke";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -12,9 +12,21 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/admin", "/api", "/auth", "/signin", "/checkout", "/orders", "/profile"],
+        disallow: [
+          "/admin",
+          "/api",
+          "/auth",
+          "/signin",
+          "/cart",
+          "/checkout",
+          "/orders",
+          "/profile",
+          "/forgot-password",
+          "/reset-password",
+        ],
       },
     ],
-    sitemap: `${siteUrl}/sitemap.xml`,
+    sitemap: `${SITE_URL}/sitemap.xml`,
+    host: SITE_URL,
   };
 }

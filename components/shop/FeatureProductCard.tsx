@@ -2,33 +2,43 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/products";
 import { formatKes } from "@/lib/products";
+import { useCart } from "@/components/providers/CartProvider";
 
 interface FeatureProductCardProps {
   product: Product;
 }
 
 export default function FeatureProductCard({ product }: FeatureProductCardProps) {
-  const stars = Math.round(product.rating);
+  const { addItem } = useCart();
+  const router = useRouter();
+  const [showAdded, setShowAdded] = useState(false);
+
+  useEffect(() => {
+    if (!showAdded) return;
+    const timeout = window.setTimeout(() => setShowAdded(false), 900);
+    return () => window.clearTimeout(timeout);
+  }, [showAdded]);
+
+  function addToCart(event: React.MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    if (addItem(product) > 0) setShowAdded(true);
+  }
 
   return (
-    <article className="group w-full overflow-hidden rounded-2xl bg-white dark:bg-surface border border-primary/15 shadow-[0_8px_24px_rgba(142,68,173,0.08)] hover:bg-primary hover:border-primary hover:shadow-[0_16px_40px_rgba(142,68,173,0.28)] hover:scale-[1.04] transition-all duration-300 origin-center">
+    <article
+      onClick={() => router.push(`/product/${product.id}`)}
+      className="group w-full cursor-pointer overflow-hidden rounded-2xl bg-white dark:bg-surface border border-primary/15 shadow-[0_8px_24px_rgba(142,68,173,0.08)] hover:bg-primary hover:border-primary hover:shadow-[0_16px_40px_rgba(142,68,173,0.28)] hover:scale-[1.04] transition-all duration-300 origin-center"
+    >
       <div className="relative w-full aspect-square bg-[#faf6fc] dark:bg-surface-container overflow-hidden">
         {product.badge && (
           <span className="absolute top-3 left-3 z-20 inline-flex items-center h-6 px-2.5 rounded-full bg-primary text-white text-[10px] font-semibold uppercase tracking-[0.08em] group-hover:bg-white group-hover:text-primary transition-colors">
             {product.badge}
           </span>
         )}
-
-        <div className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
-          <Link
-            href={`/product/${product.id}`}
-            className="inline-flex items-center h-7 px-3 rounded-full bg-white text-primary text-[10px] font-semibold uppercase tracking-[0.08em]"
-          >
-            Learn more
-          </Link>
-        </div>
 
         <Link href={`/product/${product.id}`} className="absolute inset-0 block" tabIndex={-1}>
           <Image
@@ -49,22 +59,8 @@ export default function FeatureProductCard({ product }: FeatureProductCardProps)
           </h3>
         </Link>
 
-        <div className="mt-1.5 flex justify-center gap-0" aria-label={`${product.rating} out of 5 stars`}>
-          {Array.from({ length: 5 }).map((_, i) => (
-            <span
-              key={i}
-              className={`material-symbols-outlined text-[13px] ${
-                i < stars ? "text-[#C5A059]" : "text-[#C5A059]/30 group-hover:text-white/35"
-              }`}
-              style={i < stars ? { fontVariationSettings: "'FILL' 1" } : undefined}
-              aria-hidden="true"
-            >
-              star
-            </span>
-          ))}
-        </div>
-
-        <p className="mt-1.5 text-[13px] font-semibold text-on-surface group-hover:text-white transition-colors">
+        <div className="mt-2 flex items-center justify-center gap-2">
+          <p className="text-[13px] font-semibold text-on-surface group-hover:text-white transition-colors">
           {product.originalPrice != null && (
             <span className="text-on-surface-variant/60 group-hover:text-white/55 line-through font-normal mr-1.5 text-[11px]">
               {formatKes(product.originalPrice)}
@@ -73,8 +69,23 @@ export default function FeatureProductCard({ product }: FeatureProductCardProps)
           <span className="text-primary group-hover:text-[#C5A059] transition-colors">
             {formatKes(product.price)}
           </span>
-        </p>
+          </p>
+          <button
+            type="button"
+            onClick={addToCart}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-sm transition hover:scale-105 hover:bg-[#7a3a96] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 group-hover:bg-white group-hover:text-primary"
+            aria-label={`Add ${product.name} to cart`}
+          >
+            <span className="material-symbols-outlined text-[17px]" aria-hidden="true">shopping_cart</span>
+          </button>
+        </div>
       </div>
+
+      {showAdded && (
+        <div className="fixed bottom-5 left-1/2 z-[100] -translate-x-1/2 rounded-full bg-on-surface px-4 py-2 text-xs font-medium text-white shadow-lg" role="status">
+          Added to cart
+        </div>
+      )}
     </article>
   );
 }

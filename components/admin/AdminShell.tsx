@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/AuthProvider";
 import ThemeToggle from "@/components/layout/ThemeToggle";
+import { useAdminBadges, type AdminBadges } from "@/components/admin/useAdminBadges";
 
 /**
  * Admin sidebar, topbar and mobile drawer.
@@ -20,6 +21,8 @@ interface NavPage {
   label: string;
   /** Icon tint when the item is not active, mirroring the old `color` field. */
   color?: string;
+  /** Which unread count, if any, shows as a badge on this item. */
+  badge?: keyof AdminBadges;
 }
 
 const PAGES: NavPage[] = [
@@ -30,18 +33,22 @@ const PAGES: NavPage[] = [
   { href: "/admin/deals", icon: "local_offer", label: "Manage Deals", color: "text-amber-400" },
   { href: "/admin/updates", icon: "campaign", label: "Updates", color: "text-blue-400" },
   { href: "/admin/reviews", icon: "star", label: "Reviews", color: "text-amber-300" },
+  { href: "/admin/transactions", icon: "payments", label: "Payments", color: "text-green-400" },
   {
-    href: "/admin/transactions",
-    icon: "check_circle",
-    label: "Successful Payments",
-    color: "text-green-400",
+    href: "/admin/notifications",
+    icon: "notifications",
+    label: "Notifications",
+    color: "text-amber-300",
+    badge: "notifications",
   },
   {
-    href: "/admin/transactions/failed",
-    icon: "cancel",
-    label: "Failed Payments",
-    color: "text-red-400",
+    href: "/admin/communications",
+    icon: "forum",
+    label: "Communications",
+    color: "text-blue-400",
+    badge: "messages",
   },
+  { href: "/admin/settings", icon: "settings", label: "Settings", color: "text-white/60" },
 ];
 
 export default function AdminShell({
@@ -64,6 +71,7 @@ export default function AdminShell({
   const [open, setOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const badges = useAdminBadges(pathname);
 
   const email = profile?.email ?? adminEmail ?? "Admin";
   const roleLabel = isSuperAdmin ? "Super Admin" : "Administrator";
@@ -79,8 +87,8 @@ export default function AdminShell({
     router.refresh();
   }
 
-  // Longest matching href wins, so /admin/transactions/failed doesn't also
-  // light up /admin/transactions.
+  // Longest matching href wins, so a nested page lights up its own item
+  // rather than its parent's.
   const activeHref = PAGES.map((p) => p.href)
     .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
     .sort((a, b) => b.length - a.length)[0];
@@ -155,7 +163,7 @@ export default function AdminShell({
                 key={page.href}
                 href={page.href}
                 onClick={() => setOpen(false)}
-                className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all ${
+                className={`relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all ${
                   sidebarCollapsed ? "md:justify-center" : ""
                 } ${
                   active
@@ -171,6 +179,15 @@ export default function AdminShell({
                   {page.icon}
                 </span>
                 <span className={sidebarCollapsed ? "md:hidden" : ""}>{page.label}</span>
+                {page.badge && badges[page.badge] > 0 && (
+                  <span
+                    className={`ml-auto min-w-4 rounded-full bg-red-500 px-1 text-center text-[9px] font-black leading-4 text-white ${
+                      sidebarCollapsed ? "md:absolute md:right-1 md:top-0.5 md:ml-0" : ""
+                    }`}
+                  >
+                    {badges[page.badge] > 99 ? "99+" : badges[page.badge]}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -283,9 +300,25 @@ export default function AdminShell({
                 </div>
               ) : null}
             </div>
-            <button type="button" aria-label="Notifications" className="admin-command-icon">
-              <span className="material-symbols-outlined text-xl">notifications</span>
-            </button>
+            <Link
+              href="/admin/notifications"
+              aria-label={
+                badges.notifications
+                  ? `Notifications, ${badges.notifications} unread`
+                  : "Notifications"
+              }
+              title="Notifications"
+              className="admin-command-icon relative"
+            >
+              <span className="material-symbols-outlined text-xl">
+                {badges.notifications ? "notifications_active" : "notifications"}
+              </span>
+              {badges.notifications > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 min-w-[18px] rounded-full bg-red-500 px-1 text-center text-[10px] font-black leading-[18px] text-white shadow ring-2 ring-[var(--kelmon-bg-page,#18181b)]">
+                  {badges.notifications > 99 ? "99+" : `+${badges.notifications}`}
+                </span>
+              )}
+            </Link>
             <span className="h-7 w-px bg-[var(--kelmon-border-default)]" />
             <ThemeToggle />
             <span className="h-7 w-px bg-[var(--kelmon-border-default)]" />

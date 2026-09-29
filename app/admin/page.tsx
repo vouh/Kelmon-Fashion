@@ -11,16 +11,20 @@ import {
   formatKes,
   timeAgo,
 } from "@/components/admin/ui";
+import OrderDetailsButton from "@/components/admin/OrderDetails";
+import RequestPaymentButton from "@/components/admin/RequestPaymentButton";
 import { getAdminStats, getOrdersWithStats } from "@/lib/supabase/stats";
+import { getProducts } from "@/lib/supabase/products";
 import { getAdminEmail } from "@/lib/supabase/server";
 
 export const metadata = { title: "Overview — Kelmon Admin" };
 
 /** Port of admin/index.html. */
 export default async function AdminOverviewPage() {
-  const [stats, { orders, paid, failed }] = await Promise.all([
+  const [stats, { orders, paid, failed }, products] = await Promise.all([
     getAdminStats(),
     getOrdersWithStats(),
+    getProducts(),
   ]);
 
   const recent = orders.slice(0, 10);
@@ -80,24 +84,7 @@ export default async function AdminOverviewPage() {
         </div>
       </div>
 
-      {/* Quick action — replaces the old "Request Payment" STK modal entry point */}
-      <Link
-        href="/admin/orders?new=1"
-        className="group flex items-center gap-3 rounded-xl border border-purple-400/20 bg-purple-400/10 px-4 py-3 transition-all hover:bg-purple-400/20"
-      >
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-400/20">
-          <span className="material-symbols-outlined text-lg text-purple-300">send_to_mobile</span>
-        </div>
-        <div>
-          <p className="text-xs font-black text-white">Request Payment</p>
-          <p className="mt-0.5 text-[9px] font-bold text-white/30">
-            Create a direct order and send an STK push
-          </p>
-        </div>
-        <span className="material-symbols-outlined ml-auto text-white/20 transition-colors group-hover:text-white/50">
-          chevron_right
-        </span>
-      </Link>
+      <RequestPaymentButton products={products} />
 
       <Panel
         title="Recent Orders"
@@ -126,6 +113,9 @@ export default async function AdminOverviewPage() {
                     <th className={TH}>Status</th>
                     <th className={TH}>Payment</th>
                     <th className={TH}>Time</th>
+                    <th className={TH}>
+                      <span className="sr-only">View</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -141,6 +131,9 @@ export default async function AdminOverviewPage() {
                         <PaymentBadge status={order.payment_status} />
                       </td>
                       <td className={`${TD} text-white/40`}>{timeAgo(order.created_at)}</td>
+                      <td className={`${TD} w-10 text-right`}>
+                        <OrderDetailsButton orderId={order.id} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -164,6 +157,7 @@ export default async function AdminOverviewPage() {
                     <span className="ml-auto text-[9px] font-bold text-white/25">
                       {timeAgo(order.created_at)}
                     </span>
+                    <OrderDetailsButton orderId={order.id} />
                   </div>
                 </div>
               ))}

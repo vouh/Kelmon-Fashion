@@ -4,19 +4,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import type { Product } from "@/lib/products";
+import type { HomepageDropRow } from "@/lib/supabase/types";
 import { formatKes } from "@/lib/products";
 
 interface CircleCollectionProps {
-  products: Product[];
+  products: Array<Product | HomepageDropRow>;
   title?: string;
 }
 
 const VISIBLE_DESKTOP = 4;
 const VISIBLE_MOBILE = 2;
+const MAX_CIRCLE = 240;
+/** Space around the circle inside its slot (the p-2 wrapper), so the ring and shadow fit. */
+const CIRCLE_INSET = 16;
 
 export default function CircleCollection({
   products,
-  title = "The drops are dropping",
+  title = "Just Dropped",
 }: CircleCollectionProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -187,19 +191,24 @@ export default function CircleCollection({
 
   if (products.length === 0) return null;
 
+  const circle = itemWidth > 0 ? Math.min(itemWidth - CIRCLE_INSET, MAX_CIRCLE) : 144;
+  // Centres the arrows on the circles: py-5 + pt-2 + p-2 above the circle, minus half an arrow.
+  const arrowTop = 20 + 8 + 8 + circle / 2 - 22;
+
   return (
     <section className="relative px-margin-mobile md:px-margin-desktop py-16 md:py-20 bg-surface">
-      <h2 className="font-headline-lg text-[1.85rem] md:text-[2.35rem] text-on-surface text-center mb-12 md:mb-14 tracking-tight">
+      <h2 className="font-display-lg text-[2.25rem] md:text-[3.25rem] leading-tight text-on-surface text-center tracking-tight whitespace-nowrap mb-10 md:mb-12">
         {title}
       </h2>
 
-      <div className="relative max-w-5xl mx-auto px-10 md:px-14">
+      <div className="relative max-w-6xl mx-auto md:px-14">
         <button
           type="button"
           onClick={() => scrollByOne(-1)}
           disabled={!canPrev}
           aria-label="Previous drop"
-          className="absolute left-0 top-[88px] md:top-[100px] z-10 w-10 h-10 md:w-11 md:h-11 rounded-full bg-primary text-white flex items-center justify-center shadow-md hover:bg-[#7a3a96] transition-colors disabled:opacity-35 disabled:pointer-events-none"
+          style={{ top: arrowTop }}
+          className="absolute left-0 z-10 hidden md:flex w-11 h-11 rounded-full bg-primary text-white items-center justify-center shadow-md hover:bg-[#7a3a96] transition-colors disabled:opacity-35 disabled:pointer-events-none"
         >
           <span className="material-symbols-outlined text-[22px]" aria-hidden="true">
             chevron_left
@@ -210,7 +219,8 @@ export default function CircleCollection({
           onClick={() => scrollByOne(1)}
           disabled={!canNext}
           aria-label="Next drop"
-          className="absolute right-0 top-[88px] md:top-[100px] z-10 w-10 h-10 md:w-11 md:h-11 rounded-full bg-primary text-white flex items-center justify-center shadow-md hover:bg-[#7a3a96] transition-colors disabled:opacity-35 disabled:pointer-events-none"
+          style={{ top: arrowTop }}
+          className="absolute right-0 z-10 hidden md:flex w-11 h-11 rounded-full bg-primary text-white items-center justify-center shadow-md hover:bg-[#7a3a96] transition-colors disabled:opacity-35 disabled:pointer-events-none"
         >
           <span className="material-symbols-outlined text-[22px]" aria-hidden="true">
             chevron_right
@@ -237,7 +247,7 @@ export default function CircleCollection({
             {products.map((product) => (
               <Link
                 key={product.id}
-                href={`/product/${product.id}`}
+                href={"description" in product ? `/product/${product.id}` : "/shop"}
                 draggable={false}
                 onClick={(e) => {
                   if (dragRef.current.moved) {
@@ -253,7 +263,9 @@ export default function CircleCollection({
                 }
               >
                 <div className="mx-auto w-fit p-2 pointer-events-none">
-                  <div className="relative w-36 h-36 md:w-44 md:h-44 rounded-full overflow-hidden bg-surface-container ring-[5px] ring-white dark:ring-surface shadow-[0_12px_32px_rgba(142,68,173,0.14)] group-hover:shadow-[0_16px_40px_rgba(142,68,173,0.22)] transition-shadow">
+                  <div
+                    style={{ width: circle, height: circle }}
+                    className="relative rounded-full overflow-hidden bg-surface-container ring-[5px] ring-white dark:ring-surface shadow-[0_12px_32px_rgba(142,68,173,0.14)] group-hover:shadow-[0_16px_40px_rgba(142,68,173,0.22)] transition-shadow">
                     <Image
                       src={product.image}
                       alt={product.name}

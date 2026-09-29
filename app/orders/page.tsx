@@ -1,6 +1,10 @@
 import { Suspense } from "react";
 import OrdersClient, { type StoredOrder } from "@/components/orders/OrdersClient";
 import { getUserOrders } from "@/lib/supabase/orders";
+import { mpesaFailureReason } from "@/lib/mpesa";
+import { PRIVATE_PAGE } from "@/lib/seo";
+
+export const metadata = { title: "My Orders", ...PRIVATE_PAGE };
 
 /**
  * Same page as before; the orders are just fetched from Supabase here and
@@ -19,6 +23,11 @@ export default async function OrdersPage() {
     payment: order.payment_method,
     total: Number(order.total),
     status: order.status,
+    paymentStatus: order.payment_status,
+    failureReason:
+      order.payment_status === "failed"
+        ? mpesaFailureReason(order.mpesa_result_code, order.mpesa_result_desc)
+        : null,
     lines: (order.order_items ?? []).map((line) => ({
       name: line.name,
       quantity: line.quantity,

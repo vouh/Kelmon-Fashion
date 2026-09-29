@@ -78,7 +78,7 @@ export default function ProductSlider({
               {product.category}
             </p>
             <h3 className="font-headline-lg text-headline-lg text-on-surface">{product.name}</h3>
-            <StarRating rating={product.rating} reviewCount={product.reviewCount} size="md" />
+            <StarRating reviewCount={product.reviewCount} size="md" />
             <p className="font-headline-sm text-headline-sm text-primary">{formatKes(product.price)}</p>
             <div className="flex flex-wrap gap-3 pt-2">
               <Link

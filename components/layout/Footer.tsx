@@ -1,11 +1,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { logoOnDark } from "@/lib/logo";
+import AccountLink from "@/components/layout/AccountLink";
 
 export default function Footer() {
   return (
     <footer className="w-full mt-auto bg-[#8E44AD] dark:bg-[#3b1a55] text-white">
-      <div className="px-margin-mobile md:px-margin-desktop pt-16 md:pt-20 pb-12 md:pb-14">
+      <div className="px-margin-mobile md:px-margin-desktop pt-16 md:pt-20 pb-28 md:pb-14">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 md:gap-8">
           <div className="sm:col-span-2 md:col-span-1 space-y-4">
             <Image
@@ -42,8 +43,8 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/shop?category=Fashion" className="font-body-md text-body-md text-white/80 hover:text-white transition-colors">
-                  Fashion
+                <Link href="/shop?category=Accessories" className="font-body-md text-body-md text-white/80 hover:text-white transition-colors">
+                  Accessories
                 </Link>
               </li>
             </ul>
@@ -65,9 +66,9 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/orders" className="font-body-md text-body-md text-white/80 hover:text-white transition-colors">
+                <AccountLink href="/orders" className="font-body-md text-body-md text-white/80 hover:text-white transition-colors">
                   Orders
-                </Link>
+                </AccountLink>
               </li>
             </ul>
           </div>
@@ -84,7 +85,7 @@ export default function Footer() {
               </li>
               <li>
                 <a
-                  href="https://wa.me/254700000000"
+                  href="https://wa.me/254794640214"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-body-md text-body-md text-white/80 hover:text-white transition-colors"
@@ -93,9 +94,9 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <Link href="/profile" className="font-body-md text-body-md text-white/80 hover:text-white transition-colors">
+                <AccountLink href="/profile" className="font-body-md text-body-md text-white/80 hover:text-white transition-colors">
                   Profile
-                </Link>
+                </AccountLink>
               </li>
             </ul>
           </div>
@@ -104,9 +105,14 @@ export default function Footer() {
         <div className="mt-14 md:mt-16 pt-8 border-t border-white/20 flex flex-col sm:flex-row justify-between gap-3">
           <p className="font-body-md text-body-md text-white/70">
             © 2026 Kelmon · Beauty · Fashion · Glamour
-          </p>
-          <p className="font-body-md text-body-md text-secondary">
-            Free delivery over KES 3,000
+            <span className="mx-2 text-white/40">·</span>
+            <Link href="/terms" className="hover:text-white underline-offset-4 hover:underline">
+              Terms
+            </Link>
+            <span className="mx-2 text-white/40">·</span>
+            <Link href="/privacy" className="hover:text-white underline-offset-4 hover:underline">
+              Privacy
+            </Link>
           </p>
         </div>
       </div>

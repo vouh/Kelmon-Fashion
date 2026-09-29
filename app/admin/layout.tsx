@@ -17,6 +17,12 @@ import { isFirebaseAdminConfigured } from "@/lib/firebase/admin";
  */
 export const dynamic = "force-dynamic";
 
+/** Admin pages already name themselves ("Products — Kelmon Admin"), so no site suffix, and never indexed. */
+export const metadata = {
+  title: { template: "%s", default: "Kelmon Admin" },
+  robots: { index: false, follow: false },
+};
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   // Without the service account there is no way to verify a token, so the gate
   // cannot be trusted — fail closed rather than waving everyone through.

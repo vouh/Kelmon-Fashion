@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useCart } from "@/components/providers/CartProvider";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { uploadAvatar } from "@/lib/supabase/storage";
@@ -52,7 +53,21 @@ function pointsForOrder(total: number): number {
 
 export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
   const { itemCount } = useCart();
-  const { user, profile, loading, updateProfile, isAdmin, isSuperAdmin } = useAuth();
+  const { user, profile, loading, updateProfile, isAdmin, isSuperAdmin, signOut } = useAuth();
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
+
+  /** Ends the Firebase session and clears the server cookie, then back to the shop. */
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      await signOut();
+    } catch {
+      // Already signed out, or Firebase unconfigured. Leaving is still correct.
+    }
+    router.push("/shop");
+    router.refresh();
+  }
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
@@ -150,38 +165,15 @@ export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
     }
   };
 
-  if (!loading && !user) {
-    return (
-      <main className="relative flex-grow overflow-hidden">
-        <div
-          className="absolute inset-x-0 top-0 h-[280px] md:h-[320px] bg-primary-container"
-          aria-hidden="true"
-        />
-        <div className="relative z-10 px-margin-mobile md:px-margin-desktop pt-14 md:pt-16 pb-16 md:pb-24">
-          <div className="max-w-md mx-auto mt-8 bg-white dark:bg-surface rounded-[1.75rem] px-6 py-12 text-center shadow-[0_20px_60px_rgba(142,68,173,0.18)]">
-            <span
-              className="material-symbols-outlined text-[40px] text-primary"
-              aria-hidden="true"
-            >
-              account_circle
-            </span>
-            <h1 className="mt-4 font-display-lg text-2xl text-on-surface tracking-tight">
-              Sign in to see your account
-            </h1>
-            <p className="mt-2 text-sm text-on-surface-variant">
-              Your orders, points and saved details all live with your account.
-            </p>
-            <Link
-              href="/signin?next=/profile"
-              className="mt-6 inline-flex h-11 px-7 rounded-full bg-primary text-white text-[11px] font-semibold uppercase tracking-[0.14em] items-center"
-            >
-              Sign in
-            </Link>
-          </div>
-        </div>
-      </main>
-    );
-  }
+  // Signed out here (a lapsed session, or a direct visit the middleware let
+  // through): no "please sign in" page — go to the shop with the sign-in modal
+  // open, and come back here after. Skipped while signing out on purpose.
+  const signedOut = !loading && !user;
+  useEffect(() => {
+    if (signedOut && !signingOut) router.replace("/shop?auth=signin&next=/profile");
+  }, [signedOut, signingOut, router]);
+
+  if (signedOut) return <main className="flex-grow" />;
 
   return (
     <main className="relative flex-grow overflow-hidden">
@@ -333,17 +325,30 @@ export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
                   </p>
                 )}
                 {email && <p className="mt-3 text-sm text-primary">{email}</p>}
-                {isAdmin && (
-                  <a
-                    href="/admin"
-                    className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white shadow-md shadow-primary/25 transition hover:bg-primary/90"
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                  {isAdmin && (
+                    <a
+                      href="/admin"
+                      className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white shadow-md shadow-primary/25 transition hover:bg-primary/90"
+                    >
+                      <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                        admin_panel_settings
+                      </span>
+                      {isSuperAdmin ? "Super admin dashboard" : "Admin dashboard"}
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void handleSignOut()}
+                    disabled={signingOut}
+                    className="inline-flex items-center gap-2 rounded-full border border-error/30 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-error transition hover:bg-error/5 disabled:opacity-60"
                   >
                     <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                      admin_panel_settings
+                      logout
                     </span>
-                    {isSuperAdmin ? "Super admin dashboard" : "Admin dashboard"}
-                  </a>
-                )}
+                    {signingOut ? "Signing out…" : "Sign out"}
+                  </button>
+                </div>
                 {phone && <p className="mt-1 text-sm text-on-surface-variant">{phone}</p>}
                 {savedFlash && (
                   <p className="mt-2 text-xs text-secondary" role="status">
@@ -478,6 +483,18 @@ export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
               </ul>
             )}
           </section>
+
+          <button
+            type="button"
+            onClick={() => void handleSignOut()}
+            disabled={signingOut}
+            className="w-full h-12 rounded-2xl border border-error/30 bg-white dark:bg-surface text-error text-[11px] font-semibold uppercase tracking-[0.14em] flex items-center justify-center gap-2 hover:bg-error/5 transition-colors disabled:opacity-60"
+          >
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+              logout
+            </span>
+            {signingOut ? "Signing out…" : "Sign out"}
+          </button>
 
           <p className="text-center text-xs text-on-surface-variant/80 leading-relaxed">
             Your profile, orders and points are saved to your account, on every device you sign

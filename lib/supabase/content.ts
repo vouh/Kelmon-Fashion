@@ -1,5 +1,5 @@
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import type { DealRow, ReviewRow, UpdateRow } from "@/lib/supabase/types";
+import type { DealRow, HomepageDropRow, ReviewRow, UpdateRow } from "@/lib/supabase/types";
 
 /**
  * Reviews, deals and updates.
@@ -94,6 +94,28 @@ export async function getDeals(activeOnly = true): Promise<DealRow[]> {
   const { data, error } = await query;
   if (error) {
     console.error("[content] getDeals:", error.message);
+    return [];
+  }
+  return data ?? [];
+}
+
+/** Cards for the homepage carousel, ordered by their admin-defined position. */
+export async function getHomepageDrops(activeOnly = true): Promise<HomepageDropRow[]> {
+  if (!isSupabaseConfigured()) return [];
+  const supabase = await createClient();
+  let query = supabase
+    .from("homepage_drops")
+    .select("*")
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (activeOnly) query = query.eq("active", true);
+
+  const { data, error } = await query;
+  if (error) {
+    // A deployed app can briefly run newer code than its database migration.
+    // Keep the homepage on its product fallback during that window instead of
+    // emitting a development error overlay for the missing optional table.
+    if (error.code !== "PGRST205") console.error("[content] getHomepageDrops:", error.message);
     return [];
   }
   return data ?? [];

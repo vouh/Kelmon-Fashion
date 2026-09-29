@@ -138,13 +138,25 @@ export const createOrderSchema = z.object({
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 
-/** Admin road sale. No user, no cart — a single total typed by the admin. */
+/**
+ * Admin road sale. The optional item is a catalogue product (productId set) or
+ * a typed-in one (no productId) to be reconciled later. Admins may override the
+ * unit price, so it is taken from the input rather than the products table.
+ */
 export const directOrderSchema = z.object({
   customerName: requiredText("Customer name", 120),
   phone: phoneSchema,
   dropPoint: requiredText("Drop point", 160),
   total: money("Total").refine((value) => value > 0, "Total must be greater than zero."),
   notes: optionalText(1000),
+  item: z
+    .object({
+      productId: productSlugSchema.optional(),
+      name: requiredText("Item name", 200),
+      price: money("Price").refine((value) => value > 0, "Price must be greater than zero."),
+      quantity: z.number().int("Quantity must be a whole number.").min(1).max(99),
+    })
+    .optional(),
 });
 
 // ── Products ────────────────────────────────────────────────────────────────
@@ -157,9 +169,14 @@ export const productInputSchema = z
     price: money("Price").refine((value) => value > 0, "Price must be greater than zero."),
     originalPrice: money("Original price").nullable().optional(),
     category: requiredText("Category", 60),
-    images: z.array(imageUrlSchema).max(12, "At most 12 images per product."),
+    images: z
+      .array(imageUrlSchema)
+      .min(1, "Add at least one photo.")
+      .max(4, "At most 4 photos per product."),
     sizes: z.array(z.string().trim().min(1).max(40)).max(24),
     colors: z.array(z.string().trim().min(1).max(40)).max(24),
+    /** Colour name → photo. Keys must be one of `colors`; checked below. */
+    colorImages: z.record(z.string().trim().min(1).max(40), imageUrlSchema).default({}),
     stock: z
       .number({ message: "Stock must be a number." })
       .int("Stock must be a whole number.")
@@ -175,9 +192,13 @@ export const productInputSchema = z
       path: ["originalPrice"],
       message: "Original price must be higher than the sale price.",
     }
+  )
+  .refine(
+    (input) => Object.keys(input.colorImages).every((color) => input.colors.includes(color)),
+    { path: ["colorImages"], message: "Each colour photo must belong to one of the product's colours." }
   );
 
-export type ProductInput = z.infer<typeof productInputSchema>;
+export type ProductInput = z.input<typeof productInputSchema>;
 
 // ── Content ─────────────────────────────────────────────────────────────────
 
@@ -207,6 +228,15 @@ export const updateInputSchema = z.object({
   title: requiredText("Title", 160),
   body: requiredText("Body", 4000),
   tag: optionalText(40),
+});
+
+export const homepageDropInputSchema = z.object({
+  id: z.string().uuid("Invalid drop id.").optional(),
+  name: requiredText("Drop name", 160),
+  price: money("Price"),
+  category: requiredText("Category", 60),
+  image: imageUrlSchema,
+  active: z.boolean(),
 });
 
 export const reviewInputSchema = z.object({

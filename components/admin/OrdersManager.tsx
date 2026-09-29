@@ -11,12 +11,11 @@ import {
   formatDateTime,
   formatKes,
 } from "@/components/admin/ui";
-import {
-  createDirectOrder,
-  deleteOrder,
-  updateOrderStatus,
-  updatePaymentStatus,
-} from "@/app/admin/actions";
+import { deleteOrder, updateOrderStatus, updatePaymentStatus } from "@/app/admin/actions";
+import OrderDetailsButton from "@/components/admin/OrderDetails";
+import RequestPaymentModal from "@/components/admin/RequestPaymentModal";
+import { sendStkPrompt, waitForPaymentResult } from "@/components/payments/MpesaPayment";
+import type { Product } from "@/lib/products";
 import type { OrderWithItems } from "@/lib/supabase/orders";
 import type { OrderStatus, PaymentStatus } from "@/lib/supabase/types";
 
@@ -33,11 +32,18 @@ const PAYMENT_STATUSES: PaymentStatus[] = ["unpaid", "initiated", "paid", "faile
 
 type Filter = "all" | "pending" | "paid" | "unpaid" | "delivered";
 
+/** A direct order with a typed-in item, still to be matched to a product. */
+function needsReconciling(order: OrderWithItems): boolean {
+  return order.source === "admin_direct" && (order.order_items ?? []).some((item) => !item.product_id);
+}
+
 export default function OrdersManager({
   orders,
+  products,
   openDirectOrder = false,
 }: {
   orders: OrderWithItems[];
+  products: Product[];
   openDirectOrder?: boolean;
 }) {
   const router = useRouter();
@@ -48,6 +54,10 @@ export default function OrdersManager({
   const [showDirect, setShowDirect] = useState(openDirectOrder);
   const [error, setError] = useState<string | null>(null);
   const [stkSending, setStkSending] = useState<string | null>(null);
+  /** Live result of the last prompt per order: waiting, paid, or why it failed. */
+  const [stkResult, setStkResult] = useState<
+    Record<string, { tone: "info" | "success" | "error"; text: string }>
+  >({});
 
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -74,25 +84,33 @@ export default function OrdersManager({
     });
   }
 
+  /**
+   * Sends the prompt, then waits for M-Pesa's answer so staff see the real
+   * outcome — paid, or the reason it failed (wrong PIN, cancelled, timeout,
+   * insufficient funds…) — instead of just "sent".
+   */
   async function sendStkPush(order: OrderWithItems) {
     setError(null);
     setStkSending(order.id);
-    try {
-      // The server reads the amount from this order, so staff cannot alter the
-      // payment total in the browser before a Safaricom prompt is sent.
-      const response = await fetch("/api/mpesa/stk-push", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: order.id, phone: order.phone }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error ?? "Could not send STK push.");
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not send STK push.");
-    } finally {
-      setStkSending(null);
+    const show = (tone: "info" | "success" | "error", text: string) =>
+      setStkResult((prev) => ({ ...prev, [order.id]: { tone, text } }));
+
+    // The server reads the amount from this order, so staff cannot alter the
+    // payment total in the browser before a Safaricom prompt is sent.
+    const sent = await sendStkPrompt(order.id, order.phone);
+    setStkSending(null);
+    if (!sent.ok) {
+      show("error", `Prompt not sent: ${sent.reason}`);
+      return;
     }
+    show("info", `Prompt sent to ${order.phone}. Waiting for the customer to enter their PIN…`);
+    router.refresh();
+
+    const result = await waitForPaymentResult(order.id);
+    if (result.outcome === "paid") show("success", "Paid ✓ — M-Pesa confirmed the payment.");
+    else if (result.outcome === "failed") show("error", `Payment failed: ${result.reason}`);
+    else if (result.outcome === "timeout") show("error", "No answer from M-Pesa yet. Check again shortly or resend.");
+    router.refresh();
   }
 
   return (
@@ -134,26 +152,11 @@ export default function OrdersManager({
           onClick={() => setShowDirect(true)}
           className="flex items-center gap-1.5 rounded-lg border border-purple-400/20 bg-purple-400/10 px-3 py-1.5 text-xs font-black text-purple-300 transition-all hover:bg-purple-400/20"
         >
-          <span className="material-symbols-outlined text-sm">add</span> Direct Order
+          <span className="material-symbols-outlined text-sm">send_to_mobile</span> Request Payment
         </button>
       </div>
 
-      {showDirect && (
-        <DirectOrderForm
-          busy={pending}
-          onClose={() => setShowDirect(false)}
-          onSubmit={(input) =>
-            startTransition(async () => {
-              const result = await createDirectOrder(input);
-              if (!result.ok) setError(result.error);
-              else {
-                setShowDirect(false);
-                router.refresh();
-              }
-            })
-          }
-        />
-      )}
+      <RequestPaymentModal open={showDirect} onClose={() => setShowDirect(false)} products={products} />
 
       <div className="overflow-hidden rounded-xl border border-white/5 bg-zinc-900">
         {visible.length === 0 ? (
@@ -184,6 +187,11 @@ export default function OrdersManager({
                           {order.source === "admin_direct" && (
                             <span className="ml-1.5 rounded bg-purple-400/15 px-1 py-0.5 text-[8px] font-black uppercase text-purple-300">
                               direct
+                            </span>
+                          )}
+                          {needsReconciling(order) && (
+                            <span className="ml-1 rounded bg-amber-400/15 px-1 py-0.5 text-[8px] font-black uppercase text-amber-300">
+                              reconcile
                             </span>
                           )}
                         </td>
@@ -247,6 +255,7 @@ export default function OrdersManager({
                                 {stkSending === order.id ? "Sending…" : "Send STK"}
                               </button>
                             )}
+                            <OrderDetailsButton orderId={order.id} />
                             <button
                               type="button"
                               onClick={() =>
@@ -266,6 +275,13 @@ export default function OrdersManager({
                           </div>
                         </td>
                       </tr>
+                      {stkResult[order.id] && (
+                        <tr>
+                          <td colSpan={8} className="px-4 pb-2.5 pt-0">
+                            <StkNotice {...stkResult[order.id]} />
+                          </td>
+                        </tr>
+                      )}
                       {expanded === order.id && (
                         <tr className="bg-zinc-950/60">
                           <td colSpan={8} className="px-6 py-3">
@@ -285,7 +301,14 @@ export default function OrdersManager({
                 <div key={order.id} className="space-y-2 px-4 py-3">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="font-mono text-xs font-bold text-white">{order.id}</p>
+                      <p className="font-mono text-xs font-bold text-white">
+                        {order.id}
+                        {needsReconciling(order) && (
+                          <span className="ml-1.5 rounded bg-amber-400/15 px-1 py-0.5 text-[8px] font-black uppercase text-amber-300">
+                            reconcile
+                          </span>
+                        )}
+                      </p>
                       <p className="text-[11px] text-white/50">{order.customer_name}</p>
                       <p className="text-[10px] text-white/30">{order.phone}</p>
                     </div>
@@ -329,6 +352,7 @@ export default function OrdersManager({
                         </option>
                       ))}
                     </select>
+                    <OrderDetailsButton orderId={order.id} />
                     <DeleteButton
                       busy={pending}
                       onConfirm={() => run(() => deleteOrder(order.id))}
@@ -344,6 +368,7 @@ export default function OrdersManager({
                       {stkSending === order.id ? "Sending M-Pesa prompt…" : "Send M-Pesa STK prompt"}
                     </button>
                   )}
+                  {stkResult[order.id] && <StkNotice {...stkResult[order.id]} />}
                   <OrderItems order={order} />
                 </div>
               ))}
@@ -423,106 +448,16 @@ function DeleteButton({ busy, onConfirm }: { busy: boolean; onConfirm: () => voi
 }
 
 /** Road-sale order form. Replaces the openRequestPaymentModal() flow. */
-function DirectOrderForm({
-  busy,
-  onClose,
-  onSubmit,
-}: {
-  busy: boolean;
-  onClose: () => void;
-  onSubmit: (input: {
-    customerName: string;
-    phone: string;
-    dropPoint: string;
-    total: number;
-    notes?: string;
-  }) => void;
-}) {
-  const [customerName, setCustomerName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [dropPoint, setDropPoint] = useState("Road sale");
-  const [total, setTotal] = useState("");
-  const [notes, setNotes] = useState("");
+const STK_TONES = {
+  info: "border-blue-400/25 bg-blue-400/10 text-blue-200",
+  success: "border-green-400/25 bg-green-400/10 text-green-300",
+  error: "border-red-400/30 bg-red-400/10 text-red-300",
+} as const;
 
-  const inputClass =
-    "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-xs text-white placeholder:text-white/25 focus:border-purple-400/50 focus:outline-none";
-
+function StkNotice({ tone, text }: { tone: keyof typeof STK_TONES; text: string }) {
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit({
-          customerName,
-          phone,
-          dropPoint,
-          total: Number(total),
-          notes: notes || undefined,
-        });
-      }}
-      className="space-y-3 rounded-xl border border-purple-400/20 bg-zinc-900 p-4"
-    >
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-black text-white">New direct order</h3>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded p-1 text-white/40 hover:text-white"
-          aria-label="Close"
-        >
-          <span className="material-symbols-outlined text-base">close</span>
-        </button>
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-2">
-        <input
-          required
-          value={customerName}
-          onChange={(e) => setCustomerName(e.target.value)}
-          placeholder="Customer name"
-          className={inputClass}
-        />
-        <input
-          required
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="07XXXXXXXX"
-          className={inputClass}
-        />
-        <input
-          required
-          value={dropPoint}
-          onChange={(e) => setDropPoint(e.target.value)}
-          placeholder="Drop point"
-          className={inputClass}
-        />
-        <input
-          required
-          type="number"
-          min="1"
-          step="1"
-          value={total}
-          onChange={(e) => setTotal(e.target.value)}
-          placeholder="Amount (KES)"
-          className={inputClass}
-        />
-      </div>
-      <input
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        placeholder="Notes (optional)"
-        className={inputClass}
-      />
-
-      <button
-        type="submit"
-        disabled={busy}
-        className="w-full rounded-lg bg-purple-600 px-4 py-2 text-xs font-black uppercase tracking-widest text-white transition hover:bg-purple-500 disabled:opacity-50"
-      >
-        {busy ? "Creating…" : "Create order"}
-      </button>
-      <p className="text-[10px] text-white/30">
-        Creates an unpaid order you can then charge with an STK push from the order row.
-      </p>
-    </form>
+    <p role={tone === "error" ? "alert" : "status"} className={`rounded-lg border px-2.5 py-1.5 text-[11px] ${STK_TONES[tone]}`}>
+      {text}
+    </p>
   );
 }

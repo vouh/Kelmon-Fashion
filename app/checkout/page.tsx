@@ -1,39 +1,74 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
 import { useAuth } from "@/components/providers/AuthProvider";
+import { useAuthModal } from "@/components/auth/AuthModal";
 import { useCart } from "@/components/providers/CartProvider";
+import { MpesaPayModal, useMpesaPayment } from "@/components/payments/MpesaPayment";
 import { FREE_DELIVERY_THRESHOLD } from "@/lib/cart";
 import { formatKes } from "@/lib/products";
 
-const DROP_POINTS = [
-  "UoN Main Campus — Gate A",
-  "UoN Main Campus — Library plaza",
-  "UoN Kikuyu Campus",
-  "UoN Chiromo Campus",
-];
+/** 2547XXXXXXXX (how profiles store it) → 07XXXXXXXX, the form people type. */
+function displayPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  return digits.startsWith("254") && digits.length === 12 ? `0${digits.slice(3)}` : phone;
+}
 
 const inputClass =
   "w-full h-11 px-3.5 rounded-xl bg-[#faf6fc] dark:bg-surface-container border border-primary/15 text-sm text-on-surface outline-none focus:border-primary transition-colors";
 
+interface StockIssue {
+  productId: string;
+  name: string;
+  available: number;
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
-  const { lines, subtotal, deliveryFee, total, clearCart, itemCount } = useCart();
-  const { ensureSession } = useAuth();
+  const { lines, subtotal, deliveryFee, total, clearCart, itemCount, fitToStock } = useCart();
+  const { ensureSession, user, profile } = useAuth();
+  const { openAuth } = useAuthModal();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [dropPoint, setDropPoint] = useState(DROP_POINTS[0]);
+  const [dropPoint, setDropPoint] = useState("");
   const [payment, setPayment] = useState<"mpesa" | "cod">("mpesa");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mpesaMessage, setMpesaMessage] = useState<string | null>(null);
+  // Set when the server says the cart asks for more than is in stock.
+  const [stockIssue, setStockIssue] = useState<StockIssue | null>(null);
+  // Kept after a failed payment so "Try again" re-charges the same order
+  // instead of opening a duplicate one.
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const { state: payState, pay, reset: resetPay } = useMpesaPayment();
+  const formRef = useRef<HTMLFormElement>(null);
+  // Held separately because a successful payment clears the cart (and total).
+  const [chargedTotal, setChargedTotal] = useState<number | null>(null);
+  const paying = payState.phase === "sending" || payState.phase === "waiting";
 
   const isEmpty = lines.length === 0;
+
+  // Prefill from the signed-in customer's profile once it loads. Only empty
+  // fields are filled, so anything already typed is never overwritten, and it
+  // runs once so clearing a field doesn't make it bounce back.
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (prefilled.current || (!profile && !user)) return;
+    const fullName = profile?.full_name?.trim() || user?.displayName?.trim() || "";
+    const savedPhone = profile?.phone?.trim() || user?.phoneNumber?.trim() || "";
+    const savedDropPoint = profile?.campus?.trim();
+
+    if (fullName) setName((current) => current || fullName);
+    if (savedPhone) setPhone((current) => current || displayPhone(savedPhone));
+    if (savedDropPoint) setDropPoint(savedDropPoint);
+    // Wait for the profile row itself before locking in, since `user` usually
+    // arrives first with less detail.
+    if (profile) prefilled.current = true;
+  }, [profile, user]);
 
   const phoneValid = useMemo(() => {
     const digits = phone.replace(/\D/g, "");
@@ -43,7 +78,8 @@ export default function CheckoutPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-    setMpesaMessage(null);
+    setStockIssue(null);
+    resetPay();
 
     if (isEmpty) {
       setError("Your cart is empty.");
@@ -64,62 +100,67 @@ export default function CheckoutPage() {
       // Refresh the server's cookie first, so an hour-old tab doesn't get a 401
       // from someone who is plainly still signed in.
       if (!(await ensureSession())) {
-        router.push("/signin?next=/checkout");
+        openAuth({ message: "Sign in or create an account to place your order." });
         return;
       }
 
-      const orderRes = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          phone: phone.trim(),
-          dropPoint,
-          payment,
-          notes: notes.trim(),
-          lines,
-          subtotal,
-          deliveryFee,
-          total,
-        }),
-      });
-
-      if (orderRes.status === 401) {
-        router.push("/signin?next=/checkout");
-        return;
-      }
-
-      const orderData = (await orderRes.json()) as { orderId?: string; error?: string };
-      if (!orderRes.ok || !orderData.orderId) {
-        throw new Error(orderData.error ?? "Could not create order");
-      }
-
-      const orderId = orderData.orderId;
-
-      if (payment === "mpesa") {
-        // The amount is read from the order row server-side, so it isn't sent.
-        const stkRes = await fetch("/api/mpesa/stk-push", {
+      let id = orderId;
+      if (!id) {
+        const orderRes = await fetch("/api/orders", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            orderId,
+            name: name.trim(),
             phone: phone.trim(),
+            dropPoint,
+            payment,
+            notes: notes.trim(),
+            lines,
+            subtotal,
+            deliveryFee,
+            total,
           }),
         });
 
-        const stkData = (await stkRes.json()) as { message?: string; error?: string };
-
-        if (!stkRes.ok) {
-          throw new Error(stkData.error ?? "M-Pesa STK push failed");
+        if (orderRes.status === 401) {
+          openAuth({ message: "Your session expired. Sign in again to place your order." });
+          return;
         }
 
-        setMpesaMessage(stkData.message ?? "Check your phone for the M-Pesa prompt.");
+        const orderData = (await orderRes.json()) as {
+          orderId?: string;
+          error?: string;
+          stockIssue?: StockIssue;
+        };
+        if (orderData.stockIssue) setStockIssue(orderData.stockIssue);
+        if (!orderRes.ok || !orderData.orderId) {
+          throw new Error(orderData.error ?? "Could not create order");
+        }
+        id = orderData.orderId;
+        setOrderId(id);
       }
 
-      // Orders now live in Supabase, so /orders reads them from there rather
-      // than from a localStorage mirror.
+      if (payment === "mpesa") {
+        // The amount is read from the order row server-side, so it isn't sent.
+        // Only a confirmed payment clears the cart; on failure the customer
+        // stays here with the reason and can try again.
+        setChargedTotal(total);
+        const outcome = await pay(id, phone.trim());
+        if (outcome === "failed") {
+          setSubmitting(false);
+          return;
+        }
+        if (outcome === "timeout") {
+          // The cart is cleared when they follow the link to their orders;
+          // clearing it here would swap this message for the empty-cart view.
+          setSubmitting(false);
+          return;
+        }
+        if (outcome === "cancelled") return;
+      }
+
       clearCart();
-      router.push(`/orders?placed=${encodeURIComponent(orderId)}`);
+      router.push(`/orders?placed=${encodeURIComponent(id)}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed");
       setSubmitting(false);
@@ -158,6 +199,7 @@ export default function CheckoutPage() {
           </div>
         ) : (
           <form
+            ref={formRef}
             onSubmit={onSubmit}
             className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 lg:gap-8"
           >
@@ -191,17 +233,13 @@ export default function CheckoutPage() {
                 </label>
                 <label className="block space-y-1.5">
                   <span className="text-xs text-on-surface-variant">Drop point</span>
-                  <select
+                  <input
+                    required
                     value={dropPoint}
                     onChange={(e) => setDropPoint(e.target.value)}
+                    placeholder="Enter your preferred delivery or pickup location"
                     className={inputClass}
-                  >
-                    {DROP_POINTS.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </label>
                 <label className="block space-y-1.5">
                   <span className="text-xs text-on-surface-variant">Notes (optional)</span>
@@ -262,14 +300,24 @@ export default function CheckoutPage() {
               </fieldset>
 
               {error && (
-                <p role="alert" className="text-sm text-error">
-                  {error}
-                </p>
-              )}
-              {mpesaMessage && (
-                <p role="status" className="text-sm text-[#C5A059]">
-                  {mpesaMessage}
-                </p>
+                <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-error">
+                  <p>{error}</p>
+                  {stockIssue && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        fitToStock(stockIssue.productId, stockIssue.available);
+                        setStockIssue(null);
+                        setError(null);
+                      }}
+                      className="h-9 px-4 rounded-full bg-primary text-white text-[11px] font-semibold uppercase tracking-wider hover:bg-[#7a3a96]"
+                    >
+                      {stockIssue.available > 0
+                        ? `Change to ${stockIssue.available} and continue`
+                        : "Remove it from my cart"}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
 
@@ -328,20 +376,32 @@ export default function CheckoutPage() {
 
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || paying || payState.phase === "timeout"}
                   className="w-full h-11 rounded-full bg-primary hover:bg-[#7a3a96] text-white text-[11px] font-semibold uppercase tracking-[0.12em] disabled:opacity-60 transition-colors"
                 >
-                  {submitting
-                    ? "Processing…"
-                    : payment === "mpesa"
-                      ? "Pay with M-Pesa"
-                      : "Place order"}
+                  {paying
+                    ? "Waiting for M-Pesa…"
+                    : submitting
+                      ? "Processing…"
+                      : payState.phase === "failed"
+                        ? "Try again"
+                        : payment === "mpesa"
+                          ? "Pay with M-Pesa"
+                          : "Place order"}
                 </button>
               </div>
             </aside>
           </form>
         )}
       </main>
+      <MpesaPayModal
+        state={payState}
+        amount={chargedTotal ?? undefined}
+        phone={phone.trim()}
+        onClose={resetPay}
+        onRetry={() => formRef.current?.requestSubmit()}
+        onOrdersClick={clearCart}
+      />
     </AppShell>
   );
 }

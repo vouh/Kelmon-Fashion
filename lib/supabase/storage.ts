@@ -63,8 +63,9 @@ export function publicUrl(bucket: Bucket, path: string): string {
 /**
  * Uploads one file and returns its public URL.
  *
- * `cacheControl` is a year because the path carries a timestamp, so an object is
- * never rewritten — a changed image is a new path.
+ * `cacheControl` is a year because the path carries a
+ * timestamp, so an object is never rewritten — a changed image is a new path.
+ * Browsers therefore fetch each photo once and serve it from cache afterwards.
  */
 export async function uploadTo(bucket: Bucket, path: string, file: File): Promise<string> {
   assertUploadable(file, bucket);

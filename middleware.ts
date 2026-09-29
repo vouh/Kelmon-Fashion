@@ -2,8 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ID_TOKEN_COOKIE, SESSION_COOKIE, peekIdToken } from "@/lib/firebase/cookie";
 
 /**
- * First-pass gate for /admin, plus the redirect away from /signin for users who
- * are already signed in.
+ * First-pass gate for /admin. Signed-out visitors are sent to the shop with the
+ * sign-in modal open (`?auth=signin&next=…`).
  *
  * **Not the authorisation boundary.** Middleware runs on the Edge runtime,
  * where the Firebase Admin SDK cannot load, so the token is only decoded here,
@@ -30,11 +30,12 @@ export function middleware(request: NextRequest) {
   if (pathname.startsWith("/admin")) {
     if (!signedIn) {
       // Includes the expired-token case: the client holds a Firebase refresh
-      // token, so /signin can mint a new ID token and send the user straight
-      // back to where they were headed.
+      // token, so the sign-in modal can mint a new ID token and send the user
+      // straight back to where they were headed.
       const redirect = request.nextUrl.clone();
-      redirect.pathname = "/signin";
+      redirect.pathname = "/shop";
       redirect.search = "";
+      redirect.searchParams.set("auth", "signin");
       redirect.searchParams.set("next", pathname);
       return NextResponse.redirect(redirect);
     }
@@ -47,17 +48,14 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(redirect);
     }
   }
-
-  // Signed-in users have no reason to see the sign-in page. Admins land on the
-  // dashboard; everyone else on their account. Only on a real navigation: the
-  // router.refresh() AuthProvider fires right after sign-in is an RSC fetch,
-  // and redirecting it would yank an admin off the "where to?" prompt.
-  if (pathname === "/signin" && signedIn && request.headers.get("RSC") !== "1") {
-    const next = request.nextUrl.searchParams.get("next");
+  // The account page has nothing to show a signed-out visitor, so open the
+  // sign-in modal over the shop instead of rendering an empty "sign in" page.
+  if (pathname === "/profile" && !signedIn) {
     const redirect = request.nextUrl.clone();
-    redirect.pathname =
-      next?.startsWith("/") && !next.startsWith("//") ? next : token.admin ? "/admin" : "/profile";
+    redirect.pathname = "/shop";
     redirect.search = "";
+    redirect.searchParams.set("auth", "signin");
+    redirect.searchParams.set("next", "/profile");
     return NextResponse.redirect(redirect);
   }
 

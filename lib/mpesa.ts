@@ -117,6 +117,31 @@ function password(shortcode: string, passkey: string, ts: string): string {
   return Buffer.from(`${shortcode}${passkey}${ts}`).toString("base64");
 }
 
+/**
+ * Safaricom sometimes accepts a connection and then never answers. Without a
+ * limit the request hangs until the platform kills it, and the customer (or
+ * admin) watches "Sending prompt…" forever. 25s is well past a normal reply.
+ */
+const SAFARICOM_TIMEOUT_MS = 25_000;
+
+async function safaricomFetch(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, {
+      ...init,
+      cache: "no-store",
+      signal: AbortSignal.timeout(SAFARICOM_TIMEOUT_MS),
+    });
+  } catch (err) {
+    const timedOut = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
+    throw new MpesaError(
+      timedOut
+        ? "M-Pesa took too long to respond. Please try again."
+        : "Could not reach M-Pesa. Please try again.",
+      err instanceof Error ? err.message : String(err)
+    );
+  }
+}
+
 export class MpesaError extends Error {
   constructor(
     message: string,
@@ -134,9 +159,8 @@ export async function getMpesaAccessToken(): Promise<string> {
 
   const auth = Buffer.from(`${creds.consumerKey}:${creds.consumerSecret}`).toString("base64");
 
-  const res = await fetch(`${getBaseUrl()}/oauth/v1/generate?grant_type=client_credentials`, {
+  const res = await safaricomFetch(`${getBaseUrl()}/oauth/v1/generate?grant_type=client_credentials`, {
     headers: { Authorization: `Basic ${auth}` },
-    cache: "no-store",
   });
 
   const text = await res.text();
@@ -211,14 +235,13 @@ export async function initiateStkPush(params: {
     TransactionDesc: `Kelmon order ${params.orderId}`.slice(0, TRANSACTION_DESC_MAX),
   };
 
-  const res = await fetch(`${getBaseUrl()}/mpesa/stkpush/v1/processrequest`, {
+  const res = await safaricomFetch(`${getBaseUrl()}/mpesa/stkpush/v1/processrequest`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
-    cache: "no-store",
   });
 
   const text = await res.text();
@@ -240,4 +263,76 @@ export async function initiateStkPush(params: {
   }
 
   return data as unknown as StkPushResult;
+}
+
+/**
+ * Plain-language reasons for Safaricom's STK ResultCodes, shown to customers
+ * and stored in payment_failures. Unknown codes fall back to Safaricom's own
+ * ResultDesc.
+ */
+const FAILURE_REASONS: Record<number, string> = {
+  1: "Insufficient M-Pesa balance to complete the payment.",
+  17: "M-Pesa declined the payment. Please try again in a moment.",
+  26: "M-Pesa is busy right now. Please try again in a moment.",
+  1001: "Another M-Pesa transaction is already in progress on this phone. Finish it, then try again.",
+  1019: "The payment request expired before it was completed.",
+  1025: "We couldn't send the M-Pesa prompt to your phone. Please try again.",
+  1032: "You cancelled the M-Pesa prompt.",
+  1037: "No response from your phone — the M-Pesa prompt timed out. Make sure your phone is on and unlocked.",
+  2001: "Wrong M-Pesa PIN entered. Please try again with the correct PIN.",
+  2006: "Insufficient M-Pesa balance to complete the payment.",
+  2028: "This payment isn't allowed on the store's M-Pesa account. Please contact us.",
+  8006: "Your M-Pesa PIN is locked after too many wrong attempts. Dial *334# or call Safaricom to unlock it.",
+  9999: "We couldn't send the M-Pesa prompt to your phone. Please try again.",
+};
+
+export function mpesaFailureReason(code: number | null | undefined, desc?: string | null): string {
+  if (code !== null && code !== undefined && FAILURE_REASONS[code]) return FAILURE_REASONS[code];
+  return desc?.trim() || "The M-Pesa payment did not go through.";
+}
+
+export type StkQueryResult =
+  | { state: "pending" }
+  | { state: "paid"; resultCode: 0; resultDesc: string }
+  | { state: "failed"; resultCode: number; resultDesc: string };
+
+/**
+ * Asks Safaricom for the outcome of an STK push. Used as a fallback when the
+ * callback is late or lost, so an order never sits in awaiting_mpesa forever.
+ * Safaricom answers an in-flight request with an error body
+ * ("The transaction is being processed"), which maps to `pending`.
+ */
+export async function queryStkPush(checkoutRequestId: string): Promise<StkQueryResult> {
+  const creds = getCredentials();
+  if (!creds) throw new MpesaError("M-Pesa is not configured");
+
+  const ts = timestamp();
+  const token = await getMpesaAccessToken();
+
+  const res = await safaricomFetch(`${getBaseUrl()}/mpesa/stkpushquery/v1/query`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      BusinessShortCode: creds.shortcode,
+      Password: password(creds.shortcode, creds.passkey, ts),
+      Timestamp: ts,
+      CheckoutRequestID: checkoutRequestId,
+    }),
+  });
+
+  let data: Record<string, unknown>;
+  try {
+    data = (await res.json()) as Record<string, unknown>;
+  } catch {
+    return { state: "pending" };
+  }
+
+  if (data.ResultCode === undefined || data.ResultCode === null) {
+    return { state: "pending" };
+  }
+
+  const resultCode = Number(data.ResultCode);
+  const resultDesc = String(data.ResultDesc ?? "");
+  if (resultCode === 0) return { state: "paid", resultCode: 0, resultDesc };
+  return { state: "failed", resultCode, resultDesc };
 }

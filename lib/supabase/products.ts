@@ -8,6 +8,10 @@ import type { ProductRow } from "@/lib/supabase/types";
  * empty storefront means an empty table, and the fix is to add products in
  * /admin/products.
  *
+ * Storefront reads skip sold-out products (stock 0) as well as hidden ones, so
+ * a depleted item disappears from the shop until it's restocked. The product
+ * page itself still loads, and shows it as sold out.
+ *
  * Every function degrades to an empty result when Supabase is unconfigured, so
  * the storefront renders (empty) instead of crashing on a fresh clone.
  */
@@ -23,6 +27,7 @@ export async function getProducts(options?: {
     .from("products")
     .select("*")
     .eq("active", true)
+      .gt("stock", 0)
     .order("created_at", { ascending: false });
 
   if (options?.category && options.category !== "All") {
@@ -59,6 +64,7 @@ export async function getFeaturedProducts(limit = 6): Promise<Product[]> {
       .from("products")
       .select("*")
       .eq("active", true)
+      .gt("stock", 0)
       .not("badge", "is", null)
       .order("rating", { ascending: false })
       .limit(limit));
@@ -126,6 +132,7 @@ export async function getRelatedProducts(
       .from("products")
       .select("*")
       .eq("active", true)
+      .gt("stock", 0)
       .eq("category", product.category)
       .neq("id", product.id)
       .limit(limit));
@@ -139,30 +146,6 @@ export async function getRelatedProducts(
     return [];
   }
   return (data ?? []).map(productFromRow);
-}
-
-/** Distinct categories that actually have active products. */
-export async function getCategories(): Promise<string[]> {
-  if (!isSupabaseConfigured()) return [];
-  const supabase = await createClient();
-
-  let data: Pick<ProductRow, "category">[] | null;
-  let error: { message: string } | null;
-  try {
-    ({ data, error } = await supabase
-      .from("products")
-      .select("category")
-      .eq("active", true));
-  } catch (fetchError) {
-    console.warn("[products] getCategories request unavailable", fetchError);
-    return [];
-  }
-
-  if (error) {
-    console.warn("[products] getCategories:", error.message);
-    return [];
-  }
-  return [...new Set((data ?? []).map((r) => r.category))].sort();
 }
 
 /** Admin view: includes inactive products. Relies on RLS for authorisation. */

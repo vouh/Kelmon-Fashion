@@ -8,6 +8,11 @@ export interface CartLine {
   quantity: number;
   variant?: string;
   category: string;
+  /**
+   * Stock when the item was added. A convenience cap for the cart's + buttons
+   * only; /api/orders re-checks against the live row before anything is paid.
+   */
+  stock?: number;
 }
 
 export function cartLineKey(productId: string, variant?: string): string {
@@ -23,7 +28,15 @@ export function lineFromProduct(product: Product, quantity: number, variant?: st
     quantity,
     variant,
     category: product.category,
+    stock: product.stock,
   };
+}
+
+/** Units of a product across all its lines (sizes/colours share one stock). */
+export function quantityOfProduct(lines: CartLine[], productId: string, exceptKey?: string): number {
+  return lines
+    .filter((l) => l.productId === productId && cartLineKey(l.productId, l.variant) !== exceptKey)
+    .reduce((sum, l) => sum + l.quantity, 0);
 }
 
 export function cartSubtotal(lines: CartLine[]): number {
@@ -41,19 +54,4 @@ export const DELIVERY_FEE = 150;
 export function deliveryFeeFor(subtotal: number): number {
   if (subtotal <= 0) return 0;
   return subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE;
-}
-
-export function getVariantOptions(category: string): { label: string; options: string[] } | null {
-  switch (category) {
-    case "Perfumes":
-      return { label: "Size", options: ["30ml", "50ml", "100ml"] };
-    case "Bags":
-      return { label: "Color", options: ["Black", "Brown", "Cream"] };
-    case "Fashion":
-      return { label: "Size", options: ["S", "M", "L"] };
-    case "Nails":
-      return { label: "Kit", options: ["Nude", "Bold", "Classic"] };
-    default:
-      return null;
-  }
 }
