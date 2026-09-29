@@ -626,10 +626,49 @@ export async function upsertHomepageDrop(input: {
     } else {
       const { data, error: listError } = await supabase.from("homepage_drops").select("sort_order");
       if (listError) throw new Error(listError.message);
+      if ((data ?? []).length >= 4) {
+        throw new Error("All four Just Dropped slots are already filled. Edit or remove a slot first.");
+      }
       const sortOrder = Math.max(0, ...(data ?? []).map((r) => r.sort_order)) + 1;
       const { error } = await supabase.from("homepage_drops").insert({ ...row, sort_order: sortOrder });
       if (error) throw new Error(error.message);
     }
+
+    revalidatePath("/home");
+    revalidatePath("/admin/homepage-drops");
+    return ok();
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function moveHomepageDrop(id: string, direction: "up" | "down"): Promise<ActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    const dropId = validUuid(id);
+    const parsedDirection = z.enum(["up", "down"]).safeParse(direction);
+    if (!parsedDirection.success) throw new Error("Invalid move direction.");
+
+    const { data, error } = await supabase
+      .from("homepage_drops")
+      .select("id, sort_order")
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    const rows = data ?? [];
+    const index = rows.findIndex((row) => row.id === dropId);
+    const nextIndex = parsedDirection.data === "up" ? index - 1 : index + 1;
+    if (index < 0 || nextIndex < 0 || nextIndex >= rows.length) return ok();
+
+    const current = rows[index];
+    const adjacent = rows[nextIndex];
+    const temporaryOrder = -Date.now();
+    const first = await supabase.from("homepage_drops").update({ sort_order: temporaryOrder }).eq("id", current.id);
+    if (first.error) throw new Error(first.error.message);
+    const second = await supabase.from("homepage_drops").update({ sort_order: current.sort_order }).eq("id", adjacent.id);
+    if (second.error) throw new Error(second.error.message);
+    const third = await supabase.from("homepage_drops").update({ sort_order: adjacent.sort_order }).eq("id", current.id);
+    if (third.error) throw new Error(third.error.message);
 
     revalidatePath("/home");
     revalidatePath("/admin/homepage-drops");

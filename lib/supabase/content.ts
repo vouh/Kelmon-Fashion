@@ -118,7 +118,32 @@ export async function getHomepageDrops(activeOnly = true): Promise<HomepageDropR
     if (error.code !== "PGRST205") console.error("[content] getHomepageDrops:", error.message);
     return [];
   }
-  return data ?? [];
+  const drops = data ?? [];
+  if (!activeOnly) return drops;
+
+  // Drops linked to a product show its live name, price and category, and are
+  // left out while that product is unpublished or sold out — so the homepage
+  // never links to something a customer can't buy.
+  const linkedIds = [...new Set(drops.map((d) => d.product_id).filter((id): id is string => Boolean(id)))];
+  if (linkedIds.length === 0) return drops;
+  const { data: products } = await supabase
+    .from("products")
+    .select("id, name, price, category, images, active, stock")
+    .in("id", linkedIds);
+  const live = new Map((products ?? []).map((p) => [p.id, p]));
+
+  return drops.flatMap((drop) => {
+    if (!drop.product_id) return [drop];
+    const product = live.get(drop.product_id);
+    if (!product || !product.active || product.stock <= 0) return [];
+    return [{
+      ...drop,
+      name: product.name,
+      price: Number(product.price),
+      category: product.category,
+      image: product.images?.[0] ?? drop.image,
+    }];
+  });
 }
 
 // ── Updates ─────────────────────────────────────────────────────────────────
