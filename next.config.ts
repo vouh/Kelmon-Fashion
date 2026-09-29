@@ -29,6 +29,9 @@ const nextConfig: NextConfig = {
   },
   // Hide the Next.js "N" / DevTools bubble in the corner
   devIndicators: false,
+  // Lets a production build run beside `next dev` without clobbering its .next
+  // folder (NEXT_BUILD_DIR=.next-build npm run build). Unset on Vercel.
+  distDir: process.env.NEXT_BUILD_DIR || ".next",
   // The site opens on the shop; the editorial home page lives at /home.
   // Sign-in is a modal now, so old /signin links open it over the shop
   // (query params such as ?next= pass through).

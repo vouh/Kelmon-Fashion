@@ -1,6 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { isOrderId } from "@/lib/order-ids";
+import { nextOrderId } from "@/lib/supabase/orders";
+import { after } from "next/server";
+import { sendManualPaymentEmails, sendNewOrderAlert } from "@/lib/email/alerts";
 import { createClient, isAdmin } from "@/lib/supabase/server";
 import type {
   OrderItemRow,
@@ -68,9 +73,9 @@ function validUuid(id: unknown): string {
   return id;
 }
 
-/** Order ids are the human-readable KM-XXXXX form from createOrderId(). */
+/** Order ids: P001-20260930-01, or the older KM-XXXXX form (lib/order-ids.ts). */
 function validOrderId(id: unknown): string {
-  if (typeof id !== "string" || !/^KM-[A-Z0-9]{4,20}$/.test(id)) {
+  if (!isOrderId(id)) {
     throw new Error("Invalid order id.");
   }
   return id;
@@ -102,11 +107,19 @@ export async function updatePaymentStatus(
   try {
     const supabase = await requireAdmin();
     const id = validOrderId(orderId);
-    const { error } = await supabase
+    // Only the unpaid -> paid transition sends receipts, so re-saving an
+    // already-paid order doesn't email anyone twice.
+    const { data: changed, error } = await supabase
       .from("orders")
       .update({ payment_status: paymentStatus })
-      .eq("id", id);
+      .eq("id", id)
+      .neq("payment_status", paymentStatus)
+      .select("id")
+      .maybeSingle();
     if (error) throw new Error(error.message);
+    if (changed && paymentStatus === "paid") {
+      after(() => sendManualPaymentEmails(id));
+    }
     revalidatePath("/admin/orders");
     revalidatePath("/admin/transactions");
     revalidatePath("/admin");
@@ -222,7 +235,10 @@ export async function createDirectOrder(input: {
       product = data;
     }
 
-    const orderId = `KM-${Date.now().toString(36).toUpperCase()}`;
+    const orderId = await nextOrderId(
+      supabase,
+      item ? [{ productId: item.productId ?? null, price: item.price, quantity: item.quantity }] : []
+    );
 
     const { error } = await supabase.from("orders").insert({
       id: orderId,
@@ -261,6 +277,19 @@ export async function createDirectOrder(input: {
       }
     }
 
+    after(() =>
+      sendNewOrderAlert({
+        id: orderId,
+        customerName: order.customerName,
+        phone: order.phone,
+        dropPoint: order.dropPoint,
+        paymentMethod: "mpesa",
+        total: order.total,
+        lines: item ? [{ name: item.name, quantity: item.quantity, price: item.price }] : [],
+        source: "admin_direct",
+      })
+    );
+
     revalidatePath("/admin/orders");
     revalidatePath("/admin");
     return { ok: true, orderId };
@@ -293,6 +322,7 @@ export async function upsertProduct(input: ProductInput): Promise<ActionResult> 
       description: product.description ?? null,
       price: product.price,
       original_price: product.originalPrice ?? null,
+      gender: product.gender,
       category: product.category,
       images: product.images,
       sizes: product.sizes,
@@ -643,6 +673,68 @@ export async function deleteReview(id: string): Promise<ActionResult> {
     const { error } = await supabase.from("reviews").delete().eq("id", validUuid(id));
     if (error) throw new Error(error.message);
     revalidatePath("/admin/reviews");
+    return ok();
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+// ── Product code letters (Products → Settings) ──────────────────────────────
+
+const codeLetterSchema = z.object({
+  letter: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z]$/, "Use a single letter, A to Z."),
+  category: z.string().trim().min(1, "Choose a category.").max(60),
+});
+
+/**
+ * Gives a category its code letter. Products already in that category are
+ * coded straight away, oldest first; new ones get the next number when saved.
+ */
+export async function createCodeLetter(input: { letter: string; category: string }): Promise<ActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    const parsed = codeLetterSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the form." };
+
+    const { error } = await supabase.from("code_prefixes").insert({
+      letter: parsed.data.letter,
+      category: parsed.data.category,
+    });
+    if (error) {
+      if (error.code === "23505") {
+        return {
+          ok: false,
+          error: error.message.includes("category")
+            ? `"${parsed.data.category}" already has a letter.`
+            : `Letter ${parsed.data.letter} is already taken.`,
+        };
+      }
+      throw new Error(error.message);
+    }
+
+    revalidatePath("/admin/products/settings");
+    revalidatePath("/admin/products");
+    return ok();
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/** Removes a letter that has never been used. The database refuses a used one. */
+export async function deleteCodeLetter(letter: string): Promise<ActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    const parsed = codeLetterSchema.shape.letter.safeParse(letter);
+    if (!parsed.success) return { ok: false, error: "Invalid letter." };
+
+    const { error } = await supabase.from("code_prefixes").delete().eq("letter", parsed.data);
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/admin/products/settings");
     return ok();
   } catch (err) {
     return fail(err);

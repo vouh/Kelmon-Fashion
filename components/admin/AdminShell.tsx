@@ -2,9 +2,13 @@
 
 import { useState, type CSSProperties } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import adminLogoDark from "@/images/admin-logo-dark.png";
+import adminLogoLight from "@/images/admin-logo-light.png";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/AuthProvider";
 import ThemeToggle from "@/components/layout/ThemeToggle";
+import AdminSearch from "@/components/admin/AdminSearch";
 import { useAdminBadges, type AdminBadges } from "@/components/admin/useAdminBadges";
 
 /**
@@ -23,6 +27,8 @@ interface NavPage {
   color?: string;
   /** Which unread count, if any, shows as a badge on this item. */
   badge?: keyof AdminBadges;
+  /** Hidden from admins who aren't super admins (the page itself also checks). */
+  superAdminOnly?: boolean;
 }
 
 const PAGES: NavPage[] = [
@@ -34,6 +40,7 @@ const PAGES: NavPage[] = [
   { href: "/admin/updates", icon: "campaign", label: "Updates", color: "text-blue-400" },
   { href: "/admin/reviews", icon: "star", label: "Reviews", color: "text-amber-300" },
   { href: "/admin/transactions", icon: "payments", label: "Payments", color: "text-green-400" },
+  { href: "/admin/accounts", icon: "group", label: "Accounts", color: "text-pink-300", superAdminOnly: true },
   {
     href: "/admin/notifications",
     icon: "notifications",
@@ -123,6 +130,7 @@ export default function AdminShell({
           {title}
         </span>
         <div className="flex items-center gap-1">
+          <AdminSearch superAdmin={isSuperAdmin} variant="mobile" />
           <Link
             href="/profile"
             aria-label="Open user dashboard"
@@ -141,22 +149,30 @@ export default function AdminShell({
         }`}
       >
         <div className={`flex items-center gap-2.5 border-b border-white/5 px-3 py-3 ${sidebarCollapsed ? "md:justify-center" : ""}`}>
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-purple-400/30 bg-purple-400/15 text-[11px] font-black text-purple-300">
-            K
-          </span>
-          <div className={sidebarCollapsed ? "md:hidden" : ""}>
-            <p className="text-xs font-black leading-none text-white">Kelmon</p>
-            <p className="mt-0.5 text-[8px] font-black uppercase tracking-widest text-purple-400/60">
-              Admin Panel
-            </p>
-          </div>
+          <Link href="/admin" aria-label="Kelmon admin home" className="flex min-w-0 flex-col items-start">
+            {/* Collapsed sidebar: the bottle mark; expanded: the full wordmark. */}
+            <Image
+              src="/icons/icon-192.png"
+              alt=""
+              width={32}
+              height={32}
+              className={`h-8 w-8 rounded-lg ${sidebarCollapsed ? "md:block" : "md:hidden"} hidden`}
+            />
+            <span className={`block ${sidebarCollapsed ? "md:hidden" : ""}`}>
+              <Image src={adminLogoLight} alt="Kelmon" className="h-10 w-auto dark:hidden" priority />
+              <Image src={adminLogoDark} alt="Kelmon" className="hidden h-10 w-auto dark:block" priority />
+              <span className="mt-1 block text-[8px] font-black uppercase tracking-widest text-purple-400/70">
+                Admin Panel
+              </span>
+            </span>
+          </Link>
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
           <p className={`mb-1.5 mt-1 px-2 text-[8px] font-black uppercase tracking-widest text-white/20 ${sidebarCollapsed ? "md:hidden" : ""}`}>
             Navigation
           </p>
-          {PAGES.map((page) => {
+          {PAGES.filter((page) => !page.superAdminOnly || isSuperAdmin).map((page) => {
             const active = page.href === activeHref;
             return (
               <Link
@@ -244,11 +260,7 @@ export default function AdminShell({
                 {sidebarCollapsed ? "menu" : "menu_open"}
               </span>
             </button>
-            <label className="admin-command-search">
-              <span className="material-symbols-outlined text-[18px]">search</span>
-              <input aria-label="Search admin pages" placeholder="Search pages…" />
-              <kbd>Ctrl K</kbd>
-            </label>
+            <AdminSearch superAdmin={isSuperAdmin} />
           </div>
 
           <div className="ml-auto flex items-center gap-3">

@@ -11,6 +11,8 @@ import { useToast } from "@/components/ui/Toast";
 import { useAuthModal } from "@/components/auth/AuthModal";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import logo from "@/lib/logo";
+import PasswordRules from "@/components/auth/PasswordRules";
+import { passwordProblem } from "@/lib/validation/credentials";
 
 type Status = "checking" | "ready" | "invalid";
 
@@ -25,6 +27,8 @@ function ResetPasswordForm() {
   const { openAuth } = useAuthModal();
 
   const oobCode = params.get("oobCode");
+  /** Invite links reuse the reset flow; only the wording and landing page differ. */
+  const invite = params.get("mode") === "invite";
 
   const [status, setStatus] = useState<Status>("checking");
   const [email, setEmail] = useState("");
@@ -67,6 +71,11 @@ function ResetPasswordForm() {
     if (!oobCode) return;
     setError(null);
 
+    const problem = passwordProblem(password);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     if (password !== confirm) {
       setError("The passwords don't match.");
       return;
@@ -82,12 +91,12 @@ function ResetPasswordForm() {
     }
 
     try {
-      await signInWithEmail(email, password);
-      toast("Password updated. Welcome back!");
-      router.push("/profile");
+      const result = await signInWithEmail(email, password);
+      toast(invite ? "You're all set. Welcome to Kelmon!" : "Password updated. Welcome back!");
+      router.push(result.admin ? "/admin" : "/profile");
       router.refresh();
     } catch {
-      toast("Password updated. Please sign in.");
+      toast("Password saved. Please sign in.");
       openAuth({ next: "/profile" });
     }
   }
@@ -101,10 +110,14 @@ function ResetPasswordForm() {
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/15 bg-white shadow-lg shadow-primary/10 dark:bg-surface-container">
           <Image src={logo} alt="Kelmon" width={54} height={54} className="h-12 w-12 object-contain" />
         </div>
-        <h1 className="mt-5 font-display-md text-3xl text-on-surface sm:text-4xl">Choose a new password</h1>
+        <h1 className="mt-5 font-display-md text-3xl text-on-surface sm:text-4xl">
+          {invite ? "Set up your account" : "Choose a new password"}
+        </h1>
         <p className="mt-2 max-w-sm text-body-md leading-relaxed text-on-surface-variant">
           {status === "ready"
-            ? <>For <strong className="text-on-surface">{email}</strong></>
+            ? invite
+              ? <>Create a password for <strong className="text-on-surface">{email}</strong> to finish joining Kelmon.</>
+              : <>For <strong className="text-on-surface">{email}</strong></>
             : status === "checking"
               ? "Checking your reset link…"
               : "This link can't be used."}
@@ -124,22 +137,25 @@ function ResetPasswordForm() {
       {status === "ready" && (
         <form onSubmit={handleSubmit} className="relative mt-6 space-y-4">
           <label className="block">
-            <span className="mb-1.5 flex items-center justify-between text-sm font-semibold text-on-surface">
-              <span>New password</span>
-              <span className="font-normal text-on-surface-variant">6+ characters</span>
+            <span className="mb-1.5 block text-sm font-semibold text-on-surface">
+              {invite ? "Create a password" : "New password"}
             </span>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="new-password" minLength={6} required className={inputClass} />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="new-password" minLength={8} maxLength={128} required className={inputClass} />
           </label>
+          <PasswordRules password={password} className="px-1" />
           <label className="block">
-            <span className="mb-1.5 block text-sm font-semibold text-on-surface">Confirm new password</span>
-            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="••••••••" autoComplete="new-password" minLength={6} required className={inputClass} />
+            <span className="mb-1.5 block text-sm font-semibold text-on-surface">Confirm password</span>
+            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="••••••••" autoComplete="new-password" minLength={8} maxLength={128} required className={inputClass} />
+            {confirm && confirm !== password && (
+              <span className="mt-1.5 block text-xs text-error">The passwords don&apos;t match yet.</span>
+            )}
           </label>
           <button
             type="submit"
             disabled={busy}
             className="group mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-4 font-button-text text-button-text text-on-primary shadow-lg shadow-primary/25 transition hover:-translate-y-0.5 hover:bg-primary/90 disabled:opacity-60"
           >
-            {busy ? "Saving…" : "Save and sign in"}
+            {busy ? "Saving…" : invite ? "Create password and sign in" : "Save and sign in"}
             <span className="material-symbols-outlined text-lg transition-transform group-hover:translate-x-1">arrow_forward</span>
           </button>
         </form>

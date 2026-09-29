@@ -6,6 +6,7 @@ import { EmptyState, formatDateTime } from "@/components/admin/ui";
 import { createDeal, deleteDeal } from "@/app/admin/actions";
 import { uploadDealImage } from "@/lib/supabase/storage";
 import type { DealRow } from "@/lib/supabase/types";
+import { searchAnchor } from "@/lib/admin-search";
 
 const inputClass =
   "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-xs text-white placeholder:text-white/25 focus:border-purple-400/50 focus:outline-none";
@@ -157,7 +158,7 @@ export default function DealsManager({ deals }: { deals: DealRow[] }) {
         ) : (
           <ul className="divide-y divide-white/5">
             {deals.map((deal) => (
-              <li key={deal.id} className="flex items-start gap-3 px-4 py-3">
+              <li key={deal.id} id={searchAnchor("deal", deal.id)} className="flex items-start gap-3 px-4 py-3">
                 <span className="material-symbols-outlined mt-0.5 text-base text-amber-400">
                   local_offer
                 </span>

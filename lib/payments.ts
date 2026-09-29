@@ -1,11 +1,10 @@
 import "server-only";
 
-import { getEmailSettings, resend } from "@/lib/email/resend";
 import { configuredSiteOrigin, paymentFailedEmail, paymentReceivedEmail } from "@/lib/email/templates";
 import { mpesaFailureReason } from "@/lib/mpesa";
 import { awardLoyaltyPoints } from "@/lib/supabase/orders";
 import { createServiceClient } from "@/lib/supabase/server";
-import { getContactRecipients } from "@/lib/supabase/admin-inbox";
+import { sendEmailSafely, sendPaymentReceivedAlert } from "@/lib/email/alerts";
 
 /**
  * The single place an M-Pesa outcome is applied to an order, shared by the
@@ -31,26 +30,6 @@ async function customerEmail(userId: string | null): Promise<string | null> {
     .eq("id", userId)
     .maybeSingle();
   return data?.email ?? null;
-}
-
-/** Best effort: a failed email must never fail the payment bookkeeping. */
-async function sendEmail(to: string | null, message: { subject: string; text: string; html: string }) {
-  const settings = getEmailSettings();
-  if (!to || !resend || !settings.from) return;
-  try {
-    const { error } = await resend.emails.send({ from: settings.from, to, ...message });
-    if (error) console.error("[payments] email failed:", error);
-  } catch (err) {
-    console.error("[payments] email failed:", err);
-  }
-}
-
-async function sendPaymentEmails(
-  customer: string | null,
-  message: { subject: string; text: string; html: string }
-) {
-  const recipients = new Set([customer, ...(await getContactRecipients())].filter(Boolean) as string[]);
-  await Promise.all([...recipients].map((email) => sendEmail(email, message)));
 }
 
 /**
@@ -171,10 +150,16 @@ export async function applyPaymentSuccess(
   // Idempotent inside Postgres, so a duplicate callback cannot double-award.
   await awardLoyaltyPoints(order.id);
 
-  await sendPaymentEmails(
-    await customerEmail(order.user_id),
-    paymentReceivedEmail({ id: order.id, total: Number(order.total), receipt: details.receipt }, siteUrl())
-  );
+  // The customer gets their receipt; the shop's alert list and super admins
+  // get a "payment received" email. Both best effort.
+  await Promise.all([
+    sendEmailSafely(
+      await customerEmail(order.user_id),
+      paymentReceivedEmail({ id: order.id, total: Number(order.total), receipt: details.receipt }, siteUrl()),
+      "payments"
+    ),
+    sendPaymentReceivedAlert(order.id, details.receipt),
+  ]);
 
   return order.id;
 }
@@ -263,9 +248,12 @@ export async function applyPaymentFailure(
   });
   if (logError) console.error("[payments] failure log:", logError.message);
 
-  await sendPaymentEmails(
+  // Failures go to the customer only; staff see them on the notifications
+  // bell and the Payments page.
+  await sendEmailSafely(
     await customerEmail(order.user_id),
-    paymentFailedEmail({ id: order.id, total: Number(order.total), reason }, siteUrl())
+    paymentFailedEmail({ id: order.id, total: Number(order.total), reason }, siteUrl()),
+    "payments"
   );
 
   return { orderId: order.id, reason };

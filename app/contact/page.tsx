@@ -48,9 +48,6 @@ export default function ContactPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-start">
             <div className="space-y-8">
               <div>
-                <h2 className="font-display-lg text-xl md:text-2xl text-on-surface mb-6">
-                  Let&apos;s connect
-                </h2>
                 <ul className="space-y-5">
                   {contactDetails.map((item) => (
                     <li key={item.label} className="flex gap-4">

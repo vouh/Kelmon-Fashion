@@ -181,20 +181,22 @@ export async function syncClaims(
   return { changed, claims };
 }
 
-/** Grants or revokes admin. Used by the admin panel's user management. */
+/**
+ * Grants or revokes admin. Used by the Accounts page. A revocation also signs
+ * the user out everywhere, so no still-valid token keeps admin rights; a grant
+ * is picked up on their next sign-in or token refresh.
+ */
 export async function setAdminClaim(uid: string, admin: boolean): Promise<void> {
   if (!admin) await assertNotProtected(uid);
   await getAdminAuth().setCustomUserClaims(uid, { role: "authenticated", admin });
-  // Force every existing token to be re-minted so the change takes effect now
-  // rather than whenever the current hour-long token happens to expire.
-  await getAdminAuth().revokeRefreshTokens(uid);
+  if (!admin) await getAdminAuth().revokeRefreshTokens(uid);
 }
 
-/** Throws for the protected super admins, before anything destructive runs. */
+/** Throws for the owner account, before anything destructive runs. */
 export async function assertNotProtected(uid: string): Promise<void> {
   const user = await getAdminAuth().getUser(uid);
   if (isProtectedAccount(user.email)) {
-    throw new Error("This super admin account is protected and cannot be removed or demoted.");
+    throw new Error("The owner account is protected and cannot be removed or demoted.");
   }
 }
 

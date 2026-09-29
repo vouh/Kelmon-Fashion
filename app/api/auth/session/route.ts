@@ -32,10 +32,11 @@ import { parseInput, sessionRequestSchema } from "@/lib/validation/schemas";
  *
  * DELETE clears both cookies on sign-out.
  *
- * Admin precedence, highest first: the ADMIN_EMAILS allowlist, then an existing
- * `admin` role in profiles (granted through the admin panel), then an existing
- * claim. The allowlist is how the first admin comes to exist at all — the
- * claim cannot be self-granted and profiles.role is not client-writable.
+ * Admin precedence, highest first: the ADMIN_EMAILS allowlist (plus the owner),
+ * then profiles.role (managed on the admin Accounts page), and the existing
+ * claim only when there is no profile yet. The allowlist is how the first admin
+ * comes to exist at all — the claim cannot be self-granted and profiles.role is
+ * not client-writable.
  */
 
 export async function POST(request: Request) {
@@ -72,7 +73,9 @@ export async function POST(request: Request) {
   }
 
   const email = decoded.email?.toLowerCase() ?? null;
-  let admin = bootstrapAdminEmails().includes(email ?? "") || decoded.admin === true;
+  const bootstrap = bootstrapAdminEmails().includes(email ?? "");
+  let admin = bootstrap || decoded.admin === true;
+  let superAdmin = isProtectedAccount(email);
 
   // Keep Postgres and Firebase in step. Without Supabase configured the claims
   // still get written, so the admin gate works before the database exists.
@@ -82,11 +85,16 @@ export async function POST(request: Request) {
 
       const { data: existing } = await db
         .from("profiles")
-        .select("role, full_name, avatar_url")
+        .select("role, super_admin, full_name, avatar_url")
         .eq("id", decoded.uid)
         .maybeSingle();
 
-      if (existing?.role === "admin") admin = true;
+      // Once a profile exists it decides: a demoted admin's token still says
+      // `admin: true` until it expires, and must not re-promote them here.
+      if (existing) {
+        admin = bootstrap || existing.role === "admin";
+        superAdmin ||= existing.role === "admin" && existing.super_admin === true;
+      }
 
       if (existing) {
         // Email and role come from the identity provider and the allowlist, so
@@ -127,7 +135,7 @@ export async function POST(request: Request) {
   const response = NextResponse.json({
     uid: decoded.uid,
     admin,
-    superAdmin: isProtectedAccount(email),
+    superAdmin,
     // The token just verified predates any claim written above. Claims only
     // reach Postgres inside a freshly minted token, so tell the client to force
     // a refresh and post again.

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isOrderId } from "@/lib/order-ids";
 import { isMpesaConfigured, mpesaFailureReason, queryStkPush } from "@/lib/mpesa";
 import { applyPaymentFailure, applyPaymentSuccess } from "@/lib/payments";
 import { getIdentity } from "@/lib/firebase/session";
@@ -38,7 +39,7 @@ function shouldQuery(checkoutId: string): boolean {
 
 export async function GET(request: Request) {
   const orderId = new URL(request.url).searchParams.get("orderId");
-  if (!orderId || !/^KM-[A-Z0-9]{4,20}$/.test(orderId)) {
+  if (!isOrderId(orderId)) {
     return NextResponse.json({ error: "Invalid order id." }, { status: 400 });
   }
 

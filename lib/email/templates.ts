@@ -60,13 +60,33 @@ interface LayoutOptions {
   cta?: { label: string; url: string };
   /** Trusted HTML shown under the button in smaller type. */
   footnoteHtml?: string;
+  /**
+   * Where the header logo comes from. Defaults to the inline attachment that
+   * lib/email/resend.ts adds to every single send; batch sends (which can't
+   * carry attachments) pass the hosted copy instead.
+   */
+  logoSrc?: string;
 }
 
-export function emailLayout({ origin, preheader, eyebrow, heading, bodyHtml, cta, footnoteHtml }: LayoutOptions): string {
+/** The hosted white logo, for emails that can't carry an inline attachment. */
+export const HOSTED_EMAIL_LOGO = `${PUBLIC_SITE}/email/kelmon-logo-light.png`;
+
+export function emailLayout({
+  origin,
+  preheader,
+  eyebrow,
+  heading,
+  bodyHtml,
+  cta,
+  footnoteHtml,
+  logoSrc = "cid:kelmon-logo",
+}: LayoutOptions): string {
   const siteLink = origin ?? PUBLIC_SITE;
 
-  // Text, not an image: many inboxes block or fail to load remote images.
-  const logoCell = `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="56" height="56" align="center" valign="middle" style="width:56px;height:56px;border-radius:16px;background:${brand.surface};font-family:${serif};font-size:30px;font-weight:700;line-height:56px;color:${brand.purple};">K</td></tr></table>`;
+  // The full white logo on the purple header. By default it's attached inline
+  // (cid:), so it shows even in inboxes that block images from websites; the
+  // alt text keeps the brand name if it still can't load.
+  const logoCell = `<img src="${logoSrc}" width="210" alt="Kelmon — Beauty · Fashion · Glamour" style="display:block;width:210px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;font-family:${serif};font-size:26px;font-weight:700;color:#ffffff;" />`;
 
   const ctaBlock = cta
     ? `<tr><td style="padding:30px 40px 0;">
@@ -97,13 +117,7 @@ export function emailLayout({ origin, preheader, eyebrow, heading, bodyHtml, cta
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
 
           <tr><td style="background:${brand.purple};background-image:linear-gradient(135deg, ${brand.purple} 0%, ${brand.purpleDeep} 100%);border-radius:28px 28px 0 0;padding:28px 40px;">
-            <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-              <td style="vertical-align:middle;">${logoCell}</td>
-              <td style="vertical-align:middle;padding-left:14px;">
-                <div style="font-family:${serif};font-size:24px;font-weight:700;color:#ffffff;letter-spacing:0.5px;">Kelmon</div>
-                <div style="font-family:${sans};font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:${brand.gold};padding-top:2px;">Fashion &middot; Beauty</div>
-              </td>
-            </tr></table>
+            <a href="${siteLink}" style="text-decoration:none;">${logoCell}</a>
           </td></tr>
 
           <tr><td style="background:${brand.gold};height:4px;line-height:4px;font-size:0;">&nbsp;</td></tr>
@@ -156,6 +170,49 @@ export function passwordResetEmail(link: string, origin: string | null) {
   };
 }
 
+export function accountInviteEmail({
+  link,
+  origin,
+  name,
+  admin,
+}: {
+  link: string;
+  origin: string | null;
+  name: string | null;
+  /** Invited as an admin (true) or a shopper (false); only changes the wording. */
+  admin: boolean;
+}) {
+  const greeting = name ? `Hi ${escapeHtml(name)},` : "Hi there,";
+  const what = admin
+    ? "You've been added to the <strong>Kelmon team</strong> as an admin. Once your password is set you'll be able to manage orders, products and payments from the admin dashboard."
+    : "A <strong>Kelmon</strong> account has been created for you. Once your password is set you can shop, track your orders and collect loyalty points.";
+  const rules = "Your password needs at least 8 characters, including a number, an uppercase letter and a special character.";
+
+  return {
+    subject: admin ? "You're invited to the Kelmon admin team" : "Your Kelmon account is ready",
+    text:
+      `${name ? `Hi ${name},` : "Hi there,"}\n\n` +
+      (admin
+        ? "You've been added to the Kelmon team as an admin.\n\n"
+        : "A Kelmon account has been created for you.\n\n") +
+      `Set your password here:\n${link}\n\n${rules}\n\n` +
+      "This link expires in 1 hour and can only be used once. If it has expired, ask the Kelmon team to send a new invite. If you weren't expecting this, you can ignore this email.",
+    html: emailLayout({
+      origin,
+      preheader: admin
+        ? "Set your password to join the Kelmon admin team."
+        : "Set your password to start shopping on Kelmon.",
+      eyebrow: admin ? "Team invite" : "Welcome",
+      heading: "Set up your Kelmon account",
+      bodyHtml: `${greeting}<br /><br />${what}<br /><br />${rules}`,
+      cta: { label: "Set my password", url: link },
+      footnoteHtml:
+        "This link expires in <strong>1 hour</strong> and can only be used once. If it has expired, ask the Kelmon team to send you a new invite. If you weren't expecting this, you can safely ignore this email." +
+        `<br /><br /><span style="font-size:12px;word-break:break-all;">Button not working? Paste this into your browser:<br /><a href="${link}" style="color:${brand.purple};">${link}</a></span>`,
+    }),
+  };
+}
+
 export function contactMessageEmail(
   message: { firstName: string; lastName: string; email: string; phone: string; message: string },
   origin: string | null,
@@ -200,7 +257,7 @@ export function paymentReceivedEmail(
   return {
     subject: `Payment received — order ${order.id}`,
     text:
-      `We received your M-Pesa payment of ${formatKesPlain(order.total)} for order ${order.id}.${receiptLine}\n\n` +
+      `We received your payment of ${formatKesPlain(order.total)} for order ${order.id}.${receiptLine}\n\n` +
       `We're getting it ready. Track it here: ${ordersUrl}`,
     html: emailLayout({
       origin,
@@ -208,7 +265,7 @@ export function paymentReceivedEmail(
       eyebrow: "Payment received",
       heading: "Thank you — you're paid up",
       bodyHtml:
-        `We received your M-Pesa payment of <strong>${escapeHtml(formatKesPlain(order.total))}</strong> for order <strong>${escapeHtml(order.id)}</strong>.` +
+        `We received your payment of <strong>${escapeHtml(formatKesPlain(order.total))}</strong> for order <strong>${escapeHtml(order.id)}</strong>.` +
         (order.receipt ? ` Your M-Pesa receipt is <strong>${escapeHtml(order.receipt)}</strong>.` : "") +
         " We're getting your order ready now.",
       cta: { label: "Track your order", url: ordersUrl },
@@ -256,11 +313,118 @@ export function announcementEmail(
     text: message.body,
     html: emailLayout({
       origin,
+      // Sent in batches, which can't carry the inline logo attachment.
+      logoSrc: HOSTED_EMAIL_LOGO,
       preheader: message.body.slice(0, 120),
       eyebrow: "From Kelmon",
       heading: message.subject,
       bodyHtml: paragraphs,
       cta: { label: "Visit the shop", url: `${origin ?? PUBLIC_SITE}/shop` },
+    }),
+  };
+}
+
+// ── Admin alerts (sent to the Settings alert list + super admins) ───────────
+
+export interface AlertOrder {
+  id: string;
+  customerName: string;
+  phone: string;
+  dropPoint: string;
+  paymentMethod: string;
+  total: number;
+  lines: { name: string; quantity: number; price: number; variant?: string | null }[];
+  source?: string;
+}
+
+function detailRows(rows: [string, string][]) {
+  return (
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 4px;">` +
+    rows
+      .map(
+        ([label, value]) =>
+          `<tr><td style="padding:6px 0;width:110px;vertical-align:top;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${brand.faint};">${escapeHtml(label)}</td>` +
+          `<td style="padding:6px 0;vertical-align:top;font-size:15px;color:${brand.text};">${escapeHtml(value)}</td></tr>`
+      )
+      .join("") +
+    `</table>`
+  );
+}
+
+function itemsTable(lines: AlertOrder["lines"]) {
+  if (!lines.length) return "";
+  return (
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border-top:1px solid ${brand.border};">` +
+    lines
+      .map(
+        (l) =>
+          `<tr><td style="padding:9px 0;border-bottom:1px solid ${brand.border};font-size:14px;color:${brand.text};">${escapeHtml(l.name)}${
+            l.variant ? ` <span style="color:${brand.faint};">(${escapeHtml(l.variant)})</span>` : ""
+          } &times; ${l.quantity}</td>` +
+          `<td align="right" style="padding:9px 0;border-bottom:1px solid ${brand.border};font-size:14px;color:${brand.text};white-space:nowrap;">${escapeHtml(formatKesPlain(l.price * l.quantity))}</td></tr>`
+      )
+      .join("") +
+    `</table>`
+  );
+}
+
+function paymentLabel(method: string) {
+  return method === "cod" ? "Pay on delivery" : "M-Pesa";
+}
+
+export function newOrderAdminEmail(order: AlertOrder, origin: string | null) {
+  const adminUrl = `${origin ?? PUBLIC_SITE}/admin/orders`;
+  const itemCount = order.lines.reduce((n, l) => n + l.quantity, 0);
+  const itemsText = order.lines.map((l) => `- ${l.name}${l.variant ? ` (${l.variant})` : ""} x${l.quantity}`).join("\n");
+  return {
+    subject: `New order ${order.id} — ${formatKesPlain(order.total)} from ${order.customerName}`,
+    text:
+      `New order ${order.id}\n\nCustomer: ${order.customerName}\nPhone: ${order.phone}\nDrop point: ${order.dropPoint}\n` +
+      `Payment: ${paymentLabel(order.paymentMethod)}\nTotal: ${formatKesPlain(order.total)}\n\n${itemsText}\n\n${adminUrl}`,
+    html: emailLayout({
+      origin,
+      preheader: `${order.customerName} ordered ${itemCount} item${itemCount === 1 ? "" : "s"} — ${formatKesPlain(order.total)}.`,
+      eyebrow: order.source === "admin_direct" ? "New order (created by admin)" : "New order",
+      heading: `Order ${order.id}`,
+      bodyHtml:
+        detailRows([
+          ["Customer", order.customerName],
+          ["Phone", order.phone],
+          ["Drop point", order.dropPoint],
+          ["Payment", `${paymentLabel(order.paymentMethod)} · not paid yet`],
+          ["Total", formatKesPlain(order.total)],
+        ]) + itemsTable(order.lines),
+      cta: { label: "Open orders", url: adminUrl },
+      footnoteHtml: "You'll get another email when it's paid.",
+    }),
+  };
+}
+
+export function paymentReceivedAdminEmail(
+  payment: { id: string; customerName: string; phone: string; total: number; receipt: string | null; method: string },
+  origin: string | null,
+) {
+  const adminUrl = `${origin ?? PUBLIC_SITE}/admin/transactions`;
+  return {
+    subject: `Paid: ${payment.id} — ${formatKesPlain(payment.total)}${payment.receipt ? ` (${payment.receipt})` : ""}`,
+    text:
+      `Payment received for order ${payment.id}.\n\nCustomer: ${payment.customerName}\nPhone: ${payment.phone}\n` +
+      `Amount: ${formatKesPlain(payment.total)}\nMethod: ${paymentLabel(payment.method)}\n` +
+      `${payment.receipt ? `M-Pesa receipt: ${payment.receipt}\n` : ""}\nThe order is confirmed and ready to pack.\n${adminUrl}`,
+    html: emailLayout({
+      origin,
+      preheader: `${payment.customerName} paid ${formatKesPlain(payment.total)} for ${payment.id}.`,
+      eyebrow: "Payment received",
+      heading: `${formatKesPlain(payment.total)} received`,
+      bodyHtml:
+        detailRows([
+          ["Order", payment.id],
+          ["Customer", payment.customerName],
+          ["Phone", payment.phone],
+          ["Method", paymentLabel(payment.method)],
+          ...(payment.receipt ? ([["M-Pesa receipt", payment.receipt]] as [string, string][]) : []),
+        ]) + `<p style="margin:14px 0 0;">The order is confirmed and ready to pack.</p>`,
+      cta: { label: "View payments", url: adminUrl },
     }),
   };
 }

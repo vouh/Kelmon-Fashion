@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getAdminAuth, isFirebaseAdminConfigured } from "@/lib/firebase/admin";
 import { getEmailSettings, resend } from "@/lib/email/resend";
 import { passwordResetEmail, siteOrigin } from "@/lib/email/templates";
+import { EMAIL_PATTERN } from "@/lib/validation/credentials";
 
 export const runtime = "nodejs";
 
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
   const rawEmail = (body as { email?: unknown } | null)?.email;
   const email = typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
 
-  if (!/^\S+@\S+\.\S+$/.test(email)) {
+  if (email.length > 254 || !EMAIL_PATTERN.test(email)) {
     return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
   }
 

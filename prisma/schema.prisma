@@ -86,6 +86,9 @@ model Profile {
   campus         String?
   avatar_url     String?
   role           user_role @default(customer)
+  /// Admins with this set can manage accounts. Service-role writes only;
+  /// the owner (lib/auth/protected-accounts.ts) always has it.
+  super_admin    Boolean   @default(false)
   loyalty_points Int       @default(0)
   /// When the customer accepted the Terms of Service and Privacy Policy, and
   /// which version (the policies' effective date, see lib/legal.ts).
@@ -108,6 +111,11 @@ model Profile {
 /// sync_product_rating() trigger. Never write them by hand.
 model Product {
   id             String   @id
+  /// Permanent product code (P001, B001…), assigned by the database from the
+  /// category's letter in code_prefixes. Never changed or reused.
+  code           String?
+  /// 'men' | 'women' | 'unisex' — who the product is for.
+  gender         String   @default("unisex")
   name           String
   description    String?
   price          Decimal  @db.Decimal(10, 2)
@@ -406,4 +414,23 @@ model MpesaRequest {
 
   @@index([order_id, created_at(sort: Desc)], map: "mpesa_requests_order_idx")
   @@map("mpesa_requests")
+}
+
+/// One letter per category for product codes (P = Perfumes, B = Bags…).
+/// `last_number` is how far the letter has got; only product saves move it.
+model CodePrefix {
+  letter      String   @id
+  category    String
+  last_number Int      @default(0)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("code_prefixes")
+}
+
+/// Running order number per day (Nairobi time), behind next_order_id().
+model OrderDayCounter {
+  day         DateTime @id @db.Date
+  last_number Int      @default(0)
+
+  @@map("order_day_counters")
 }

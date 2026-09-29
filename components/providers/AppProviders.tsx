@@ -5,6 +5,7 @@ import { CartProvider } from "./CartProvider";
 import { AuthProvider } from "./AuthProvider";
 import { ToastProvider } from "@/components/ui/Toast";
 import { AuthModalProvider } from "@/components/auth/AuthModal";
+import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 
 export default function AppProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -12,7 +13,9 @@ export default function AppProviders({ children }: { children: React.ReactNode }
       <AuthProvider>
         <CartProvider>
           <ToastProvider>
-            <AuthModalProvider>{children}</AuthModalProvider>
+            <ConfirmProvider>
+              <AuthModalProvider>{children}</AuthModalProvider>
+            </ConfirmProvider>
           </ToastProvider>
         </CartProvider>
       </AuthProvider>

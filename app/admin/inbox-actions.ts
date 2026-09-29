@@ -10,6 +10,7 @@ import {
   resolveAudience,
 } from "@/lib/supabase/admin-inbox";
 import { createClient, getAdminEmail, isAdmin } from "@/lib/supabase/server";
+import { ORDER_ALERT_RECIPIENTS_KEY } from "@/lib/email/alerts";
 
 /**
  * Server Actions for admin Settings, Notifications and Communications.
@@ -34,6 +35,15 @@ const email = z.string().trim().toLowerCase().email();
 // ── Settings ────────────────────────────────────────────────────────────────
 
 export async function saveContactRecipients(emails: string[]): Promise<ActionResult> {
+  return saveEmailList(CONTACT_RECIPIENTS_KEY, emails);
+}
+
+/** Who gets "new order" and "payment received" emails (super admins always do). */
+export async function saveOrderAlertRecipients(emails: string[]): Promise<ActionResult> {
+  return saveEmailList(ORDER_ALERT_RECIPIENTS_KEY, emails);
+}
+
+async function saveEmailList(key: string, emails: string[]): Promise<ActionResult> {
   try {
     const supabase = await requireAdmin();
     const parsed = z
@@ -47,7 +57,7 @@ export async function saveContactRecipients(emails: string[]): Promise<ActionRes
 
     const { error } = await supabase
       .from("site_settings")
-      .upsert({ key: CONTACT_RECIPIENTS_KEY, value: unique, updated_at: new Date().toISOString() });
+      .upsert({ key, value: unique, updated_at: new Date().toISOString() });
     if (error) throw new Error(error.message);
 
     revalidatePath("/admin/settings");

@@ -16,6 +16,10 @@ export type NavItem =
  */
 export interface Product {
   id: string;
+  /** Permanent product code, e.g. P001. Null until its category has a letter. */
+  code?: string | null;
+  /** Who it's for: men, women or unisex. */
+  gender?: "men" | "women" | "unisex";
   name: string;
   price: number;
   category: string;
@@ -47,6 +51,8 @@ const PLACEHOLDER_IMAGE = "/logo.png";
 export function productFromRow(row: ProductRow): Product {
   return {
     id: row.id,
+    code: row.code ?? null,
+    gender: row.gender ?? "unisex",
     name: row.name,
     price: Number(row.price),
     category: row.category,
@@ -73,3 +79,9 @@ export function discountPercent(product: Product): number | null {
   if (!product.originalPrice || product.originalPrice <= product.price) return null;
   return Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
 }
+
+export const GENDER_LABELS: Record<"men" | "women" | "unisex", string> = {
+  men: "Men",
+  women: "Ladies",
+  unisex: "Unisex",
+};

@@ -10,7 +10,9 @@ import {
   setCategoryInFilter,
   type ActionResult,
 } from "@/app/admin/actions";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import type { CategoryRow } from "@/lib/supabase/types";
+import { searchAnchor } from "@/lib/admin-search";
 
 const inputClass =
   "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-xs text-white placeholder:text-white/25 focus:border-purple-400/50 focus:outline-none";
@@ -22,6 +24,7 @@ interface CategoriesManagerProps {
 
 export default function CategoriesManager({ categories, productCounts }: CategoriesManagerProps) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [busy, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -100,7 +103,7 @@ export default function CategoriesManager({ categories, productCounts }: Categor
             {categories.map((category, index) => {
               const count = productCounts[category.name] ?? 0;
               return (
-                <li key={category.name} className="flex items-center gap-3 px-4 py-3">
+                <li key={category.name} id={searchAnchor("category", category.name)} className="flex items-center gap-3 px-4 py-3">
                   <div className="flex flex-col">
                     <button
                       type="button"
@@ -153,10 +156,15 @@ export default function CategoriesManager({ categories, productCounts }: Categor
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => {
-                      if (window.confirm(`Delete the "${category.name}" category?`)) {
-                        run(() => deleteCategory(category.name));
-                      }
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: `Delete the "${category.name}" category?`,
+                        message:
+                          "It will be removed from the list and the shop filters. Products already in it keep their category.",
+                        confirmLabel: "Delete category",
+                        tone: "danger",
+                      });
+                      if (ok) run(() => deleteCategory(category.name));
                     }}
                     className="rounded p-1 text-red-400/50 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
                     aria-label={`Delete ${category.name}`}

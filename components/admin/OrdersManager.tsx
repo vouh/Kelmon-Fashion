@@ -18,6 +18,7 @@ import { sendStkPrompt, waitForPaymentResult } from "@/components/payments/Mpesa
 import type { Product } from "@/lib/products";
 import type { OrderWithItems } from "@/lib/supabase/orders";
 import type { OrderStatus, PaymentStatus } from "@/lib/supabase/types";
+import { searchAnchor } from "@/lib/admin-search";
 
 const ORDER_STATUSES: OrderStatus[] = [
   "pending",
@@ -41,16 +42,21 @@ export default function OrdersManager({
   orders,
   products,
   openDirectOrder = false,
+  initialSearch = "",
 }: {
   orders: OrderWithItems[];
   products: Product[];
   openDirectOrder?: boolean;
+  /** Pre-filled search, from ?q= (the admin topbar search links here). */
+  initialSearch?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [filter, setFilter] = useState<Filter>("all");
-  const [search, setSearch] = useState("");
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [search, setSearch] = useState(initialSearch);
+  const [expanded, setExpanded] = useState<string | null>(
+    orders.some((o) => o.id === initialSearch) ? initialSearch : null
+  );
   const [showDirect, setShowDirect] = useState(openDirectOrder);
   const [error, setError] = useState<string | null>(null);
   const [stkSending, setStkSending] = useState<string | null>(null);
@@ -181,7 +187,7 @@ export default function OrdersManager({
                 <tbody className="divide-y divide-white/5">
                   {visible.map((order) => (
                     <Fragment key={order.id}>
-                      <tr className="hover:bg-white/5">
+                      <tr id={searchAnchor("order", order.id)} className="hover:bg-white/5">
                         <td className={`${TD} font-mono font-bold text-white`}>
                           {order.id}
                           {order.source === "admin_direct" && (

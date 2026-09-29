@@ -7,6 +7,7 @@ import { deleteHomepageDrop, upsertHomepageDrop } from "@/app/admin/actions";
 import { EmptyState } from "@/components/admin/ui";
 import { uploadDealImage } from "@/lib/supabase/storage";
 import type { HomepageDropRow } from "@/lib/supabase/types";
+import { searchAnchor } from "@/lib/admin-search";
 
 const inputClass =
   "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-xs text-white placeholder:text-white/25 focus:border-purple-400/50 focus:outline-none";
@@ -130,7 +131,7 @@ export default function HomepageDropsManager({ drops }: { drops: HomepageDropRow
         ) : (
           <ul className="divide-y divide-white/5">
             {drops.map((drop) => (
-              <li key={drop.id} className="flex items-center gap-3 p-3">
+              <li key={drop.id} id={searchAnchor("drop", drop.id)} className="flex items-center gap-3 p-3">
                 <Image src={drop.image} alt="" width={48} height={48} unoptimized className="h-12 w-12 rounded-full object-cover" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-black text-white">{drop.name}</p>

@@ -13,6 +13,8 @@ import type {
   PaymentMethod,
 } from "@/lib/supabase/types";
 import { getIdentity } from "@/lib/firebase/session";
+import { after } from "next/server";
+import { sendNewOrderAlert } from "@/lib/email/alerts";
 
 /** Columns an order update may touch (excludes created_at/updated_at). */
 export type OrderPatch = Database["public"]["Tables"]["orders"]["Update"];
@@ -29,7 +31,38 @@ export interface OrderWithItems extends OrderRow {
   order_items: OrderItemRow[];
 }
 
-/** Human-readable id, unchanged from the old createOrderId() in lib/orders.ts. */
+/**
+ * The order number for a new order: P001-20260930-01, from the product code of
+ * the order's priciest item (see lib/order-ids.ts). Falls back to the old
+ * KM-XXXX form only if the database can't hand out a number.
+ */
+export async function nextOrderId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  lines: { productId?: string | null; price: number; quantity: number }[]
+): Promise<string> {
+  const priciest = [...lines]
+    .filter((l) => l.productId)
+    .sort((a, b) => b.price * b.quantity - a.price * a.quantity)[0];
+
+  let code: string | null = null;
+  if (priciest?.productId) {
+    const { data } = await supabase
+      .from("products")
+      .select("code")
+      .eq("id", priciest.productId)
+      .maybeSingle();
+    code = data?.code ?? null;
+  }
+
+  const { data, error } = await supabase.rpc("next_order_id", { p_code: code ?? "" });
+  if (error || !data) {
+    console.error("[orders] next_order_id failed, using fallback id:", error?.message);
+    return createOrderId();
+  }
+  return data;
+}
+
+/** The pre-product-code id shape, kept as a fallback. */
 export function createOrderId(): string {
   return `KM-${Date.now().toString(36).toUpperCase()}`;
 }
@@ -60,7 +93,7 @@ export async function createOrder(input: NewOrderInput): Promise<string> {
   // Scoped by hand: user_id comes from the verified identity, and status and
   // payment_status are pinned below exactly as the RLS insert policy requires.
   const supabase = await createCallerClient(identity);
-  const id = createOrderId();
+  const id = await nextOrderId(supabase, input.lines);
 
   const { error: orderError } = await supabase.from("orders").insert({
     id,
@@ -99,6 +132,26 @@ export async function createOrder(input: NewOrderInput): Promise<string> {
     await supabase.from("orders").delete().eq("id", id);
     throw new Error(itemsError.message);
   }
+
+  // Email the shop's alert list after the response is sent, so placing an
+  // order never waits on (or fails because of) email.
+  after(() =>
+    sendNewOrderAlert({
+      id,
+      customerName: input.customerName,
+      phone: input.phone,
+      dropPoint: input.dropPoint,
+      paymentMethod: input.paymentMethod,
+      total: input.total,
+      lines: input.lines.map((l) => ({
+        name: l.name,
+        quantity: l.quantity,
+        price: l.price,
+        variant: l.variant ?? null,
+      })),
+      source: "storefront",
+    })
+  );
 
   return id;
 }

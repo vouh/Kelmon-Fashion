@@ -13,7 +13,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useProductLike } from "@/components/product/useProductLike";
 import { MpesaPayModal, useMpesaPayment } from "@/components/payments/MpesaPayment";
 import type { Product } from "@/lib/products";
-import { formatKes } from "@/lib/products";
+import { GENDER_LABELS, formatKes } from "@/lib/products";
 import { quantityOfProduct } from "@/lib/cart";
 
 interface ProductDetailClientProps {
@@ -255,7 +255,13 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                 Details
               </p>
               <ul className="text-sm text-on-surface-variant space-y-1">
+                {product.code && (
+                  <li>
+                    Item code: <span className="font-semibold text-on-surface">{product.code}</span>
+                  </li>
+                )}
                 <li>Category: {product.category}</li>
+                <li>For: {GENDER_LABELS[product.gender ?? "unisex"]}</li>
                 {selectedColor && <li>Colour: {selectedColor}</li>}
                 {selectedSize && <li>Size: {selectedSize}</li>}
                 <li>

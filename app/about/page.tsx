@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import AppShell from "@/components/layout/AppShell";
 import FaqSection from "@/components/home/FaqSection";
+import AboutVideoHero from "@/components/about/AboutVideoHero";
 import { formatKes } from "@/lib/products";
 import { getProducts } from "@/lib/supabase/products";
 import { pageMetadata } from "@/lib/seo";
@@ -37,7 +38,8 @@ export default async function AboutPage() {
   return (
     <AppShell activeNav="about">
       <main className="flex-grow">
-        <section className="px-margin-mobile md:px-margin-desktop pt-8 md:pt-12 pb-xl">
+        <AboutVideoHero />
+        <section id="story" className="scroll-mt-24 px-margin-mobile md:px-margin-desktop pt-14 md:pt-20 pb-xl">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center mb-xl">
             <div className="relative aspect-[4/3] overflow-hidden rounded-3xl rounded-tl-[90px] border border-primary/20 bg-surface-container">
               <Image

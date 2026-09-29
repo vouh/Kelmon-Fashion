@@ -8,6 +8,8 @@ import {
   getSavedContactRecipients,
 } from "@/lib/supabase/admin-inbox";
 import { getAdminEmail } from "@/lib/supabase/server";
+import { MAX_ORDER_ALERT_RECIPIENTS, getSavedAlertRecipients } from "@/lib/email/alerts";
+import { PROTECTED_SUPER_ADMIN_EMAILS } from "@/lib/auth/protected-accounts";
 
 export const metadata = { title: "Settings — Kelmon Admin" };
 
@@ -51,12 +53,34 @@ const CONTENT_LINKS = [
 ];
 
 export default async function AdminSettingsPage() {
-  const [saved, adminEmail] = await Promise.all([getSavedContactRecipients(), getAdminEmail()]);
+  const [saved, savedAlerts, adminEmail] = await Promise.all([
+    getSavedContactRecipients(),
+    getSavedAlertRecipients(),
+    getAdminEmail(),
+  ]);
   const envFallback = getEnvContactRecipients();
 
   return (
     <AdminShell adminEmail={adminEmail} title="Settings" subtitle="Site content and email">
       <div className="space-y-4">
+        <Panel
+          title="Order & payment alerts"
+          hint={`Up to ${MAX_ORDER_ALERT_RECIPIENTS} addresses`}
+          padded
+        >
+          <p className="mb-3 text-[11px] text-white/45">
+            These addresses get an email for every <strong className="text-white/70">new order</strong> and
+            every <strong className="text-white/70">successful payment</strong>. Super admins (
+            {PROTECTED_SUPER_ADMIN_EMAILS.join(", ")}) always get them too. Customers get their own
+            receipt and failed-payment emails separately.
+          </p>
+          <ContactRecipientsForm
+            list="alerts"
+            initial={savedAlerts}
+            fallback={[...PROTECTED_SUPER_ADMIN_EMAILS]}
+          />
+        </Panel>
+
         <Panel title="Contact form emails" hint={`Up to ${MAX_CONTACT_RECIPIENTS} addresses`} padded>
           <p className="mb-3 text-[11px] text-white/45">
             Messages sent from the Contact page are emailed to these addresses. Every message

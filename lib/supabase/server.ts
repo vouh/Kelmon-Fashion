@@ -1,6 +1,7 @@
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database, ProfileRow } from "@/lib/supabase/types";
 import { getIdentity, getIdTokenCookie, type Identity } from "@/lib/firebase/session";
+import { isProtectedAccount } from "@/lib/auth/protected-accounts";
 
 /**
  * Server-side Supabase access, authenticated by the Firebase ID token that
@@ -83,21 +84,53 @@ export async function getCurrentProfile(): Promise<ProfileRow | null> {
   return data ?? null;
 }
 
-/**
- * True when the caller is an admin.
- *
- * The `admin` custom claim is checked first because it is already in the
- * verified token — no database round trip, and it works before Supabase is
- * configured. profiles.role is the fallback for the window between an admin
- * being granted in the panel and the user's next token refresh.
- */
-export async function isAdmin(): Promise<boolean> {
-  const identity = await getIdentity();
-  if (!identity) return false;
-  if (identity.admin) return true;
+export interface AdminAccess {
+  uid: string;
+  email: string | null;
+  /** May open the Accounts page and change roles. */
+  superAdmin: boolean;
+  /** The protected owner; the only one who may grant or revoke super admin. */
+  owner: boolean;
+}
 
-  const profile = await getCurrentProfile();
-  return profile?.role === "admin";
+/**
+ * The caller's admin rights, or null for a non-admin.
+ *
+ * profiles.role decides, not the `admin` claim: a demoted admin's token (and
+ * the two-week session cookie minted from it) keeps saying `admin: true`. The
+ * claim only counts when there is no profile row to ask. Read with the service
+ * role when available, so a caller down to the session cookie still resolves.
+ */
+export async function getAdminAccess(): Promise<AdminAccess | null> {
+  const identity = await getIdentity();
+  if (!identity) return null;
+
+  let row: { role: ProfileRow["role"]; super_admin: boolean } | null = null;
+  if (isSupabaseConfigured()) {
+    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createServiceClient() : await createClient();
+    const { data } = await db
+      .from("profiles")
+      .select("role, super_admin")
+      .eq("id", identity.uid)
+      .maybeSingle();
+    row = data ?? null;
+  }
+
+  const owner = isProtectedAccount(identity.email);
+  const admin = owner || (row ? row.role === "admin" : identity.admin);
+  if (!admin) return null;
+
+  return {
+    uid: identity.uid,
+    email: identity.email,
+    owner,
+    superAdmin: owner || (row?.role === "admin" && row.super_admin === true),
+  };
+}
+
+/** True when the caller is an admin. See getAdminAccess. */
+export async function isAdmin(): Promise<boolean> {
+  return (await getAdminAccess()) !== null;
 }
 
 /** The signed-in admin's email, for display in the admin shell. */

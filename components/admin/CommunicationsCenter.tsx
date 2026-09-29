@@ -9,7 +9,9 @@ import {
   setContactMessageRead,
 } from "@/app/admin/inbox-actions";
 import { refreshAdminBadges } from "@/components/admin/useAdminBadges";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import type { ContactMessageRow, EmailAudience, EmailCampaignRow } from "@/lib/supabase/types";
+import { searchAnchor } from "@/lib/admin-search";
 
 const inputClass =
   "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-xs text-white placeholder:text-white/25 focus:border-purple-400/50 focus:outline-none";
@@ -28,17 +30,23 @@ export default function CommunicationsCenter({
   campaigns,
   audienceCounts,
   canSend,
+  initialOpenId,
 }: {
   messages: ContactMessageRow[];
   campaigns: EmailCampaignRow[];
   audienceCounts: { all: number; withOrders: number };
   canSend: boolean;
+  /** Message to show expanded, from ?open= (the admin topbar search links here). */
+  initialOpenId?: string;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [busy, startTransition] = useTransition();
   const [tab, setTab] = useState<Tab>("inbox");
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(
+    initialOpenId && messages.some((m) => m.id === initialOpenId) ? initialOpenId : null
+  );
 
   // Composer
   const [audience, setAudience] = useState<EmailAudience>("all_customers");
@@ -91,11 +99,22 @@ export default function CommunicationsCenter({
         ? audienceCounts.withOrders
         : customList.length;
 
-  function send(event: React.FormEvent) {
+  async function send(event: React.FormEvent) {
     event.preventDefault();
-    if (!window.confirm(`Send "${subject}" to ${recipientCount} recipient${recipientCount === 1 ? "" : "s"}?`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: `Send this email to ${recipientCount} ${recipientCount === 1 ? "person" : "people"}?`,
+      message: (
+        <>
+          <span className="block font-medium text-zinc-800 dark:text-white/85">&ldquo;{subject}&rdquo;</span>
+          <span className="mt-1 block">
+            {AUDIENCE_LABEL[audience]} · each person gets their own copy. This can&apos;t be unsent.
+          </span>
+        </>
+      ),
+      confirmLabel: "Send email",
+      icon: "send",
+    });
+    if (!ok) return;
     run(
       () =>
         sendEmailCampaign({
@@ -159,7 +178,7 @@ export default function CommunicationsCenter({
               {messages.map((m) => {
                 const open = openId === m.id;
                 return (
-                  <li key={m.id} className={m.read ? "" : "bg-purple-500/[0.06]"}>
+                  <li key={m.id} id={searchAnchor("message", m.id)} className={m.read ? "" : "bg-purple-500/[0.06]"}>
                     <button
                       type="button"
                       onClick={() => toggle(m)}

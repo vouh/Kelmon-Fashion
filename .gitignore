@@ -13,6 +13,7 @@ serviceAccount*.json
 # ── Dependencies & Build ───────────────────────────────────────────────────
 node_modules/
 .next/
+.next-build/
 out/
 dist/
 build/

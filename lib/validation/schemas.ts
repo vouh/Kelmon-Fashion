@@ -168,6 +168,7 @@ export const productInputSchema = z
     description: optionalText(2000),
     price: money("Price").refine((value) => value > 0, "Price must be greater than zero."),
     originalPrice: money("Original price").nullable().optional(),
+    gender: z.enum(["men", "women", "unisex"], { message: "Choose Men, Ladies or Unisex." }),
     category: requiredText("Category", 60),
     images: z
       .array(imageUrlSchema)
@@ -247,6 +248,32 @@ export const reviewInputSchema = z.object({
     .min(1, "Rating must be between 1 and 5.")
     .max(5, "Rating must be between 1 and 5."),
   body: optionalText(2000),
+});
+
+// ── Accounts ────────────────────────────────────────────────────────────────
+
+/** A Firebase uid, which is also profiles.id. */
+export const accountIdSchema = z
+  .string({ message: "Account id is required." })
+  .trim()
+  .regex(/^[A-Za-z0-9_-]{1,128}$/, "Invalid account id.");
+
+export const accountRoleSchema = z.enum(["customer", "admin", "super_admin"], {
+  message: "Choose User, Admin or Super admin.",
+});
+
+export const emailSchema = z
+  .string({ message: "Email is required." })
+  .trim()
+  .toLowerCase()
+  .min(1, "Email is required.")
+  .max(254, "Email must be 254 characters or fewer.")
+  .email("Enter a valid email address.");
+
+export const inviteAccountSchema = z.object({
+  email: emailSchema,
+  fullName: optionalText(120),
+  role: z.enum(["customer", "admin"], { message: "Choose User or Admin." }),
 });
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

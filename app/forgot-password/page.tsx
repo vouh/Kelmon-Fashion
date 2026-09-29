@@ -5,6 +5,7 @@ import Image from "next/image";
 import AppShell from "@/components/layout/AppShell";
 import { useAuthModal } from "@/components/auth/AuthModal";
 import logo from "@/lib/logo";
+import { EMAIL_PATTERN } from "@/lib/validation/credentials";
 
 export default function ForgotPasswordPage() {
   const { openAuth } = useAuthModal();
@@ -16,6 +17,10 @@ export default function ForgotPasswordPage() {
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
+    if (!EMAIL_PATTERN.test(email.trim())) {
+      setError("Please enter a valid email address.");
+      return;
+    }
     setBusy(true);
 
     try {

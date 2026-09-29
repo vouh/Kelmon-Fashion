@@ -12,7 +12,7 @@ import {
 } from "@/app/admin/actions";
 import { compressImage } from "@/lib/images/compress";
 import { uploadProductImage } from "@/lib/supabase/storage";
-import type { Product } from "@/lib/products";
+import { GENDER_LABELS, type Product } from "@/lib/products";
 
 /**
  * The badge values products.badge accepts. Typed as a literal union rather than
@@ -24,6 +24,12 @@ type Badge = (typeof BADGES)[number];
 
 /** Mirrors the max in productInputSchema. */
 const MAX_IMAGES = 4;
+
+const GENDER_TABS = [
+  { value: "men", label: "Men", icon: "man", active: "bg-sky-600 text-white shadow" },
+  { value: "women", label: "Ladies", icon: "woman", active: "bg-pink-600 text-white shadow" },
+  { value: "unisex", label: "Unisex", icon: "wc", active: "bg-purple-600 text-white shadow" },
+] as const;
 
 const inputClass =
   "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-xs text-white placeholder:text-white/25 focus:border-purple-400/50 focus:outline-none";
@@ -46,6 +52,8 @@ interface Draft {
   price: string;
   originalPrice: string;
   category: string;
+  /** Who it's for; there's no default for new products, so it's a deliberate choice. */
+  gender: "men" | "women" | "unisex" | "";
   images: string[];
   sizes: string;
   colors: string[];
@@ -66,6 +74,7 @@ function emptyDraft(category: string): Draft {
     price: "",
     originalPrice: "",
     category,
+    gender: "",
     images: [],
     sizes: "",
     colors: [],
@@ -85,6 +94,7 @@ function draftFrom(product: Product): Draft {
     price: String(product.price),
     originalPrice: product.originalPrice ? String(product.originalPrice) : "",
     category: product.category,
+    gender: product.gender ?? "unisex",
     images: product.images ?? [product.image],
     sizes: (product.sizes ?? []).join(", "),
     colors: product.colors ?? [],
@@ -99,14 +109,23 @@ function draftFrom(product: Product): Draft {
 export default function ProductsManager({
   products,
   categories,
+  codeLetters = {},
+  initialEditId,
 }: {
   products: Product[];
   categories: string[];
+  /** lower-cased category -> code letter, from Products → Settings. */
+  codeLetters?: Record<string, string>;
+  /** Opens this product's edit form, from ?edit= (the admin topbar search links here). */
+  initialEditId?: string;
 }) {
   const router = useRouter();
   const [busy, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(() => {
+    const product = initialEditId ? products.find((p) => p.id === initialEditId) : undefined;
+    return product ? draftFrom(product) : null;
+  });
   const [uploading, setUploading] = useState(false);
 
   function run(action: () => Promise<{ ok: boolean; error?: string }>, onDone?: () => void) {
@@ -157,6 +176,10 @@ export default function ProductsManager({
 
   function save() {
     if (!draft) return;
+    if (!draft.gender) {
+      setError("Choose who this product is for: Men, Ladies or Unisex.");
+      return;
+    }
     run(
       () =>
         upsertProduct({
@@ -166,6 +189,7 @@ export default function ProductsManager({
           price: Number(draft.price),
           originalPrice: draft.originalPrice ? Number(draft.originalPrice) : null,
           category: draft.category,
+          gender: draft.gender as "men" | "women" | "unisex",
           images: draft.images,
           sizes: draft.sizes
             .split(",")
@@ -207,6 +231,12 @@ export default function ProductsManager({
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-black text-white">
               {draft.existing ? `Edit ${draft.name || draft.id}` : "New product"}
+              <CodeHint
+                code={products.find((p) => p.id === draft.id)?.code ?? null}
+                existing={draft.existing}
+                letter={codeLetters[draft.category.trim().toLowerCase()]}
+                category={draft.category}
+              />
             </h3>
             <button
               type="button"
@@ -219,6 +249,29 @@ export default function ProductsManager({
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
+            <div className="sm:col-span-3">
+              <label className={labelClass}>Who is it for?</label>
+              <div role="tablist" aria-label="Who is it for" className="grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-zinc-800 p-1">
+                {GENDER_TABS.map((tab) => {
+                  const selected = draft.gender === tab.value;
+                  return (
+                    <button
+                      key={tab.value}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      onClick={() => setDraft({ ...draft, gender: tab.value })}
+                      className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-black uppercase tracking-widest transition ${
+                        selected ? tab.active : "text-white/45 hover:bg-white/5 hover:text-white"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-base">{tab.icon}</span>
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <div className="sm:col-span-3">
               <label className={labelClass}>Name</label>
               <input
@@ -459,7 +512,7 @@ export default function ProductsManager({
                     )}
                   </div>
                   <p className="mt-0.5 text-[10px] text-white/40">
-                    {product.category} · {formatKes(product.price)}
+                    {product.category} · {GENDER_LABELS[product.gender ?? "unisex"]} · {formatKes(product.price)}
                     {product.originalPrice && (
                       <span className="ml-1 line-through text-white/20">
                         {formatKes(product.originalPrice)}
@@ -470,7 +523,18 @@ export default function ProductsManager({
                       {product.stock ? `${product.stock} in stock` : "Sold out — hidden from shop"}
                     </span>
                   </p>
-                  <p className="font-mono text-[9px] text-white/20">{product.id}</p>
+                  <p className="font-mono text-[9px] text-white/20">
+                    {product.code ? (
+                      <span className="mr-1.5 rounded bg-purple-400/15 px-1 py-0.5 font-black text-purple-200">
+                        {product.code}
+                      </span>
+                    ) : (
+                      <span className="mr-1.5 rounded bg-amber-400/15 px-1 py-0.5 font-black text-amber-300" title="Give this category a letter in Products → Settings">
+                        no code
+                      </span>
+                    )}
+                    {product.id}
+                  </p>
                 </div>
 
                 <StockAdjuster
@@ -823,6 +887,42 @@ function DeleteProductButton({ busy, onConfirm }: { busy: boolean; onConfirm: ()
       >
         <span className="material-symbols-outlined text-sm">close</span>
       </button>
+    </span>
+  );
+}
+
+/** Shows the product's code, the code it will get, or why it won't get one yet. */
+function CodeHint({
+  code,
+  existing,
+  letter,
+  category,
+}: {
+  code: string | null;
+  existing: boolean;
+  letter?: string;
+  category: string;
+}) {
+  if (code) {
+    return (
+      <span className="ml-2 rounded bg-purple-400/15 px-1.5 py-0.5 font-mono text-[10px] font-black text-purple-200" title="Permanent product code">
+        {code}
+      </span>
+    );
+  }
+  if (letter) {
+    return (
+      <span className="ml-2 text-[10px] font-bold text-white/40">
+        {existing ? "gets" : "will get"} the next <span className="font-mono text-purple-200">{letter}</span> code when saved
+      </span>
+    );
+  }
+  return (
+    <span className="ml-2 text-[10px] font-bold text-amber-300">
+      No code letter for “{category || "this category"}” yet —{" "}
+      <a href="/admin/products/settings" className="underline underline-offset-2">
+        add one
+      </a>
     </span>
   );
 }

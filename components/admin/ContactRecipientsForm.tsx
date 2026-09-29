@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { saveContactRecipients } from "@/app/admin/inbox-actions";
+import { saveContactRecipients, saveOrderAlertRecipients } from "@/app/admin/inbox-actions";
 
 const MAX = 4;
 
@@ -13,10 +13,13 @@ const inputClass =
 export default function ContactRecipientsForm({
   initial,
   fallback,
+  list = "contact",
 }: {
   initial: string[];
   /** RESEND_CONTACT_TO_EMAIL, used until a list is saved here. */
   fallback: string[];
+  /** Which saved list this form edits. */
+  list?: "contact" | "alerts";
 }) {
   const router = useRouter();
   const [busy, startTransition] = useTransition();
@@ -31,7 +34,8 @@ export default function ContactRecipientsForm({
     event.preventDefault();
     setStatus(null);
     startTransition(async () => {
-      const result = await saveContactRecipients(emails);
+      const result =
+        list === "alerts" ? await saveOrderAlertRecipients(emails) : await saveContactRecipients(emails);
       if (!result.ok) setStatus({ ok: false, text: result.error });
       else {
         setStatus({ ok: true, text: result.message ?? "Saved." });
@@ -65,7 +69,9 @@ export default function ContactRecipientsForm({
 
       {initial.length === 0 && fallback.length > 0 && (
         <p className="text-[10px] text-white/35">
-          Nothing saved yet — currently going to {fallback.join(", ")} (from the server config).
+          {list === "alerts"
+            ? `Nothing saved yet — alerts currently go to the super admins only (${fallback.join(", ")}).`
+            : `Nothing saved yet — currently going to ${fallback.join(", ")} (from the server config).`}
         </p>
       )}
 

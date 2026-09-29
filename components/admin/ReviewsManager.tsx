@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { EmptyState, Panel, formatDateTime } from "@/components/admin/ui";
 import { deleteReview } from "@/app/admin/actions";
 import type { ReviewRow } from "@/lib/supabase/types";
+import { searchAnchor } from "@/lib/admin-search";
 
 export default function ReviewsManager({ reviews }: { reviews: ReviewRow[] }) {
   const router = useRouter();
@@ -34,7 +35,7 @@ export default function ReviewsManager({ reviews }: { reviews: ReviewRow[] }) {
         ) : (
           <ul className="divide-y divide-white/5">
             {reviews.map((review) => (
-              <li key={review.id} className="flex items-start gap-3 px-4 py-3">
+              <li key={review.id} id={searchAnchor("review", review.id)} className="flex items-start gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-black text-white">{review.author_name}</span>

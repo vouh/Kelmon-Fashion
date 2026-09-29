@@ -14,6 +14,8 @@ import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth, authErrorMessage, type SignInResult } from "@/components/providers/AuthProvider";
 import { useToast } from "@/components/ui/Toast";
+import PasswordRules from "@/components/auth/PasswordRules";
+import { EMAIL_PATTERN, passwordProblem } from "@/lib/validation/credentials";
 import logo from "@/lib/logo";
 
 type Mode = "signin" | "signup";
@@ -231,6 +233,10 @@ function AuthForm({
       let result: SignInResult;
       if (view === "signup") {
         if (!fullName.trim()) throw new Error("Please enter your name.");
+        if (fullName.trim().length > 120) throw new Error("Your name must be 120 characters or fewer.");
+        if (!EMAIL_PATTERN.test(email.trim())) throw new Error("Please enter a valid email address.");
+        const problem = passwordProblem(password);
+        if (problem) throw new Error(problem);
         if (!agreed) throw new Error("Please accept the Terms of Service and Privacy Policy.");
         result = await signUpWithEmail(email.trim(), password, fullName.trim());
         await acceptTerms();
@@ -250,6 +256,10 @@ function AuthForm({
   async function handleReset(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
+    if (!EMAIL_PATTERN.test(email.trim())) {
+      setError("Please enter a valid email address.");
+      return;
+    }
     setBusy("email");
     try {
       const response = await fetch("/api/auth/password-reset", {
@@ -402,10 +412,11 @@ function AuthForm({
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={view === "signup" ? "Password (6+ characters)" : "Password"}
+                  placeholder={view === "signup" ? "Create a password" : "Password"}
                   aria-label="Password"
                   autoComplete={view === "signup" ? "new-password" : "current-password"}
-                  minLength={6}
+                  minLength={view === "signup" ? 8 : undefined}
+                  maxLength={128}
                   required
                   className={`${inputClass} pr-11`}
                 />
@@ -421,6 +432,7 @@ function AuthForm({
                   </span>
                 </button>
               </div>
+              {view === "signup" && <PasswordRules password={password} className="px-1 sm:col-span-2" />}
               {view === "signup" && (
                 <label className="flex cursor-pointer items-start gap-2.5 rounded-xl bg-primary/5 px-3 py-2.5 text-xs leading-relaxed text-on-surface sm:col-span-2">
                   <input

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { EmptyState, formatDateTime } from "@/components/admin/ui";
 import { createUpdate, deleteUpdate } from "@/app/admin/actions";
 import type { UpdateRow } from "@/lib/supabase/types";
+import { searchAnchor } from "@/lib/admin-search";
 
 const TAGS = ["news", "feature", "restock", "event", "notice"];
 
@@ -97,7 +98,7 @@ export default function UpdatesManager({ updates }: { updates: UpdateRow[] }) {
         ) : (
           <ul className="divide-y divide-white/5">
             {updates.map((update) => (
-              <li key={update.id} className="flex items-start gap-3 px-4 py-3">
+              <li key={update.id} id={searchAnchor("update", update.id)} className="flex items-start gap-3 px-4 py-3">
                 <span className="material-symbols-outlined mt-0.5 text-base text-blue-400">
                   campaign
                 </span>

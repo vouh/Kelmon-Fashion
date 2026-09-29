@@ -33,6 +33,8 @@ export type ProfileRow = {
   campus: string | null;
   avatar_url: string | null;
   role: UserRole;
+  /** Only meaningful with role 'admin'. Written by the server, never the client. */
+  super_admin: boolean;
   loyalty_points: number;
   terms_accepted_at: string | null;
   terms_version: string | null;
@@ -42,6 +44,9 @@ export type ProfileRow = {
 
 export type ProductRow = {
   id: string;
+  /** P001, B001… Assigned by the database; never written by the app. */
+  code: string | null;
+  gender: ProductGender;
   name: string;
   description: string | null;
   price: number;
@@ -154,6 +159,16 @@ export type MpesaRequestRow = {
   duplicate: boolean;
   created_at: string;
   updated_at: string;
+}
+
+/** Who a product is for. */
+export type ProductGender = "men" | "women" | "unisex";
+
+export type CodePrefixRow = {
+  letter: string;
+  category: string;
+  last_number: number;
+  created_at: string;
 }
 
 export type PaymentFailureRow = {
@@ -305,6 +320,7 @@ export type Database = {
       updates: Table<UpdateRow, "title" | "body">;
       homepage_drops: Table<HomepageDropRow, "name" | "price" | "category" | "image">;
       payment_failures: Table<PaymentFailureRow, "reason">;
+      code_prefixes: Table<CodePrefixRow, "letter" | "category">;
       mpesa_requests: Table<MpesaRequestRow, "checkout_request_id" | "order_id" | "amount">;
       site_settings: Table<SiteSettingRow, "key" | "value">;
       contact_messages: Table<
@@ -323,6 +339,7 @@ export type Database = {
       award_loyalty_points: { Args: { p_order_id: string }; Returns: number };
       redeem_loyalty_points: { Args: { p_points: number }; Returns: number };
       cancel_order: { Args: { p_order_id: string }; Returns: undefined };
+      next_order_id: { Args: { p_code: string }; Returns: string };
       adjust_product_stock: {
         Args: { p_product_id: string; p_delta: number };
         Returns: number | null;
