@@ -17,6 +17,26 @@ import { useToast } from "@/components/ui/Toast";
 import PasswordRules from "@/components/auth/PasswordRules";
 import { EMAIL_PATTERN, passwordProblem } from "@/lib/validation/credentials";
 import logo from "@/lib/logo";
+import { getFirebaseAuth } from "@/lib/firebase/client";
+import { createClient } from "@/lib/supabase/client";
+import { isProfileComplete } from "@/lib/kenya";
+
+/** Whether the signed-in user has told us their county and location yet. */
+async function profileHasLocation(): Promise<boolean> {
+  try {
+    const uid = getFirebaseAuth().currentUser?.uid;
+    if (!uid) return true;
+    const { data } = await createClient()
+      .from("profiles")
+      .select("county, location")
+      .eq("id", uid)
+      .maybeSingle();
+    return isProfileComplete(data);
+  } catch {
+    // If we can't tell, don't block them.
+    return true;
+  }
+}
 
 type Mode = "signin" | "signup";
 type View = Mode | "forgot";
@@ -200,12 +220,24 @@ function AuthForm({
    * asks admins whether to open the dashboard; one opened mid-action (Buy Now,
    * checkout, a like) always closes so the shopper can carry on.
    */
-  function routeAfterSignIn(result: SignInResult) {
+  async function routeAfterSignIn(result: SignInResult, isNewAccount = false) {
     if (result.admin && !options.message && !next?.startsWith("/admin")) {
       setAdminRole(result);
       return;
     }
-    finish(next);
+    // Heading somewhere specific, or signed in mid-action (checkout, Buy Now,
+    // a like): carry on — checkout asks for county and location itself.
+    if (next || options.message) {
+      finish(next);
+      return;
+    }
+    // New accounts, and anyone whose county/location is still missing, land on
+    // their profile with the details form open.
+    if (isNewAccount || !(await profileHasLocation())) {
+      finish("/profile?complete=1");
+      return;
+    }
+    finish();
   }
 
   async function handleGoogle() {
@@ -217,7 +249,7 @@ function AuthForm({
       // sign-in records acceptance (existing records are left as they were).
       await acceptTerms();
       toast("Welcome!");
-      routeAfterSignIn(result);
+      await routeAfterSignIn(result);
     } catch (err) {
       setError(authErrorMessage(err));
     } finally {
@@ -241,11 +273,13 @@ function AuthForm({
         result = await signUpWithEmail(email.trim(), password, fullName.trim());
         await acceptTerms();
         toast("Account created. Welcome to Kelmon!");
+        await routeAfterSignIn(result, true);
+        return;
       } else {
         result = await signInWithEmail(email.trim(), password);
         toast("Welcome back!");
       }
-      routeAfterSignIn(result);
+      await routeAfterSignIn(result);
     } catch (err) {
       setError(authErrorMessage(err));
     } finally {

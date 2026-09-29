@@ -90,7 +90,7 @@ export default async function AdminAccountPage({ params }: { params: Promise<{ i
               <p className="truncate text-sm font-black text-white">{account.fullName || "No name"}</p>
               <p className="truncate text-xs text-white/50">{account.email ?? "—"}</p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <RoleBadge role={account.role} owner={account.owner} />
+                <RoleBadge role={account.role} />
                 {account.pendingInvite && (
                   <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-300">
                     Invite pending

@@ -18,8 +18,8 @@ const contactDetails = [
   {
     icon: "call",
     label: "Phone / WhatsApp",
-    value: "0794 640 214",
-    href: "https://wa.me/254794640214",
+    value: "0787 216 442",
+    href: "https://wa.me/254787216442",
   },
   {
     icon: "call",
@@ -82,7 +82,7 @@ export default function ContactPage() {
                   Contact us any time on WhatsApp to check stock and delivery slots.
                 </p>
                 <a
-                  href="https://wa.me/254794640214"
+                  href="https://wa.me/254787216442"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex h-11 px-7 rounded-full bg-white text-primary text-[11px] font-semibold uppercase tracking-[0.14em] items-center gap-2 hover:bg-white/90 transition-colors"

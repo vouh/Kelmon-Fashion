@@ -71,6 +71,7 @@ export interface NewOrderInput {
   customerName: string;
   phone: string;
   dropPoint: string;
+  county?: string;
   campus?: string;
   notes?: string;
   paymentMethod: PaymentMethod;
@@ -101,6 +102,7 @@ export async function createOrder(input: NewOrderInput): Promise<string> {
     customer_name: input.customerName,
     phone: input.phone,
     drop_point: input.dropPoint,
+    county: input.county ?? null,
     campus: input.campus ?? null,
     notes: input.notes ?? null,
     payment_method: input.paymentMethod,
@@ -133,9 +135,11 @@ export async function createOrder(input: NewOrderInput): Promise<string> {
     throw new Error(itemsError.message);
   }
 
-  // Email the shop's alert list after the response is sent, so placing an
-  // order never waits on (or fails because of) email.
-  after(() =>
+  // Staff hear about M-Pesa orders once the payment succeeds (with the full
+  // order), not when an attempt starts — so failed or abandoned payments don't
+  // email anyone. Pay-on-delivery orders are only paid later, so staff get a
+  // "new order" email now. Sent after the response, never delaying the order.
+  if (input.paymentMethod === "cod") after(() =>
     sendNewOrderAlert({
       id,
       customerName: input.customerName,

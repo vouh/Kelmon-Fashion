@@ -109,6 +109,7 @@ export async function POST(request: Request) {
       // Already normalised to 2547… by the schema, which is the only form
       // Safaricom accepts — so the STK push needs no further cleaning.
       phone: body.phone,
+      county: body.county,
       dropPoint: body.dropPoint,
       campus: body.campus,
       notes: body.notes,

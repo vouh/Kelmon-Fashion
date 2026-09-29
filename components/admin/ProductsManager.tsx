@@ -11,6 +11,7 @@ import {
   upsertProduct,
 } from "@/app/admin/actions";
 import { compressImage } from "@/lib/images/compress";
+import ProductImport from "@/components/admin/ProductImport";
 import { uploadProductImage } from "@/lib/supabase/storage";
 import { GENDER_LABELS, type Product } from "@/lib/products";
 
@@ -81,7 +82,8 @@ function emptyDraft(category: string): Draft {
     colorImages: {},
     stock: "1",
     badge: "",
-    active: true,
+    // New products stay off the shop until you publish them.
+    active: false,
     existing: false,
   };
 }
@@ -101,7 +103,7 @@ function draftFrom(product: Product): Draft {
     colorImages: product.colorImages ?? {},
     stock: String(product.stock ?? 0),
     badge: (product.badge ?? "") as Badge,
-    active: true,
+    active: product.active ?? true,
     existing: true,
   };
 }
@@ -217,13 +219,16 @@ export default function ProductsManager({
       )}
 
       {!draft && (
-        <button
-          type="button"
-          onClick={() => setDraft(emptyDraft(categories[0] ?? "Accessories"))}
-          className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-xs font-black uppercase tracking-widest text-white transition hover:bg-purple-500"
-        >
-          <span className="material-symbols-outlined text-sm">add</span> New product
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setDraft(emptyDraft(categories[0] ?? "Accessories"))}
+            className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-xs font-black uppercase tracking-widest text-white transition hover:bg-purple-500"
+          >
+            <span className="material-symbols-outlined text-sm">add</span> New product
+          </button>
+          <ProductImport categories={categories} />
+        </div>
       )}
 
       {draft && (
@@ -305,18 +310,33 @@ export default function ProductsManager({
               />
             </div>
             <div>
-              <label className={labelClass}>Category</label>
-              <input
-                list="product-categories"
+              <label className={`${labelClass} flex items-center justify-between`}>
+                Category
+                <a
+                  href="/admin/categories"
+                  className="normal-case tracking-normal font-bold text-purple-300 hover:text-purple-200"
+                >
+                  + New category
+                </a>
+              </label>
+              <select
                 value={draft.category}
                 onChange={(e) => setDraft({ ...draft, category: e.target.value })}
                 className={inputClass}
-              />
-              <datalist id="product-categories">
-                {categories.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
+              >
+                {/* A product whose category was since removed can still keep it. */}
+                {draft.category && !categories.includes(draft.category) && (
+                  <option value={draft.category}>{draft.category}</option>
+                )}
+                {categories.map((c) => {
+                  const letter = codeLetters[c.trim().toLowerCase()];
+                  return (
+                    <option key={c} value={c}>
+                      {letter ? `${c} (${letter})` : `${c} — no code letter yet`}
+                    </option>
+                  );
+                })}
+              </select>
             </div>
             <div className="sm:col-span-3">
               <label className={labelClass}>Description</label>
@@ -458,7 +478,7 @@ export default function ProductsManager({
                     onChange={(e) => setDraft({ ...draft, active: e.target.checked })}
                     className="h-4 w-4 accent-purple-500"
                   />
-                  Visible in shop
+                  Published <span className="font-normal text-white/40">(visible in the shop)</span>
                 </label>
               </div>
               <div>
@@ -505,6 +525,11 @@ export default function ProductsManager({
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <p className="truncate text-xs font-black text-white">{product.name}</p>
+                    {product.active === false && (
+                      <span className="rounded bg-amber-400/15 px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-300" title="Not visible in the shop">
+                        Draft
+                      </span>
+                    )}
                     {product.badge && (
                       <span className="rounded bg-purple-400/15 px-1.5 py-0.5 text-[9px] font-black uppercase text-purple-300">
                         {product.badge}
@@ -544,16 +569,27 @@ export default function ProductsManager({
                 />
 
                 <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => run(() => setProductActive(product.id, false))}
-                    title="Hide from shop"
-                    className="rounded p-1 text-white/30 hover:bg-white/10 hover:text-white disabled:opacity-50"
-                    aria-label="Hide product"
-                  >
-                    <span className="material-symbols-outlined text-base">visibility_off</span>
-                  </button>
+                  {product.active === false ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => run(() => setProductActive(product.id, true))}
+                      title="Publish — show in the shop"
+                      className="flex items-center gap-1 rounded-lg bg-green-500/15 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-green-300 hover:bg-green-500/25 disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-sm">visibility</span> Publish
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => run(() => setProductActive(product.id, false))}
+                      title="Unpublish — hide from the shop"
+                      className="flex items-center gap-1 rounded-lg px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-sm">visibility_off</span> Unpublish
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setDraft(draftFrom(product))}

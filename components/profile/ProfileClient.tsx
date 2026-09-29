@@ -9,6 +9,7 @@ import { useAuth } from "@/components/providers/AuthProvider";
 import { uploadAvatar } from "@/lib/supabase/storage";
 import { formatKes } from "@/lib/products";
 import { DEFAULT_AVATAR, avatarLibrary } from "@/lib/avatars";
+import { KENYA_COUNTIES } from "@/lib/kenya";
 
 /**
  * The account page, backed by the database.
@@ -38,17 +39,9 @@ export interface ProfileOrder {
 interface Draft {
   fullName: string;
   campus: string;
+  county: string;
+  location: string;
   phone: string;
-}
-
-/**
- * The tiers award_loyalty_points() applies, mirrored for display only — the
- * database is what actually awards them, on payment.
- */
-function pointsForOrder(total: number): number {
-  if (total >= 5000) return 50;
-  if (total >= 1000) return 20;
-  return 5;
 }
 
 export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
@@ -71,7 +64,7 @@ export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<Draft>({ fullName: "", campus: "", phone: "" });
+  const [draft, setDraft] = useState<Draft>({ fullName: "", campus: "", phone: "", county: "", location: "" });
   const [savedFlash, setSavedFlash] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [avatarOpen, setAvatarOpen] = useState(false);
@@ -82,6 +75,10 @@ export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
   const email = profile?.email ?? user?.email ?? "";
   const campus = profile?.campus?.trim() ?? "";
   const phone = profile?.phone?.trim() ?? "";
+  const county = profile?.county?.trim() ?? "";
+  const location = profile?.location?.trim() ?? "";
+  /** Sent here by sign-up (or a sign-in with details missing): open the form. */
+  const [completing, setCompleting] = useState(false);
   const avatar = profile?.avatar_url || user?.photoURL || DEFAULT_AVATAR;
   const points = profile?.loyalty_points ?? 0;
 
@@ -139,7 +136,7 @@ export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
   };
 
   const startEdit = () => {
-    setDraft({ fullName: name === "Your account" ? "" : name, campus, phone });
+    setDraft({ fullName: name === "Your account" ? "" : name, campus, phone, county, location });
     setSaveError(null);
     setEditing(true);
   };
@@ -156,14 +153,29 @@ export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
       await updateProfile({
         full_name: draft.fullName.trim() || null,
         campus: draft.campus.trim() || null,
+        county: draft.county.trim() || null,
+        location: draft.location.trim() || null,
         phone: draft.phone.trim() || null,
       });
       setEditing(false);
+      setCompleting(false);
       flashSaved();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Could not save your profile.");
     }
   };
+
+  const openedForCompletion = useRef(false);
+  useEffect(() => {
+    if (openedForCompletion.current || loading || !user || !profile) return;
+    if (new URLSearchParams(window.location.search).get("complete") !== "1") return;
+    openedForCompletion.current = true;
+    setCompleting(true);
+    startEdit();
+    window.history.replaceState(null, "", "/profile");
+    // startEdit reads the profile values captured this render, which is what we want.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, user, profile]);
 
   // Signed out here (a lapsed session, or a direct visit the middleware let
   // through): no "please sign in" page — go to the shop with the sign-in modal
@@ -247,6 +259,15 @@ export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
 
             {editing ? (
               <form onSubmit={saveProfile} className="mt-6 space-y-3 text-left max-w-md mx-auto">
+                {completing && (
+                  <div className="rounded-2xl bg-primary/[0.07] border border-primary/15 px-4 py-3 text-sm text-on-surface">
+                    <p className="font-semibold">Welcome to Kelmon! Finish your profile</p>
+                    <p className="mt-0.5 text-xs text-on-surface-variant">
+                      Add your county and location so we can deliver to you — it also fills in checkout
+                      for you. School is optional.
+                    </p>
+                  </div>
+                )}
                 <label className="block">
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
                     Name
@@ -272,13 +293,41 @@ export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
                 </div>
                 <label className="block">
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
-                    Campus / location
+                    County
+                  </span>
+                  <select
+                    value={draft.county}
+                    onChange={(e) => setDraft((p) => ({ ...p, county: e.target.value }))}
+                    className="mt-1 w-full h-11 px-3.5 rounded-xl bg-[#faf6fc] dark:bg-surface-container border border-primary/15 text-sm outline-none focus:border-primary"
+                  >
+                    <option value="">Choose your county…</option>
+                    {KENYA_COUNTIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
+                    Location
+                  </span>
+                  <input
+                    value={draft.location}
+                    onChange={(e) => setDraft((p) => ({ ...p, location: e.target.value }))}
+                    className="mt-1 w-full h-11 px-3.5 rounded-xl bg-[#faf6fc] dark:bg-surface-container border border-primary/15 text-sm outline-none focus:border-primary"
+                    placeholder="Town, estate or hostel — e.g. Parklands, Nairobi"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
+                    School <span className="normal-case tracking-normal font-normal">(optional)</span>
                   </span>
                   <input
                     value={draft.campus}
                     onChange={(e) => setDraft((p) => ({ ...p, campus: e.target.value }))}
                     className="mt-1 w-full h-11 px-3.5 rounded-xl bg-[#faf6fc] dark:bg-surface-container border border-primary/15 text-sm outline-none focus:border-primary"
-                    placeholder="e.g. Main Campus, Nairobi"
+                    placeholder="e.g. University of Nairobi"
                   />
                 </label>
                 <label className="block">
@@ -317,11 +366,28 @@ export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
                 <h1 className="font-display-lg text-[1.65rem] md:text-[1.85rem] text-on-surface tracking-tight">
                   {name}
                 </h1>
-                {campus ? (
-                  <p className="mt-1.5 text-sm text-on-surface-variant">{campus}</p>
+                {county || location ? (
+                  <p className="mt-1.5 inline-flex items-center gap-1 text-sm text-on-surface-variant">
+                    <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
+                      location_on
+                    </span>
+                    {[location, county].filter(Boolean).join(", ")}
+                  </p>
                 ) : (
-                  <p className="mt-1.5 text-sm text-on-surface-variant/70">
-                    Add your campus — tap Edit
+                  <button
+                    type="button"
+                    onClick={startEdit}
+                    className="mt-1.5 text-sm text-primary underline underline-offset-4"
+                  >
+                    Add your county and location
+                  </button>
+                )}
+                {campus && (
+                  <p className="mt-0.5 inline-flex w-full items-center justify-center gap-1 text-sm text-on-surface-variant">
+                    <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
+                      school
+                    </span>
+                    {campus}
                   </p>
                 )}
                 {email && <p className="mt-3 text-sm text-primary">{email}</p>}
@@ -397,10 +463,6 @@ export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
                 </p>
               </div>
             </div>
-            <p className="text-xs text-on-surface-variant sm:text-right max-w-xs">
-              Earn 5, 20 or 50 points per paid order — under KES 1,000, up to KES 5,000, and
-              above.
-            </p>
           </div>
 
           <section id="order-history" className="scroll-mt-28">
@@ -438,8 +500,6 @@ export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
             ) : (
               <ul className="space-y-3">
                 {orders.map((order) => {
-                  // Awarded points once paid; otherwise show what it will earn.
-                  const pts = order.pointsEarned || pointsForOrder(order.total);
                   return (
                     <li
                       key={order.id}
@@ -464,7 +524,11 @@ export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
                               order.paid ? "text-secondary" : "text-on-surface-variant"
                             }`}
                           >
-                            {order.paid ? `+${pts} pts` : `${pts} pts on payment`}
+                            {order.paid
+                              ? order.pointsEarned > 0
+                                ? `+${order.pointsEarned} pts`
+                                : "Paid"
+                              : "Awaiting payment"}
                           </p>
                         </div>
                       </div>
@@ -567,7 +631,7 @@ export default function ProfileClient({ orders }: { orders: ProfileOrder[] }) {
             )}
 
             <p className="mt-5 mb-3 text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
-              Avatar library
+              Or pick a Kelmon avatar
             </p>
             <div className="grid grid-cols-4 gap-3">
               {avatarLibrary.map((opt) => {

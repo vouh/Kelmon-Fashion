@@ -2,6 +2,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import PaymentsTable, { type PaymentEntry, type PaymentFilter } from "@/components/admin/PaymentsTable";
 import { getAllOrders, getPaymentFailures } from "@/lib/supabase/orders";
 import { getAdminEmail } from "@/lib/supabase/server";
+import { parseDateRange } from "@/lib/date-range";
 
 export const metadata = { title: "Payments — Kelmon Admin" };
 
@@ -13,14 +14,31 @@ export const metadata = { title: "Payments — Kelmon Admin" };
 export default async function AdminPaymentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; range?: string; from?: string; to?: string }>;
 }) {
-  const [{ filter }, orders, failures, adminEmail] = await Promise.all([
+  const [{ filter, ...rangeParams }, orders, failures, adminEmail] = await Promise.all([
     searchParams,
     getAllOrders(),
     getPaymentFailures(),
     getAdminEmail(),
   ]);
+
+  const orderById = new Map(orders.map((o) => [o.id, o]));
+  /** Items, drop point and status for the details popup. */
+  const orderExtras = (id: string | null) => {
+    const o = id ? orderById.get(id) : undefined;
+    return {
+      items: (o?.order_items ?? []).map((i) => ({
+        name: i.name,
+        quantity: i.quantity,
+        price: Number(i.price),
+        variant: i.variant,
+      })),
+      dropPoint: o?.drop_point ?? null,
+      orderStatus: o?.status ?? null,
+      orderedAt: o?.created_at ?? null,
+    };
+  };
 
   const entries: PaymentEntry[] = [
     ...orders
@@ -36,6 +54,9 @@ export default async function AdminPaymentsPage({
           method: o.payment_method,
           receipt: o.mpesa_receipt_number,
           detail: null,
+          resultCode: o.mpesa_result_code,
+          resultDesc: o.mpesa_result_desc,
+          ...orderExtras(o.id),
           at: o.updated_at,
         })
       ),
@@ -44,12 +65,15 @@ export default async function AdminPaymentsPage({
         id: `failed-${f.id}`,
         kind: "failed",
         orderId: f.order_id,
-        customer: orders.find((o) => o.id === f.order_id)?.customer_name ?? null,
+        customer: (f.order_id ? orderById.get(f.order_id)?.customer_name : null) ?? null,
         amount: f.amount !== null ? Number(f.amount) : null,
         phone: f.phone,
         method: "mpesa",
         receipt: null,
         detail: f.reason,
+        resultCode: f.result_code,
+        resultDesc: f.result_desc,
+        ...orderExtras(f.order_id),
         at: f.created_at,
       })
     ),
@@ -64,7 +88,7 @@ export default async function AdminPaymentsPage({
       title="Payments"
       subtitle={`${entries.length} payment${entries.length === 1 ? "" : "s"}`}
     >
-      <PaymentsTable entries={entries} initialFilter={initialFilter} />
+      <PaymentsTable entries={entries} initialFilter={initialFilter} initialRange={parseDateRange(rangeParams)} />
     </AdminShell>
   );
 }

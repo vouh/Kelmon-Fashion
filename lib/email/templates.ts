@@ -136,7 +136,8 @@ export function emailLayout({
 
           <tr><td align="center" style="padding:26px 20px 0;font-family:${sans};font-size:12px;line-height:1.7;color:${brand.faint};">
             <a href="${siteLink}" style="font-family:${serif};font-size:15px;font-weight:700;color:${brand.purple};text-decoration:none;">Kelmon</a><br />
-            Campus fashion &amp; beauty, delivered in Kenya.<br />
+            <span style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${brand.gold};">Beauty &middot; Fashion &middot; Glamour</span><br />
+            Delivered to your campus in Kenya.<br />
             <a href="${siteLink}/shop" style="color:${brand.faint};">Shop</a> &nbsp;&middot;&nbsp;
             <a href="${siteLink}/contact" style="color:${brand.faint};">Contact</a>
           </td></tr>
@@ -248,26 +249,59 @@ function formatKesPlain(amount: number): string {
   return `KES ${Number(amount).toLocaleString("en-KE")}`;
 }
 
-export function paymentReceivedEmail(
-  order: { id: string; total: number; receipt: string | null },
-  origin: string | null,
-) {
+/** The paid order, for the receipt and the staff "payment received" email. */
+export interface PaidOrderDetails {
+  id: string;
+  customerName: string;
+  phone: string;
+  dropPoint: string;
+  paymentMethod: string;
+  receipt: string | null;
+  subtotal: number;
+  deliveryFee: number;
+  total: number;
+  lines: { name: string; quantity: number; price: number; variant?: string | null }[];
+}
+
+/**
+ * The customer's email when their payment succeeds: a full receipt — what
+ * they bought, what they paid, and where it's being delivered.
+ */
+export function paymentReceivedEmail(order: PaidOrderDetails, origin: string | null) {
   const ordersUrl = `${origin ?? PUBLIC_SITE}/orders`;
-  const receiptLine = order.receipt ? ` M-Pesa receipt: ${order.receipt}.` : "";
+  const itemsText = order.lines
+    .map((l) => `- ${l.name}${l.variant ? ` (${l.variant})` : ""} x${l.quantity}  ${formatKesPlain(l.price * l.quantity)}`)
+    .join("\n");
+  const money = (label: string, value: string, bold = false) =>
+    `<tr><td style="padding:5px 0;font-size:14px;color:${bold ? brand.text : brand.muted};${bold ? "font-weight:700;" : ""}">${label}</td>` +
+    `<td align="right" style="padding:5px 0;font-size:14px;color:${brand.text};${bold ? "font-weight:700;font-size:16px;" : ""}">${escapeHtml(value)}</td></tr>`;
+
   return {
-    subject: `Payment received — order ${order.id}`,
+    subject: `Order confirmed — ${order.id} (${formatKesPlain(order.total)} paid)`,
     text:
-      `We received your payment of ${formatKesPlain(order.total)} for order ${order.id}.${receiptLine}\n\n` +
-      `We're getting it ready. Track it here: ${ordersUrl}`,
+      `Thank you! We received your payment of ${formatKesPlain(order.total)} for order ${order.id}.` +
+      `${order.receipt ? ` M-Pesa receipt: ${order.receipt}.` : ""}\n\n` +
+      `${itemsText}\n\nSubtotal: ${formatKesPlain(order.subtotal)}\n` +
+      `Delivery: ${order.deliveryFee ? formatKesPlain(order.deliveryFee) : "Free"}\nTotal paid: ${formatKesPlain(order.total)}\n\n` +
+      `Delivering to: ${order.dropPoint}\n\nTrack your order: ${ordersUrl}`,
     html: emailLayout({
       origin,
-      preheader: `Payment of ${formatKesPlain(order.total)} received for order ${order.id}.`,
-      eyebrow: "Payment received",
+      preheader: `Payment of ${formatKesPlain(order.total)} received — order ${order.id} is confirmed.`,
+      eyebrow: "Order confirmed",
       heading: "Thank you — you're paid up",
       bodyHtml:
-        `We received your payment of <strong>${escapeHtml(formatKesPlain(order.total))}</strong> for order <strong>${escapeHtml(order.id)}</strong>.` +
-        (order.receipt ? ` Your M-Pesa receipt is <strong>${escapeHtml(order.receipt)}</strong>.` : "") +
-        " We're getting your order ready now.",
+        `We received your payment for order <strong>${escapeHtml(order.id)}</strong> and we're getting it ready now.` +
+        itemsTable(order.lines) +
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;">` +
+        money("Subtotal", formatKesPlain(order.subtotal)) +
+        money("Delivery", order.deliveryFee ? formatKesPlain(order.deliveryFee) : "Free") +
+        money("Total paid", formatKesPlain(order.total), true) +
+        `</table>` +
+        detailRows([
+          ["Delivering to", order.dropPoint],
+          ["Phone", order.phone],
+          ...(order.receipt ? ([["M-Pesa receipt", order.receipt]] as [string, string][]) : []),
+        ]),
       cta: { label: "Track your order", url: ordersUrl },
     }),
   };
@@ -401,7 +435,16 @@ export function newOrderAdminEmail(order: AlertOrder, origin: string | null) {
 }
 
 export function paymentReceivedAdminEmail(
-  payment: { id: string; customerName: string; phone: string; total: number; receipt: string | null; method: string },
+  payment: {
+    id: string;
+    customerName: string;
+    phone: string;
+    total: number;
+    receipt: string | null;
+    method: string;
+    dropPoint?: string;
+    lines?: AlertOrder["lines"];
+  },
   origin: string | null,
 ) {
   const adminUrl = `${origin ?? PUBLIC_SITE}/admin/transactions`;
@@ -423,7 +466,10 @@ export function paymentReceivedAdminEmail(
           ["Phone", payment.phone],
           ["Method", paymentLabel(payment.method)],
           ...(payment.receipt ? ([["M-Pesa receipt", payment.receipt]] as [string, string][]) : []),
-        ]) + `<p style="margin:14px 0 0;">The order is confirmed and ready to pack.</p>`,
+          ...(payment.dropPoint ? ([["Deliver to", payment.dropPoint]] as [string, string][]) : []),
+        ]) +
+        itemsTable(payment.lines ?? []) +
+        `<p style="margin:14px 0 0;">The order is confirmed and ready to pack.</p>`,
       cta: { label: "View payments", url: adminUrl },
     }),
   };

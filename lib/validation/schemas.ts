@@ -126,7 +126,8 @@ export const cartLineSchema = z.object({
 export const createOrderSchema = z.object({
   name: requiredText("Name", 120),
   phone: phoneSchema,
-  dropPoint: requiredText("Drop point", 160),
+  county: optionalText(60),
+  dropPoint: requiredText("Location", 160),
   campus: optionalText(120),
   payment: z.enum(["mpesa", "cod"], { message: "Choose M-Pesa or cash on delivery." }),
   notes: optionalText(1000),
@@ -170,10 +171,9 @@ export const productInputSchema = z
     originalPrice: money("Original price").nullable().optional(),
     gender: z.enum(["men", "women", "unisex"], { message: "Choose Men, Ladies or Unisex." }),
     category: requiredText("Category", 60),
-    images: z
-      .array(imageUrlSchema)
-      .min(1, "Add at least one photo.")
-      .max(4, "At most 4 photos per product."),
+    // Drafts may have no photos yet (e.g. imported from a spreadsheet); a
+    // published product needs at least one — checked below.
+    images: z.array(imageUrlSchema).max(4, "At most 4 photos per product."),
     sizes: z.array(z.string().trim().min(1).max(40)).max(24),
     colors: z.array(z.string().trim().min(1).max(40)).max(24),
     /** Colour name → photo. Keys must be one of `colors`; checked below. */
@@ -197,9 +197,67 @@ export const productInputSchema = z
   .refine(
     (input) => Object.keys(input.colorImages).every((color) => input.colors.includes(color)),
     { path: ["colorImages"], message: "Each colour photo must belong to one of the product's colours." }
-  );
+  )
+  .refine((input) => !input.active || input.images.length > 0, {
+    path: ["images"],
+    message: "Add at least one photo before publishing. You can save it unpublished for now.",
+  });
 
 export type ProductInput = z.input<typeof productInputSchema>;
+
+/**
+ * One row of a CSV / Excel product import, after the column names have been
+ * matched. Everything arrives as text from a spreadsheet, so numbers and
+ * lists are parsed here. Photos are added later in the product form.
+ */
+/** "KES 2,500", "Ksh 2 500" and "2,500.00" all read as 2500. */
+const spreadsheetNumber = (value: unknown) =>
+  typeof value === "string" ? value.replace(/kes|ksh|sh|[,\s]/gi, "") : value;
+
+export const productImportRowSchema = z.object({
+  name: requiredText("Name", 160),
+  price: z.preprocess(
+    spreadsheetNumber,
+    z.coerce
+      .number({ message: "Price must be a number." })
+      .positive("Price must be greater than zero.")
+      .max(10_000_000, "Price is too large.")
+  ),
+  quantity: z.preprocess(
+    spreadsheetNumber,
+    z.coerce
+      .number({ message: "Quantity must be a number." })
+      .int("Quantity must be a whole number.")
+      .min(0, "Quantity cannot be negative.")
+      .max(1_000_000, "Quantity is too large.")
+  ),
+  category: requiredText("Category", 60),
+  for: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .transform((v) =>
+      ["men", "man", "male", "him", "gents"].includes(v)
+        ? "men"
+        : ["women", "woman", "ladies", "lady", "female", "her"].includes(v)
+          ? "women"
+          : ["unisex", "both", "all", "any", ""].includes(v)
+            ? "unisex"
+            : null
+    )
+    .refine((v) => v !== null, "“For” must be Men, Ladies or Unisex.")
+    .transform((v) => v as "men" | "women" | "unisex")
+    .default("unisex"),
+  description: optionalText(2000),
+  wasPrice: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : spreadsheetNumber(v)),
+    z.coerce.number({ message: "Was price must be a number." }).positive().optional()
+  ),
+  sizes: z.string().trim().max(500).default(""),
+  colors: z.string().trim().max(500).default(""),
+});
+
+export type ProductImportRow = z.input<typeof productImportRowSchema>;
 
 // ── Content ─────────────────────────────────────────────────────────────────
 
@@ -238,6 +296,8 @@ export const homepageDropInputSchema = z.object({
   category: requiredText("Category", 60),
   image: imageUrlSchema,
   active: z.boolean(),
+  /** Link to an existing product (its slug), or null for a custom card. */
+  productId: productSlugSchema.nullable().optional(),
 });
 
 export const reviewInputSchema = z.object({

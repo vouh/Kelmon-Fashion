@@ -196,7 +196,7 @@ export async function setAdminClaim(uid: string, admin: boolean): Promise<void> 
 export async function assertNotProtected(uid: string): Promise<void> {
   const user = await getAdminAuth().getUser(uid);
   if (isProtectedAccount(user.email)) {
-    throw new Error("The owner account is protected and cannot be removed or demoted.");
+    throw new Error("The main super admin account is protected and cannot be removed or demoted.");
   }
 }
 

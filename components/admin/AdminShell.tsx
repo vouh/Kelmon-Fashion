@@ -264,7 +264,6 @@ export default function AdminShell({
           </div>
 
           <div className="ml-auto flex items-center gap-3">
-            {actions}
             <div className="relative">
               <button
                 type="button"
@@ -355,9 +354,13 @@ export default function AdminShell({
         </div>
 
         <main className="flex-1 space-y-6 p-4 md:p-6">
-          <div className="hidden md:block">
-            <h1 className="text-xl font-black text-white">{title}</h1>
-            {subtitle && <p className="mt-1 text-xs font-medium text-white/50">{subtitle}</p>}
+          <div className={`flex items-start justify-between gap-3 ${actions ? "" : "hidden md:flex"}`}>
+            <div className="hidden min-w-0 md:block">
+              <h1 className="text-xl font-black text-white">{title}</h1>
+              {subtitle && <p className="mt-1 text-xs font-medium text-white/50">{subtitle}</p>}
+            </div>
+            {/* Page-level links (sub-pages, back to parent) live with the page, not in the topbar. */}
+            {actions && <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div>}
           </div>
           {children}
         </main>

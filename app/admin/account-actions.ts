@@ -88,14 +88,14 @@ export async function setAccountRole(accountId: unknown, role: unknown): Promise
     if (!target) throw new Error("Account not found.");
 
     if (isProtectedAccount(target.email)) {
-      throw new Error("This is the owner account. It can't be demoted or removed.");
+      throw new Error("This is the main super admin account. It can't be demoted or removed.");
     }
 
     const current = accountRole(target);
     if (current === next) return { ok: true, message: "No change." };
 
     if ((current === "super_admin" || next === "super_admin") && !access.owner) {
-      throw new Error("Only the owner can promote or demote super admins.");
+      throw new Error("Only the main super admin can promote or demote super admins.");
     }
     if (next === "customer" && bootstrapAdminEmails().includes((target.email ?? "").toLowerCase())) {
       throw new Error(

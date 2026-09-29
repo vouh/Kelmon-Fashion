@@ -5,8 +5,8 @@ import { z } from "zod";
 import { isOrderId } from "@/lib/order-ids";
 import { nextOrderId } from "@/lib/supabase/orders";
 import { after } from "next/server";
-import { sendManualPaymentEmails, sendNewOrderAlert } from "@/lib/email/alerts";
-import { createClient, isAdmin } from "@/lib/supabase/server";
+import { sendManualPaymentEmails } from "@/lib/email/alerts";
+import { createClient, createServiceClient, isAdmin } from "@/lib/supabase/server";
 import type {
   OrderItemRow,
   OrderRow,
@@ -19,6 +19,7 @@ import {
   directOrderSchema,
   homepageDropInputSchema,
   parseInput,
+  productImportRowSchema,
   productInputSchema,
   productSlugSchema,
   updateInputSchema,
@@ -41,11 +42,20 @@ import {
  *     can invoke with any body, typed parameters notwithstanding.
  */
 
+/**
+ * Verifies the caller is an admin (Firebase identity + the admin role on their
+ * profile), then returns a database client for the action.
+ *
+ * The service role, not the caller's token: the Firebase ID token lives an
+ * hour, and once it lapses RLS sees an anonymous caller — writes then match no
+ * rows and fail silently (the product-page +/- buttons "did nothing"). The
+ * admin check above already uses the two-week session, so it's the gate.
+ */
 async function requireAdmin() {
   if (!(await isAdmin())) {
     throw new Error("Not authorized.");
   }
-  return createClient();
+  return process.env.SUPABASE_SERVICE_ROLE_KEY ? createServiceClient() : createClient();
 }
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -277,18 +287,7 @@ export async function createDirectOrder(input: {
       }
     }
 
-    after(() =>
-      sendNewOrderAlert({
-        id: orderId,
-        customerName: order.customerName,
-        phone: order.phone,
-        dropPoint: order.dropPoint,
-        paymentMethod: "mpesa",
-        total: order.total,
-        lines: item ? [{ name: item.name, quantity: item.quantity, price: item.price }] : [],
-        source: "admin_direct",
-      })
-    );
+    // Staff are emailed when this order's payment succeeds (sendPaymentSuccessEmails).
 
     revalidatePath("/admin/orders");
     revalidatePath("/admin");
@@ -371,6 +370,14 @@ export async function setProductActive(id: string, active: boolean): Promise<Act
   try {
     const supabase = await requireAdmin();
     const slug = validSlug(id);
+    if (active) {
+      // A product with no photo would show as a blank card in the shop.
+      const { data: product } = await supabase.from("products").select("images").eq("id", slug).maybeSingle();
+      if (!product) throw new Error("Product not found.");
+      if (!product.images?.length) {
+        throw new Error("Add at least one photo before publishing — open the product with the edit button.");
+      }
+    }
     const { error } = await supabase.from("products").update({ active }).eq("id", slug);
     if (error) throw new Error(error.message);
     revalidatePath("/admin/products");
@@ -583,24 +590,44 @@ export async function upsertHomepageDrop(input: {
   category: string;
   image: string;
   active: boolean;
+  productId?: string | null;
 }): Promise<ActionResult> {
   try {
     const supabase = await requireAdmin();
     const parsed = parseInput(homepageDropInputSchema, input);
     if (!parsed.ok) return { ok: false, error: parsed.error };
-    const drop = parsed.data;
+    const { productId, id, ...drop } = parsed.data;
 
-    if (drop.id) {
-      const { error } = await supabase
-        .from("homepage_drops")
-        .update({ name: drop.name, price: drop.price, category: drop.category, image: drop.image, active: drop.active })
-        .eq("id", validUuid(drop.id));
+    // Linked to a product: save its current details as the card's fallback
+    // (the homepage reads the live ones), so the card is right even if the
+    // product is deleted later.
+    let row = { ...drop, product_id: productId ?? null };
+    if (productId) {
+      const { data: product } = await supabase
+        .from("products")
+        .select("id, name, price, category, images")
+        .eq("id", productId)
+        .maybeSingle();
+      if (!product) throw new Error("That product no longer exists. Pick another one.");
+      row = {
+        ...row,
+        name: product.name,
+        price: Number(product.price),
+        category: product.category,
+        // Keep a custom image if one was chosen; otherwise the product's cover.
+        image: drop.image || product.images?.[0] || drop.image,
+      };
+      if (!row.image) throw new Error("That product has no photo yet — add one to it first, or upload an image here.");
+    }
+
+    if (id) {
+      const { error } = await supabase.from("homepage_drops").update(row).eq("id", validUuid(id));
       if (error) throw new Error(error.message);
     } else {
       const { data, error: listError } = await supabase.from("homepage_drops").select("sort_order");
       if (listError) throw new Error(listError.message);
-      const sortOrder = Math.max(0, ...(data ?? []).map((row) => row.sort_order)) + 1;
-      const { error } = await supabase.from("homepage_drops").insert({ ...drop, sort_order: sortOrder });
+      const sortOrder = Math.max(0, ...(data ?? []).map((r) => r.sort_order)) + 1;
+      const { error } = await supabase.from("homepage_drops").insert({ ...row, sort_order: sortOrder });
       if (error) throw new Error(error.message);
     }
 
@@ -687,6 +714,7 @@ const codeLetterSchema = z.object({
     .trim()
     .toUpperCase()
     .regex(/^[A-Z]$/, "Use a single letter, A to Z."),
+  name: z.string().trim().min(1, "Give the letter a name, e.g. Bags.").max(60, "Keep the name under 60 characters."),
   category: z.string().trim().min(1, "Choose a category.").max(60),
 });
 
@@ -694,14 +722,31 @@ const codeLetterSchema = z.object({
  * Gives a category its code letter. Products already in that category are
  * coded straight away, oldest first; new ones get the next number when saved.
  */
-export async function createCodeLetter(input: { letter: string; category: string }): Promise<ActionResult> {
+export async function createCodeLetter(input: { letter: string; name: string; category: string }): Promise<ActionResult> {
   try {
     const supabase = await requireAdmin();
     const parsed = codeLetterSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the form." };
 
+    // A category typed in here that doesn't exist yet is created first, so a
+    // new category and its letter are set up in one go.
+    const { data: existing, error: listError } = await supabase.from("categories").select("name, sort_order");
+    if (listError) throw new Error(listError.message);
+    const match = existing?.find((c) => c.name.trim().toLowerCase() === parsed.data.category.toLowerCase());
+    if (match) {
+      parsed.data.category = match.name;
+    } else {
+      const nextOrder = Math.max(0, ...(existing ?? []).map((c) => c.sort_order)) + 1;
+      const { error: categoryError } = await supabase
+        .from("categories")
+        .insert({ name: parsed.data.category, show_in_filter: true, sort_order: nextOrder });
+      if (categoryError) throw new Error(categoryError.message);
+      revalidateCategories();
+    }
+
     const { error } = await supabase.from("code_prefixes").insert({
       letter: parsed.data.letter,
+      name: parsed.data.name,
       category: parsed.data.category,
     });
     if (error) {
@@ -724,19 +769,120 @@ export async function createCodeLetter(input: { letter: string; category: string
   }
 }
 
-/** Removes a letter that has never been used. The database refuses a used one. */
-export async function deleteCodeLetter(letter: string): Promise<ActionResult> {
+// ── Product import (CSV / Excel) ────────────────────────────────────────────
+
+const MAX_IMPORT_ROWS = 500;
+
+export interface ImportRowResult {
+  row: number;
+  name: string;
+  ok: boolean;
+  code?: string | null;
+  error?: string;
+}
+
+function slugifyName(value: string): string {
+  return (
+    value
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 70) || "product"
+  );
+}
+
+function splitList(value: string): string[] {
+  return [...new Set(value.split(/[,;|]/).map((v) => v.trim()).filter(Boolean))].slice(0, 24);
+}
+
+/**
+ * Creates products from spreadsheet rows. Every row is checked on its own, so
+ * one bad row never blocks the rest; each gets back its new product code or
+ * the reason it was skipped. Imported products are always **unpublished** and
+ * have no photos — add photos, then publish, from the product list.
+ */
+export async function importProducts(
+  rows: Record<string, unknown>[]
+): Promise<{ ok: true; results: ImportRowResult[] } | { ok: false; error: string }> {
   try {
     const supabase = await requireAdmin();
-    const parsed = codeLetterSchema.shape.letter.safeParse(letter);
-    if (!parsed.success) return { ok: false, error: "Invalid letter." };
+    if (!Array.isArray(rows) || rows.length === 0) return { ok: false, error: "The file has no product rows." };
+    if (rows.length > MAX_IMPORT_ROWS) {
+      return { ok: false, error: `Import at most ${MAX_IMPORT_ROWS} products at a time.` };
+    }
 
-    const { error } = await supabase.from("code_prefixes").delete().eq("letter", parsed.data);
-    if (error) throw new Error(error.message);
+    const [{ data: categoryRows }, { data: existing }] = await Promise.all([
+      supabase.from("categories").select("name"),
+      supabase.from("products").select("id"),
+    ]);
+    const categories = new Map((categoryRows ?? []).map((c) => [c.name.trim().toLowerCase(), c.name]));
+    const takenSlugs = new Set((existing ?? []).map((p) => p.id));
 
+    const results: ImportRowResult[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const rowNumber = i + 2; // spreadsheet row, after the header
+      const raw = rows[i] ?? {};
+      const name = String(raw.name ?? "").trim();
+      const parsed = productImportRowSchema.safeParse(raw);
+      if (!parsed.success) {
+        results.push({ row: rowNumber, name, ok: false, error: parsed.error.issues[0]?.message ?? "Invalid row." });
+        continue;
+      }
+      const r = parsed.data;
+
+      const category = categories.get(r.category.trim().toLowerCase());
+      if (!category) {
+        results.push({
+          row: rowNumber,
+          name: r.name,
+          ok: false,
+          error: `Unknown category "${r.category}". Use one of: ${[...categories.values()].join(", ")} — or add it first.`,
+        });
+        continue;
+      }
+      if (r.wasPrice !== undefined && r.wasPrice < r.price) {
+        results.push({ row: rowNumber, name: r.name, ok: false, error: "Was price must be higher than the price." });
+        continue;
+      }
+
+      // A unique URL slug from the name: "silk-scarf", then "silk-scarf-2"…
+      const base = slugifyName(r.name);
+      let slug = base;
+      for (let n = 2; takenSlugs.has(slug); n++) slug = `${base}-${n}`;
+      takenSlugs.add(slug);
+
+      const { data: created, error } = await supabase
+        .from("products")
+        .insert({
+          id: slug,
+          name: r.name,
+          description: r.description ?? null,
+          price: r.price,
+          original_price: r.wasPrice ?? null,
+          category,
+          gender: r.for,
+          stock: r.quantity,
+          sizes: splitList(r.sizes),
+          colors: splitList(r.colors),
+          images: [],
+          active: false,
+        })
+        .select("code")
+        .maybeSingle();
+
+      if (error) {
+        results.push({ row: rowNumber, name: r.name, ok: false, error: error.message });
+      } else {
+        results.push({ row: rowNumber, name: r.name, ok: true, code: created?.code ?? null });
+      }
+    }
+
+    revalidatePath("/admin/products");
     revalidatePath("/admin/products/settings");
-    return ok();
+    return { ok: true, results };
   } catch (err) {
-    return fail(err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }

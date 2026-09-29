@@ -11,6 +11,7 @@ import { useCart } from "@/components/providers/CartProvider";
 import { MpesaPayModal, useMpesaPayment } from "@/components/payments/MpesaPayment";
 import { FREE_DELIVERY_THRESHOLD } from "@/lib/cart";
 import { formatKes } from "@/lib/products";
+import { KENYA_COUNTIES } from "@/lib/kenya";
 
 /** 2547XXXXXXXX (how profiles store it) → 07XXXXXXXX, the form people type. */
 function displayPhone(phone: string): string {
@@ -30,11 +31,13 @@ interface StockIssue {
 export default function CheckoutPage() {
   const router = useRouter();
   const { lines, subtotal, deliveryFee, total, clearCart, itemCount, fitToStock } = useCart();
-  const { ensureSession, user, profile } = useAuth();
+  const { ensureSession, user, profile, updateProfile } = useAuth();
   const { openAuth } = useAuthModal();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [county, setCounty] = useState("");
   const [dropPoint, setDropPoint] = useState("");
+  const [school, setSchool] = useState("");
   const [payment, setPayment] = useState<"mpesa" | "cod">("mpesa");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -60,11 +63,15 @@ export default function CheckoutPage() {
     if (prefilled.current || (!profile && !user)) return;
     const fullName = profile?.full_name?.trim() || user?.displayName?.trim() || "";
     const savedPhone = profile?.phone?.trim() || user?.phoneNumber?.trim() || "";
-    const savedDropPoint = profile?.campus?.trim();
+    const savedCounty = profile?.county?.trim() ?? "";
+    const savedLocation = profile?.location?.trim() ?? "";
+    const savedSchool = profile?.campus?.trim() ?? "";
 
     if (fullName) setName((current) => current || fullName);
     if (savedPhone) setPhone((current) => current || displayPhone(savedPhone));
-    if (savedDropPoint) setDropPoint(savedDropPoint);
+    if (savedCounty) setCounty((current) => current || savedCounty);
+    if (savedLocation) setDropPoint((current) => current || savedLocation);
+    if (savedSchool) setSchool((current) => current || savedSchool);
     // Wait for the profile row itself before locking in, since `user` usually
     // arrives first with less detail.
     if (profile) prefilled.current = true;
@@ -93,6 +100,10 @@ export default function CheckoutPage() {
       setError("Enter a valid Kenyan phone number for M-Pesa / delivery.");
       return;
     }
+    if (!county) {
+      setError("Choose your county.");
+      return;
+    }
 
     setSubmitting(true);
 
@@ -112,7 +123,9 @@ export default function CheckoutPage() {
           body: JSON.stringify({
             name: name.trim(),
             phone: phone.trim(),
-            dropPoint,
+            county,
+            dropPoint: dropPoint.trim(),
+            campus: school.trim() || undefined,
             payment,
             notes: notes.trim(),
             lines,
@@ -138,6 +151,15 @@ export default function CheckoutPage() {
         }
         id = orderData.orderId;
         setOrderId(id);
+
+        // Remember where they are for next time: fill any empty profile
+        // details from this order. Never overwrites what's already saved.
+        const patch: Parameters<typeof updateProfile>[0] = {};
+        if (!profile?.county?.trim() && county) patch.county = county;
+        if (!profile?.location?.trim() && dropPoint.trim()) patch.location = dropPoint.trim();
+        if (!profile?.campus?.trim() && school.trim()) patch.campus = school.trim();
+        if (!profile?.phone?.trim() && phone.trim()) patch.phone = phone.trim();
+        if (Object.keys(patch).length) void updateProfile(patch).catch(() => {});
       }
 
       if (payment === "mpesa") {
@@ -232,12 +254,38 @@ export default function CheckoutPage() {
                   />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-xs text-on-surface-variant">Drop point</span>
+                  <span className="text-xs text-on-surface-variant">County</span>
+                  <select
+                    required
+                    value={county}
+                    onChange={(e) => setCounty(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Choose your county…</option>
+                    {KENYA_COUNTIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-xs text-on-surface-variant">Location / drop point</span>
                   <input
                     required
                     value={dropPoint}
                     onChange={(e) => setDropPoint(e.target.value)}
-                    placeholder="Enter your preferred delivery or pickup location"
+                    placeholder="Town, estate, hostel or pickup point"
+                    className={inputClass}
+                    autoComplete="address-level2"
+                  />
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-xs text-on-surface-variant">School (optional)</span>
+                  <input
+                    value={school}
+                    onChange={(e) => setSchool(e.target.value)}
+                    placeholder="e.g. University of Nairobi"
                     className={inputClass}
                   />
                 </label>

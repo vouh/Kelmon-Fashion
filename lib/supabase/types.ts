@@ -30,7 +30,10 @@ export type ProfileRow = {
   email: string | null;
   full_name: string | null;
   phone: string | null;
+  /** Shown as "School" (optional). */
   campus: string | null;
+  county: string | null;
+  location: string | null;
   avatar_url: string | null;
   role: UserRole;
   /** Only meaningful with role 'admin'. Written by the server, never the client. */
@@ -72,6 +75,7 @@ export type OrderRow = {
   customer_name: string;
   phone: string;
   drop_point: string;
+  county: string | null;
   campus: string | null;
   notes: string | null;
   payment_method: PaymentMethod;
@@ -166,6 +170,7 @@ export type ProductGender = "men" | "women" | "unisex";
 
 export type CodePrefixRow = {
   letter: string;
+  name: string;
   category: string;
   last_number: number;
   created_at: string;
@@ -248,6 +253,8 @@ export type HomepageDropRow = {
   active: boolean;
   sort_order: number;
   created_at: string;
+  /** Linked product: the card shows its live details and opens its page. */
+  product_id: string | null;
 }
 
 /** Columns the database always fills in itself, so never required on insert. */
@@ -320,7 +327,7 @@ export type Database = {
       updates: Table<UpdateRow, "title" | "body">;
       homepage_drops: Table<HomepageDropRow, "name" | "price" | "category" | "image">;
       payment_failures: Table<PaymentFailureRow, "reason">;
-      code_prefixes: Table<CodePrefixRow, "letter" | "category">;
+      code_prefixes: Table<CodePrefixRow, "letter" | "name" | "category">;
       mpesa_requests: Table<MpesaRequestRow, "checkout_request_id" | "order_id" | "amount">;
       site_settings: Table<SiteSettingRow, "key" | "value">;
       contact_messages: Table<

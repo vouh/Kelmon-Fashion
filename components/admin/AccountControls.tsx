@@ -48,17 +48,17 @@ export function AccountRoleManager({
 
   if (isOwnerAccount) {
     return (
-      <Notice icon="workspace_premium">
-        This is the <strong className="text-white">owner</strong> account. It is always a super admin and can&apos;t be
-        demoted or removed by anyone.
+      <Notice icon="lock">
+        This is the <strong className="text-white">main super admin</strong> account. It can&apos;t be demoted or
+        removed by anyone.
       </Notice>
     );
   }
   if (isSelf) {
-    return <Notice icon="lock">You can&apos;t change your own role. Ask the owner if it needs to change.</Notice>;
+    return <Notice icon="lock">You can&apos;t change your own role. Ask the main super admin if it needs to change.</Notice>;
   }
   if (currentRole === "super_admin" && !viewerIsOwner) {
-    return <Notice icon="lock">Only the owner can change a super admin&apos;s role.</Notice>;
+    return <Notice icon="lock">Only the main super admin can change another super admin&apos;s role.</Notice>;
   }
 
   const demoting = RANK[selected] < RANK[currentRole];
@@ -123,7 +123,7 @@ export function AccountRoleManager({
                       Current
                     </span>
                   )}
-                  {locked && <span className="text-[9px] font-bold uppercase tracking-widest text-white/40">Owner only</span>}
+                  {locked && <span className="text-[9px] font-bold uppercase tracking-widest text-white/40">Main super admin only</span>}
                 </span>
                 <span className="block text-[11px] text-white/50">{option.description}</span>
               </span>

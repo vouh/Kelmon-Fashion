@@ -3,7 +3,6 @@ import Image from "next/image";
 import AppShell from "@/components/layout/AppShell";
 import FaqSection from "@/components/home/FaqSection";
 import AboutVideoHero from "@/components/about/AboutVideoHero";
-import { formatKes } from "@/lib/products";
 import { getProducts } from "@/lib/supabase/products";
 import { pageMetadata } from "@/lib/seo";
 
@@ -59,8 +58,7 @@ export default async function AboutPage() {
                 vibe stays elevated from day plans to nights out.
               </p>
               <p className="font-body-md text-body-md text-on-surface-variant">
-                Shop bags, perfumes, nails, and fashion — then get it dropped at your door.
-                Free over {formatKes(3000)}.
+                Shop bags, perfumes, nails, and fashion.
               </p>
               <ul className="space-y-3 pt-2">
                 {whyPoints.map((point) => (

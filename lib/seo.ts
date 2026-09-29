@@ -33,7 +33,7 @@ export const SITE_KEYWORDS = [
 export const DEFAULT_SHARE_IMAGE = "/opengraph-image.png";
 
 export const SOCIAL = {
-  whatsapp: "https://wa.me/254794640214",
+  whatsapp: "https://wa.me/254787216442",
 };
 
 /**

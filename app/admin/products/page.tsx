@@ -34,14 +34,22 @@ export default async function AdminProductsPage({
       title="Products"
       subtitle={`${products.length} in catalogue`}
       actions={
-        <Link
-          href="/admin/products/settings"
-          title="Product settings — code letters"
-          aria-label="Product settings"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-white/60 transition hover:border-purple-400/40 hover:text-white"
-        >
-          <span className="material-symbols-outlined text-lg">settings</span>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/categories"
+            title="Add and manage categories"
+            className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white/60 transition hover:border-purple-400/40 hover:text-white"
+          >
+            <span className="material-symbols-outlined text-base">category</span> Categories
+          </Link>
+          <Link
+            href="/admin/products/settings"
+            title="Product settings — code letters"
+            className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white/60 transition hover:border-purple-400/40 hover:text-white"
+          >
+            <span className="material-symbols-outlined text-base">settings</span> Settings
+          </Link>
+        </div>
       }
     >
       <ProductsManager

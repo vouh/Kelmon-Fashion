@@ -37,6 +37,8 @@ export interface Product {
   /** Colour name → photo shown when that colour is picked. */
   colorImages?: Record<string, string>;
   stock?: number;
+  /** Published (visible in the shop). Drafts are admin-only. */
+  active?: boolean;
 }
 
 export interface CartItem {
@@ -67,6 +69,7 @@ export function productFromRow(row: ProductRow): Product {
     colors: row.colors ?? [],
     colorImages: row.color_images ?? {},
     stock: row.stock,
+    active: row.active,
   };
 }
 

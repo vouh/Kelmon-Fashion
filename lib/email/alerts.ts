@@ -42,10 +42,25 @@ export async function getSavedAlertRecipients(): Promise<string[]> {
   return asEmailList(data?.value);
 }
 
-/** Everyone who gets order and payment alerts, deduplicated. */
+/** Every super admin's email: the owner plus anyone made super admin in Accounts. */
+async function getSuperAdminEmails(): Promise<string[]> {
+  if (!isSupabaseConfigured() || !process.env.SUPABASE_SERVICE_ROLE_KEY) return [...PROTECTED_SUPER_ADMIN_EMAILS];
+  const { data, error } = await createServiceClient()
+    .from("profiles")
+    .select("email")
+    .eq("super_admin", true)
+    .not("email", "is", null);
+  if (error) console.error("[alerts] could not read super admins:", error.message);
+  return [...PROTECTED_SUPER_ADMIN_EMAILS, ...(data ?? []).map((r) => r.email as string)];
+}
+
+/**
+ * Everyone who gets order and payment alerts: the Settings list plus all super
+ * admins. Deduplicated case-insensitively, so an address on both gets one email.
+ */
 export async function getAlertRecipients(): Promise<string[]> {
-  const saved = await getSavedAlertRecipients();
-  const all = [...saved, ...PROTECTED_SUPER_ADMIN_EMAILS].map((e) => e.trim().toLowerCase());
+  const [saved, superAdmins] = await Promise.all([getSavedAlertRecipients(), getSuperAdminEmails()]);
+  const all = [...saved, ...superAdmins].map((e) => e.trim().toLowerCase()).filter((e) => e.includes("@"));
   return [...new Set(all)];
 }
 
@@ -71,43 +86,20 @@ export async function sendNewOrderAlert(order: AlertOrder) {
   await sendToAdmins(newOrderAdminEmail(order, configuredSiteOrigin()), "order-alert");
 }
 
-/** Looks the order up by id, so any code path that marks an order paid can call it. */
-export async function sendPaymentReceivedAlert(orderId: string, receipt: string | null) {
-  if (!isSupabaseConfigured() || !process.env.SUPABASE_SERVICE_ROLE_KEY) return;
-  const { data: order } = await createServiceClient()
-    .from("orders")
-    .select("id, customer_name, phone, mpesa_phone, total, payment_method, mpesa_receipt_number")
-    .eq("id", orderId)
-    .maybeSingle();
-  if (!order) return;
-
-  await sendToAdmins(
-    paymentReceivedAdminEmail(
-      {
-        id: order.id,
-        customerName: order.customer_name,
-        phone: order.mpesa_phone ?? order.phone,
-        total: Number(order.total),
-        receipt: receipt ?? order.mpesa_receipt_number,
-        method: order.payment_method,
-      },
-      configuredSiteOrigin()
-    ),
-    "payment-alert"
-  );
-}
-
 /**
- * An admin marked an order paid by hand (cash on delivery, or M-Pesa paid
- * outside the prompt): the customer gets their receipt and staff get the
- * usual "payment received" alert.
+ * A successful payment, by any route (M-Pesa callback, status check, or an
+ * admin marking it paid): the customer gets a full receipt with the order, and
+ * the alert list plus super admins get "payment received" with the order.
+ * Failed payments never come here — they go to the customer only.
  */
-export async function sendManualPaymentEmails(orderId: string) {
+export async function sendPaymentSuccessEmails(orderId: string, receipt: string | null) {
   if (!isSupabaseConfigured() || !process.env.SUPABASE_SERVICE_ROLE_KEY) return;
   const supabase = createServiceClient();
   const { data: order } = await supabase
     .from("orders")
-    .select("id, user_id, total, mpesa_receipt_number")
+    .select(
+      "id, user_id, customer_name, phone, mpesa_phone, drop_point, payment_method, subtotal, delivery_fee, total, mpesa_receipt_number, order_items(name, quantity, price, variant)"
+    )
     .eq("id", orderId)
     .maybeSingle();
   if (!order) return;
@@ -122,15 +114,47 @@ export async function sendManualPaymentEmails(orderId: string) {
     customer = profile?.email ?? null;
   }
 
+  const details = {
+    id: order.id,
+    customerName: order.customer_name,
+    phone: order.mpesa_phone ?? order.phone,
+    dropPoint: order.drop_point,
+    paymentMethod: order.payment_method,
+    receipt: receipt ?? order.mpesa_receipt_number,
+    subtotal: Number(order.subtotal),
+    deliveryFee: Number(order.delivery_fee),
+    total: Number(order.total),
+    lines: (order.order_items ?? []).map((l) => ({
+      name: l.name,
+      quantity: l.quantity,
+      price: Number(l.price),
+      variant: l.variant,
+    })),
+  };
+  const origin = configuredSiteOrigin();
+
   await Promise.all([
-    sendEmailSafely(
-      customer,
-      paymentReceivedEmail(
-        { id: order.id, total: Number(order.total), receipt: order.mpesa_receipt_number },
-        configuredSiteOrigin()
+    sendEmailSafely(customer, paymentReceivedEmail(details, origin), "payments"),
+    sendToAdmins(
+      paymentReceivedAdminEmail(
+        {
+          id: details.id,
+          customerName: details.customerName,
+          phone: details.phone,
+          total: details.total,
+          receipt: details.receipt,
+          method: details.paymentMethod,
+          dropPoint: details.dropPoint,
+          lines: details.lines,
+        },
+        origin
       ),
-      "payments"
+      "payment-alert"
     ),
-    sendPaymentReceivedAlert(order.id, order.mpesa_receipt_number),
   ]);
+}
+
+/** An admin marked an order paid by hand (e.g. cash on delivery). */
+export async function sendManualPaymentEmails(orderId: string) {
+  await sendPaymentSuccessEmails(orderId, null);
 }

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Playfair_Display, Cormorant_Garamond } from "next/font/google";
 import AppProviders from "@/components/providers/AppProviders";
+import PwaRegister from "@/components/providers/PwaRegister";
 import "@/styles/design.css";
 import "./globals.css";
 import {
@@ -98,7 +99,7 @@ const structuredData = {
       contactPoint: {
         "@type": "ContactPoint",
         contactType: "customer service",
-        telephone: "+254794640214",
+        telephone: "+254787216442",
         areaServed: "KE",
         availableLanguage: ["English", "Swahili"],
       },
@@ -152,6 +153,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={`${inter.variable} ${playfair.variable} ${cormorant.variable} kelmon-theme antialiased min-h-screen flex flex-col font-body-md text-body-md`}>
         <AppProviders>{children}</AppProviders>
+        <PwaRegister />
       </body>
     </html>
   );

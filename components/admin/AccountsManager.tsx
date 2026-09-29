@@ -25,13 +25,12 @@ const ROLE_STYLE: Record<AccountRole, string> = {
   customer: "border-white/10 bg-white/5 text-white/60",
 };
 
-export function RoleBadge({ role, owner }: { role: AccountRole; owner?: boolean }) {
+export function RoleBadge({ role }: { role: AccountRole }) {
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${ROLE_STYLE[role]}`}
     >
-      {owner && <span className="material-symbols-outlined text-[11px]">workspace_premium</span>}
-      {owner ? "Owner" : ROLE_LABELS[role]}
+      {ROLE_LABELS[role]}
     </span>
   );
 }
@@ -179,7 +178,7 @@ export default function AccountsManager({ accounts }: { accounts: AccountSummary
                     </td>
                     <td className={TD}>
                       <div className="flex flex-col items-start gap-1">
-                        <RoleBadge role={a.role} owner={a.owner} />
+                        <RoleBadge role={a.role} />
                         {a.pendingInvite && (
                           <span className="text-[9px] font-bold uppercase tracking-widest text-amber-300">Invite pending</span>
                         )}

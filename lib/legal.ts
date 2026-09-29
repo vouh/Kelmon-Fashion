@@ -10,7 +10,7 @@ export const LEGAL_UPDATED = "29 September 2026";
 
 export const LEGAL_CONTACT = {
   business: "Kelmon",
-  whatsapp: "+254 794 640 214",
-  whatsappUrl: "https://wa.me/254794640214",
+  whatsapp: "+254 787 216 442",
+  whatsappUrl: "https://wa.me/254787216442",
   contactPage: "/contact",
 };

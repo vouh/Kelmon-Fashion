@@ -1,42 +1,33 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 
 /**
  * Full-screen, muted, endlessly looping video at the top of /about.
  *
  * Muted + playsInline is what lets browsers (iOS Safari included) autoplay it.
- * Visitors who prefer reduced motion get the still poster instead, and anyone
- * can pause it with the button in the corner.
+ * Visitors who prefer reduced motion get the still poster instead.
  */
 export default function AboutVideoHero() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(true);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       video.pause();
-      setPlaying(false);
       return;
     }
-    // Some browsers ignore the autoplay attribute until play() is called.
-    void video.play().catch(() => setPlaying(false));
+    // Some browsers ignore the autoplay attribute until play() is called, and
+    // pause background tabs; resume whenever the page is visible again.
+    const play = () => {
+      if (document.visibilityState === "visible" && video.paused) void video.play().catch(() => {});
+    };
+    play();
+    document.addEventListener("visibilitychange", play);
+    return () => document.removeEventListener("visibilitychange", play);
   }, []);
-
-  function toggle() {
-    const video = videoRef.current;
-    if (!video) return;
-    if (video.paused) {
-      void video.play();
-      setPlaying(true);
-    } else {
-      video.pause();
-      setPlaying(false);
-    }
-  }
 
   return (
     <section
@@ -64,67 +55,44 @@ export default function AboutVideoHero() {
 
       <div className="w-full px-margin-mobile md:px-margin-desktop pb-24 md:pb-28">
         <div className="max-w-3xl text-white">
-          <p className="hero-rise flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.35em] text-[#ead2a1]" style={{ animationDelay: "150ms" }}>
-            <span className="hero-line inline-block h-px w-10 bg-[#ead2a1]" style={{ animationDelay: "150ms" }} />
-            Our story
-          </p>
           <h1
-            className="hero-rise mt-5 font-display-lg text-[2.75rem] leading-[1.02] tracking-tight md:text-7xl lg:text-8xl"
+            className="hero-rise font-display-lg text-[2.75rem] leading-[1.02] tracking-tight md:text-7xl lg:text-8xl"
             style={{ animationDelay: "300ms" }}
           >
-            Glam is identity.
-            <span className="block text-[#ead2a1]/90 italic font-normal">Wear it well.</span>
+            Look good.
+            <span className="block font-normal italic text-[#ead2a1]">Smell amazing.</span>
           </h1>
           <p
-            className="hero-rise mt-6 max-w-xl text-base leading-relaxed text-white/80 md:text-lg"
+            className="hero-rise mt-6 max-w-lg text-base leading-relaxed text-white/85 md:text-lg"
             style={{ animationDelay: "480ms" }}
           >
-            Kelmon curates fragrance, bags and finishing touches for students who show up — checked,
-            packed with care, and delivered to your campus.
+            Your everyday glow-up, sorted. Discover standout scents, stylish bags and accessories
+            made to match your vibe without stretching your budget.
           </p>
-          <div className="hero-rise mt-9 flex flex-wrap items-center gap-4" style={{ animationDelay: "640ms" }}>
+          <div className="hero-rise mt-8 flex flex-wrap items-center gap-4" style={{ animationDelay: "640ms" }}>
             <Link
               href="/shop"
-              className="group inline-flex h-12 items-center gap-2 rounded-full bg-white px-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary transition hover:bg-[#ead2a1]"
+              className="group inline-flex h-12 items-center gap-2 rounded-full bg-white px-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary shadow-[0_12px_35px_rgba(0,0,0,0.2)] transition hover:-translate-y-0.5 hover:bg-[#ead2a1]"
             >
-              Shop the collection
+              Explore the collection
               <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1" aria-hidden="true">
                 arrow_forward
               </span>
             </Link>
-            <a
-              href="#story"
-              className="inline-flex h-12 items-center rounded-full border border-white/35 px-7 text-[11px] font-semibold uppercase tracking-[0.2em] text-white backdrop-blur-sm transition hover:border-[#ead2a1] hover:text-[#ead2a1]"
-            >
-              Our promise
-            </a>
           </div>
         </div>
       </div>
 
-      {/* Scroll cue */}
+      {/* Scroll cue: a bouncing arrow down to the rest of the page. */}
       <a
         href="#story"
-        aria-label="Scroll to our story"
-        className="absolute bottom-7 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-white/60 transition hover:text-white md:flex"
+        aria-label="Scroll down"
+        className="about-scroll-arrow absolute bottom-6 left-1/2 flex h-12 w-12 -translate-x-1/2 items-center justify-center rounded-full border border-white/30 bg-black/20 text-white/80 backdrop-blur-sm transition hover:border-[#ead2a1] hover:text-[#ead2a1]"
       >
-        Scroll
-        <span className="relative block h-10 w-px overflow-hidden bg-white/20">
-          <span className="about-scroll-dot absolute left-0 top-0 block h-3 w-px bg-white" />
+        <span className="material-symbols-outlined text-[26px]" aria-hidden="true">
+          keyboard_arrow_down
         </span>
       </a>
-
-      {/* Pause / play — moving video should always be stoppable. */}
-      <button
-        type="button"
-        onClick={toggle}
-        aria-label={playing ? "Pause background video" : "Play background video"}
-        className="absolute bottom-6 right-5 flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/25 text-white backdrop-blur-sm transition hover:border-[#ead2a1] hover:text-[#ead2a1] md:right-10"
-      >
-        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
-          {playing ? "pause" : "play_arrow"}
-        </span>
-      </button>
     </section>
   );
 }

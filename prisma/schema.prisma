@@ -90,6 +90,9 @@ model Profile {
   /// the owner (lib/auth/protected-accounts.ts) always has it.
   super_admin    Boolean   @default(false)
   loyalty_points Int       @default(0)
+  /// Kenyan county and the customer's area/estate/hostel. `campus` is their school (optional).
+  county         String?
+  location       String?
   /// When the customer accepted the Terms of Service and Privacy Policy, and
   /// which version (the policies' effective date, see lib/legal.ts).
   terms_accepted_at DateTime? @db.Timestamptz(6)
@@ -100,6 +103,7 @@ model Profile {
   orders  Order[]
   reviews Review[]
   likes   ProductLike[]
+  weekly_bonuses LoyaltyWeeklyBonus[]
 
   @@map("profiles")
 }
@@ -138,6 +142,7 @@ model Product {
 
   order_items OrderItem[]
   reviews     Review[]
+  homepage_drops HomepageDrop[]
   likes       ProductLike[]
 
   @@map("products")
@@ -180,6 +185,8 @@ model Order {
   customer_name  String
   phone          String
   drop_point     String
+  /// County the order is delivered to; drop_point is the exact place.
+  county         String?
   campus         String?
   notes          String?
   payment_method payment_method @default(mpesa)
@@ -222,6 +229,7 @@ model Order {
   order_items      OrderItem[]
   payment_failures PaymentFailure[]
   mpesa_requests   MpesaRequest[]
+  weekly_bonuses   LoyaltyWeeklyBonus[]
 
   @@index([user_id, created_at(sort: Desc)], map: "orders_user_created_idx")
   @@index([created_at(sort: Desc)], map: "orders_created_idx")
@@ -310,8 +318,13 @@ model HomepageDrop {
   active     Boolean  @default(true)
   sort_order Int      @default(0)
   created_at DateTime @default(now()) @db.Timestamptz(6)
+  /// When set, the card shows this product's live details and opens its page.
+  product_id String?
+
+  product Product? @relation(fields: [product_id], references: [id], onDelete: SetNull)
 
   @@index([active, sort_order], map: "homepage_drops_active_sort_idx")
+  @@index([product_id], map: "homepage_drops_product_idx")
   @@map("homepage_drops")
 }
 
@@ -420,6 +433,8 @@ model MpesaRequest {
 /// `last_number` is how far the letter has got; only product saves move it.
 model CodePrefix {
   letter      String   @id
+  /// What the letter stands for, e.g. "Bags".
+  name        String
   category    String
   last_number Int      @default(0)
   created_at  DateTime @default(now()) @db.Timestamptz(6)
@@ -433,4 +448,23 @@ model OrderDayCounter {
   last_number Int      @default(0)
 
   @@map("order_day_counters")
+}
+
+/// Weekly spend bonus: 5 points the first time a customer's paid orders in a
+/// week (Monday–Sunday, Nairobi time) reach KES 1,000. Written only by
+/// award_loyalty_points(); admins can read it.
+model LoyaltyWeeklyBonus {
+  user_id    String
+  week_start DateTime @db.Date
+  /// The order that tipped the week over KES 1,000.
+  order_id   String?
+  week_total Decimal  @db.Decimal(10, 2)
+  points     Int
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  user  Profile @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  order Order?  @relation(fields: [order_id], references: [id], onDelete: SetNull)
+
+  @@id([user_id, week_start])
+  @@map("loyalty_weekly_bonuses")
 }

@@ -515,6 +515,8 @@ body {
 .hero-slide-leave { animation: hero-slide-out 0.9s cubic-bezier(0.55, 0, 0.45, 1) both; }
 .hero-kenburns { animation: hero-kenburns 7.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .hero-rise { animation: hero-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* A hero slide dragged in by a swipe is already on screen: show its text as-is. */
+.hero-static .hero-rise { animation: none; }
 .hero-line { transform-origin: left; animation: hero-line 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .hero-progress { animation-name: hero-progress; animation-timing-function: linear; animation-fill-mode: both; }
 
@@ -550,6 +552,11 @@ body {
   100% { transform: translateY(340%); opacity: 0; }
 }
 .about-scroll-dot { animation: about-scroll-dot 1.8s ease-in-out infinite; }
+@keyframes about-scroll-arrow {
+  0%, 100% { transform: translate(-50%, 0); }
+  50% { transform: translate(-50%, 8px); }
+}
+.about-scroll-arrow { animation: about-scroll-arrow 1.6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .about-hero-video, .about-scroll-dot { animation: none !important; }
+  .about-hero-video, .about-scroll-dot, .about-scroll-arrow { animation: none !important; }
 }

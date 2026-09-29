@@ -9,7 +9,7 @@ import {
   MAX_CONTACT_RECIPIENTS,
   resolveAudience,
 } from "@/lib/supabase/admin-inbox";
-import { createClient, getAdminEmail, isAdmin } from "@/lib/supabase/server";
+import { createClient, createServiceClient, getAdminEmail, isAdmin } from "@/lib/supabase/server";
 import { ORDER_ALERT_RECIPIENTS_KEY } from "@/lib/email/alerts";
 
 /**
@@ -20,9 +20,18 @@ import { ORDER_ALERT_RECIPIENTS_KEY } from "@/lib/email/alerts";
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
 
+/**
+ * Verifies the caller is an admin (Firebase identity + the admin role on their
+ * profile), then returns a database client for the action.
+ *
+ * The service role, not the caller's token: the Firebase ID token lives an
+ * hour, and once it lapses RLS sees an anonymous caller — writes then match no
+ * rows and fail silently (the product-page +/- buttons "did nothing"). The
+ * admin check above already uses the two-week session, so it's the gate.
+ */
 async function requireAdmin() {
   if (!(await isAdmin())) throw new Error("Not authorized.");
-  return createClient();
+  return process.env.SUPABASE_SERVICE_ROLE_KEY ? createServiceClient() : createClient();
 }
 
 function fail(err: unknown): ActionResult {

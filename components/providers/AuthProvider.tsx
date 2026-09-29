@@ -57,7 +57,7 @@ interface AuthContextValue {
   signUpWithEmail: (email: string, password: string, fullName: string) => Promise<SignInResult>;
   signOut: () => Promise<void>;
   updateProfile: (
-    patch: Partial<Pick<ProfileRow, "full_name" | "phone" | "campus" | "avatar_url">>
+    patch: Partial<Pick<ProfileRow, "full_name" | "phone" | "campus" | "county" | "location" | "avatar_url">>
   ) => Promise<void>;
   refreshProfile: () => Promise<void>;
   /**
@@ -313,7 +313,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [requireAuth, router]);
 
   const updateProfile = useCallback(
-    async (patch: Partial<Pick<ProfileRow, "full_name" | "phone" | "campus" | "avatar_url">>) => {
+    async (patch: Partial<Pick<ProfileRow, "full_name" | "phone" | "campus" | "county" | "location" | "avatar_url">>) => {
       if (!user) throw new Error("You must be signed in.");
       const { error } = await createClient().from("profiles").update(patch).eq("id", user.uid);
       if (error) throw new Error(error.message);

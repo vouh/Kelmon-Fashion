@@ -37,13 +37,6 @@ const CONTENT_LINKS = [
     color: "text-blue-400",
   },
   {
-    href: "/admin/categories",
-    icon: "category",
-    label: "Categories",
-    hint: "Shop categories and filter chips",
-    color: "text-purple-300",
-  },
-  {
     href: "/admin/products",
     icon: "inventory_2",
     label: "Products",

@@ -1,10 +1,10 @@
 import "server-only";
 
-import { configuredSiteOrigin, paymentFailedEmail, paymentReceivedEmail } from "@/lib/email/templates";
+import { configuredSiteOrigin, paymentFailedEmail } from "@/lib/email/templates";
 import { mpesaFailureReason } from "@/lib/mpesa";
 import { awardLoyaltyPoints } from "@/lib/supabase/orders";
 import { createServiceClient } from "@/lib/supabase/server";
-import { sendEmailSafely, sendPaymentReceivedAlert } from "@/lib/email/alerts";
+import { sendEmailSafely, sendPaymentSuccessEmails } from "@/lib/email/alerts";
 
 /**
  * The single place an M-Pesa outcome is applied to an order, shared by the
@@ -150,16 +150,9 @@ export async function applyPaymentSuccess(
   // Idempotent inside Postgres, so a duplicate callback cannot double-award.
   await awardLoyaltyPoints(order.id);
 
-  // The customer gets their receipt; the shop's alert list and super admins
-  // get a "payment received" email. Both best effort.
-  await Promise.all([
-    sendEmailSafely(
-      await customerEmail(order.user_id),
-      paymentReceivedEmail({ id: order.id, total: Number(order.total), receipt: details.receipt }, siteUrl()),
-      "payments"
-    ),
-    sendPaymentReceivedAlert(order.id, details.receipt),
-  ]);
+  // One place for "payment succeeded" emails: the customer's full receipt, and
+  // the alert list plus super admins. Failures (below) go to the customer only.
+  await sendPaymentSuccessEmails(order.id, details.receipt);
 
   return order.id;
 }
