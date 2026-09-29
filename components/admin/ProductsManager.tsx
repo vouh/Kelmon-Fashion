@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { EmptyState, formatKes } from "@/components/admin/ui";
@@ -12,6 +12,8 @@ import {
 } from "@/app/admin/actions";
 import { compressImage } from "@/lib/images/compress";
 import ProductImport from "@/components/admin/ProductImport";
+import { bulkDeleteProducts, bulkSetProductsActive } from "@/app/admin/bulk-actions";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { uploadProductImage } from "@/lib/supabase/storage";
 import { GENDER_LABELS, type Product } from "@/lib/products";
 
@@ -128,7 +130,84 @@ export default function ProductsManager({
     const product = initialEditId ? products.find((p) => p.id === initialEditId) : undefined;
     return product ? draftFrom(product) : null;
   });
+  /** The draft as it was opened, to tell whether closing would lose edits. */
+  const [baseline, setBaseline] = useState<string | null>(() => (draft ? JSON.stringify(draft) : null));
   const [uploading, setUploading] = useState(false);
+  const confirm = useConfirm();
+  const editorRef = useRef<HTMLDivElement>(null);
+  const editing = draft !== null;
+
+  function openDraft(next: Draft) {
+    setError(null);
+    setBaseline(JSON.stringify(next));
+    setDraft(next);
+  }
+
+  async function closeDraft() {
+    if (busy || uploading) return;
+    if (draft && JSON.stringify(draft) !== baseline) {
+      const discard = await confirm({
+        title: "Discard changes?",
+        message: "Your edits to this product haven't been saved.",
+        confirmLabel: "Discard",
+        tone: "danger",
+      });
+      if (!discard) return;
+    }
+    setDraft(null);
+    setError(null);
+  }
+
+  // The page behind the editor stays still while it's open.
+  useEffect(() => {
+    if (!editing) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    editorRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [editing]);
+  /** Products ticked for bulk publish / unpublish / delete. */
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+  const selectedIds = products.filter((p) => selected.has(p.id)).map((p) => p.id);
+  const allSelected = products.length > 0 && selectedIds.length === products.length;
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function runBulk(action: () => Promise<{ ok: true; message: string } | { ok: false; error: string }>) {
+    setBulkMessage(null);
+    run(async () => {
+      const result = await action();
+      if (result.ok) {
+        setBulkMessage(result.message);
+        setSelected(new Set());
+      }
+      return result;
+    });
+  }
+
+  async function deleteSelected() {
+    const ok = await confirm({
+      title: `Delete ${selectedIds.length} product${selectedIds.length === 1 ? "" : "s"}?`,
+      message:
+        "They'll be removed from the shop and the admin for good. Past orders keep their item details. This can't be undone.",
+      confirmLabel: "Delete products",
+      tone: "danger",
+    });
+    if (ok) {
+      const ids = selectedIds;
+      runBulk(() => bulkDeleteProducts(ids));
+    }
+  }
 
   function run(action: () => Promise<{ ok: boolean; error?: string }>, onDone?: () => void) {
     setError(null);
@@ -211,30 +290,47 @@ export default function ProductsManager({
 
   return (
     <div className="space-y-4">
-      {error && (
+      {error && !draft && (
         <div className="flex items-start gap-2 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3">
           <span className="material-symbols-outlined text-base text-red-400">error</span>
           <p className="text-xs text-red-300">{error}</p>
         </div>
       )}
 
-      {!draft && (
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setDraft(emptyDraft(categories[0] ?? "Accessories"))}
-            className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-xs font-black uppercase tracking-widest text-white transition hover:bg-purple-500"
-          >
-            <span className="material-symbols-outlined text-sm">add</span> New product
-          </button>
-          <ProductImport categories={categories} />
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => openDraft(emptyDraft(categories[0] ?? "Accessories"))}
+          className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-xs font-black uppercase tracking-widest text-white transition hover:bg-purple-500"
+        >
+          <span className="material-symbols-outlined text-sm">add</span> New product
+        </button>
+        <ProductImport categories={categories} />
+      </div>
 
       {draft && (
-        <div className="space-y-4 rounded-xl border border-purple-400/20 bg-zinc-900 p-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-black text-white">
+        <div
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/65 backdrop-blur-sm animate-[confirm-fade_0.15s_ease-out] sm:items-center sm:p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) void closeDraft();
+          }}
+        >
+        <div
+          ref={editorRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="product-editor-title"
+          tabIndex={-1}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              void closeDraft();
+            }
+          }}
+          className="flex max-h-[94vh] w-full flex-col overflow-hidden rounded-t-2xl border border-purple-400/20 bg-zinc-900 shadow-2xl outline-none animate-[confirm-pop_0.18s_cubic-bezier(0.22,1,0.36,1)] sm:max-w-3xl sm:rounded-2xl"
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-white/5 px-5 py-4">
+            <h3 id="product-editor-title" className="min-w-0 truncate text-sm font-black text-white">
               {draft.existing ? `Edit ${draft.name || draft.id}` : "New product"}
               <CodeHint
                 code={products.find((p) => p.id === draft.id)?.code ?? null}
@@ -245,13 +341,21 @@ export default function ProductsManager({
             </h3>
             <button
               type="button"
-              onClick={() => setDraft(null)}
-              className="rounded p-1 text-white/40 hover:text-white"
+              onClick={() => void closeDraft()}
+              className="shrink-0 rounded-lg p-1.5 text-white/40 hover:bg-white/10 hover:text-white"
               aria-label="Close"
             >
-              <span className="material-symbols-outlined text-base">close</span>
+              <span className="material-symbols-outlined text-lg">close</span>
             </button>
           </div>
+
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          {error && (
+            <div className="flex items-start gap-2 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3" role="alert">
+              <span className="material-symbols-outlined text-base text-red-400">error</span>
+              <p className="text-xs text-red-300">{error}</p>
+            </div>
+          )}
 
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="sm:col-span-3">
@@ -492,15 +596,83 @@ export default function ProductsManager({
               </div>
             </div>
           </details>
+          </div>
 
-          <button
-            type="button"
-            onClick={save}
-            disabled={busy || uploading}
-            className="rounded-lg bg-purple-600 px-4 py-2 text-xs font-black uppercase tracking-widest text-white transition hover:bg-purple-500 disabled:opacity-50"
-          >
-            {busy ? "Saving…" : draft.existing ? "Save changes" : "Create product"}
-          </button>
+          <div className="flex items-center justify-end gap-2 border-t border-white/5 px-5 py-3">
+            <button
+              type="button"
+              onClick={() => void closeDraft()}
+              disabled={busy || uploading}
+              className="rounded-lg border border-white/10 px-4 py-2 text-xs font-black uppercase tracking-widest text-white/60 transition hover:text-white disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={save}
+              disabled={busy || uploading}
+              className="rounded-lg bg-purple-600 px-4 py-2 text-xs font-black uppercase tracking-widest text-white transition hover:bg-purple-500 disabled:opacity-50"
+            >
+              {busy ? "Saving…" : uploading ? "Uploading photos…" : draft.existing ? "Save changes" : "Create product"}
+            </button>
+          </div>
+        </div>
+        </div>
+      )}
+
+      {bulkMessage && (
+        <div className="rounded-xl border border-green-400/30 bg-green-400/10 px-4 py-3 text-xs text-green-300" role="status">
+          {bulkMessage}
+        </div>
+      )}
+
+      {/* Bulk actions */}
+      {products.length > 0 && (
+        <div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-white/5 bg-zinc-900/95 px-4 py-2 backdrop-blur">
+          <label className="flex cursor-pointer items-center gap-2 text-[11px] font-bold text-white/60">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={() => setSelected(allSelected ? new Set() : new Set(products.map((p) => p.id)))}
+              className="h-3.5 w-3.5 accent-purple-500"
+            />
+            {selectedIds.length ? `${selectedIds.length} selected` : "Select all"}
+          </label>
+          {selectedIds.length > 0 && (
+            <>
+              <span className="flex-1" />
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  const ids = selectedIds;
+                  runBulk(() => bulkSetProductsActive(ids, true));
+                }}
+                className="flex items-center gap-1 rounded-lg bg-green-500/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-green-300 hover:bg-green-500/25 disabled:opacity-40"
+              >
+                <span className="material-symbols-outlined text-sm">visibility</span> Publish
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  const ids = selectedIds;
+                  runBulk(() => bulkSetProductsActive(ids, false));
+                }}
+                className="flex items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white/70 hover:text-white disabled:opacity-40"
+              >
+                <span className="material-symbols-outlined text-sm">visibility_off</span> Unpublish
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void deleteSelected()}
+                className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white hover:bg-red-500 disabled:opacity-40"
+              >
+                <span className="material-symbols-outlined text-sm">delete</span> Delete
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -511,7 +683,17 @@ export default function ProductsManager({
         ) : (
           <ul className="divide-y divide-white/5">
             {products.map((product) => (
-              <li key={product.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+              <li
+                key={product.id}
+                className={`flex flex-wrap items-center gap-3 px-4 py-3 ${selected.has(product.id) ? "bg-purple-500/[0.07]" : ""}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(product.id)}
+                  onChange={() => toggleSelected(product.id)}
+                  aria-label={`Select ${product.name}`}
+                  className="h-3.5 w-3.5 shrink-0 accent-purple-500"
+                />
                 <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-zinc-800">
                   <Image
                     src={product.image}
@@ -592,7 +774,7 @@ export default function ProductsManager({
                   )}
                   <button
                     type="button"
-                    onClick={() => setDraft(draftFrom(product))}
+                    onClick={() => openDraft(draftFrom(product))}
                     className="rounded p-1 text-purple-300/60 hover:bg-purple-500/10 hover:text-purple-300"
                     aria-label="Edit product"
                   >

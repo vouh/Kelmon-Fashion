@@ -11,7 +11,7 @@ export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? PRODUCTION_SITE_URL
 export const SITE_NAME = "Kelmon";
 export const SITE_TAGLINE = "Beauty · Fashion · Glamour";
 export const SITE_DESCRIPTION =
-  "Shop designer-inspired bags, perfumes, colognes and accessories at Kelmon. Campus fashion and beauty for Kenyan students, with M-Pesa checkout and free delivery over KES 3,000.";
+  "Shop designer-inspired bags, perfumes, colognes and accessories at Kelmon. Campus fashion and beauty for Kenyan students, with M-Pesa checkout and free delivery.";
 
 export const SITE_KEYWORDS = [
   "Kelmon",

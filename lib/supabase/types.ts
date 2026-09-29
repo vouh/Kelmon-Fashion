@@ -176,6 +176,20 @@ export type CodePrefixRow = {
   created_at: string;
 }
 
+export type SensitiveActionCodeRow = {
+  id: string;
+  action: string;
+  payload: unknown;
+  summary: string;
+  code_hash: string;
+  requested_by: string;
+  requester_email: string | null;
+  attempts: number;
+  expires_at: string;
+  used_at: string | null;
+  created_at: string;
+}
+
 export type PaymentFailureRow = {
   id: string;
   order_id: string | null;
@@ -327,6 +341,10 @@ export type Database = {
       updates: Table<UpdateRow, "title" | "body">;
       homepage_drops: Table<HomepageDropRow, "name" | "price" | "category" | "image">;
       payment_failures: Table<PaymentFailureRow, "reason">;
+      sensitive_action_codes: Table<
+        SensitiveActionCodeRow,
+        "action" | "payload" | "summary" | "code_hash" | "requested_by" | "expires_at"
+      >;
       code_prefixes: Table<CodePrefixRow, "letter" | "name" | "category">;
       mpesa_requests: Table<MpesaRequestRow, "checkout_request_id" | "order_id" | "amount">;
       site_settings: Table<SiteSettingRow, "key" | "value">;

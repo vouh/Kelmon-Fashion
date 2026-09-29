@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: ProductPageProps) {
     title: `${product.name} — ${price}`,
     description: summary(
       product.description,
-      `Buy ${product.name} (${product.category}) at Kelmon for ${price}. Pay with M-Pesa, free campus delivery over KES 3,000.`
+      `Buy ${product.name} (${product.category}) at Kelmon for ${price}. Pay with M-Pesa, free delivery.`
     ),
     path: `/product/${product.id}`,
     image: absoluteImage(product.image),

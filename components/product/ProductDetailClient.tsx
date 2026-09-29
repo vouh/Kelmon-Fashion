@@ -233,9 +233,6 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
               <StarRating reviewCount={product.reviewCount} />
             </div>
 
-            <p className="text-sm text-on-surface-variant leading-relaxed mb-5">
-              Free delivery on orders over {formatKes(3000)}.
-            </p>
 
             {colors.length > 0 && (
               <OptionPicker

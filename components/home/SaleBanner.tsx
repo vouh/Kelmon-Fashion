@@ -50,7 +50,7 @@ export default function SaleBanner({ product, endsAt }: SaleBannerProps) {
             </p>
             <h2 className="font-headline-lg text-headline-lg text-white">Campus Drop Sale</h2>
             <p className="font-body-lg text-body-lg text-white/70 max-w-md">
-              Free delivery over KES 3,000 — grab your glam before the timer hits zero.
+              Free delivery — grab your glam before the timer hits zero.
             </p>
             <div className="flex flex-wrap gap-3">
               {units.map((u) => (

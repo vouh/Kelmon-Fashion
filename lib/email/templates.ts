@@ -474,3 +474,31 @@ export function paymentReceivedAdminEmail(
     }),
   };
 }
+
+/** The one-time code a super admin needs to approve deleting sensitive records. */
+export function sensitiveActionCodeEmail(
+  request: { code: string; summary: string; requester: string; minutes: number },
+  origin: string | null,
+) {
+  return {
+    subject: `Kelmon approval code: ${request.code}`,
+    text:
+      `${request.requester} asked to delete: ${request.summary}\n\n` +
+      `Approval code: ${request.code}\n\nIt works once and expires in ${request.minutes} minutes. ` +
+      `If you don't recognise this request, don't share the code — nothing is deleted without it.`,
+    html: emailLayout({
+      origin,
+      preheader: `Approval code ${request.code} — ${request.requester} wants to delete ${request.summary}.`,
+      eyebrow: "Approval needed",
+      heading: "Approve a deletion",
+      bodyHtml:
+        `<strong>${escapeHtml(request.requester)}</strong> asked to permanently delete <strong>${escapeHtml(request.summary)}</strong>.` +
+        `<div style="margin:22px 0 6px;text-align:center;">` +
+        `<span style="display:inline-block;padding:14px 26px;border-radius:16px;background:${brand.lilac};font-family:'Courier New',monospace;font-size:34px;font-weight:700;letter-spacing:10px;color:${brand.purpleDeep};">${escapeHtml(request.code)}</span>` +
+        `</div>` +
+        `<p style="margin:8px 0 0;text-align:center;font-size:13px;color:${brand.faint};">Works once · expires in ${request.minutes} minutes</p>`,
+      footnoteHtml:
+        "Only share this code if you approve the deletion. If you don't recognise the request, ignore this email — nothing is deleted without the code.",
+    }),
+  };
+}

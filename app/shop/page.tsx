@@ -10,14 +10,14 @@ export async function generateMetadata({ searchParams }: ShopPageProps) {
   if (category && category !== "All") {
     return pageMetadata({
       title: `${category} — Shop ${category} Online in Kenya`,
-      description: `Shop ${category.toLowerCase()} at Kelmon. Campus-ready styles, M-Pesa checkout and free delivery on orders over KES 3,000.`,
+      description: `Shop ${category.toLowerCase()} at Kelmon. Campus-ready styles, M-Pesa checkout and free delivery.`,
       path: `/shop?category=${encodeURIComponent(category)}`,
     });
   }
   return pageMetadata({
     title: "Shop Bags, Perfumes & Accessories in Kenya",
     description:
-      "Browse Kelmon's full collection of handbags, ladies' perfumes, men's colognes and accessories. Pay with M-Pesa and get free campus delivery over KES 3,000.",
+      "Browse Kelmon's full collection of handbags, ladies' perfumes, men's colognes and accessories. Pay with M-Pesa and get free delivery.",
     path: "/shop",
   });
 }

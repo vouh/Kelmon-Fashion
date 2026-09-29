@@ -2,8 +2,6 @@ import Link from "next/link";
 import LegalPage, { type LegalSection } from "@/components/legal/LegalPage";
 import { LEGAL_CONTACT } from "@/lib/legal";
 import { pageMetadata } from "@/lib/seo";
-import { DELIVERY_FEE, FREE_DELIVERY_THRESHOLD } from "@/lib/cart";
-import { formatKes } from "@/lib/products";
 
 export const metadata = pageMetadata({
   title: "Terms of Service",
@@ -117,9 +115,8 @@ const sections: LegalSection[] = [
     body: (
       <>
         <p>
-          We deliver to the campus drop point you choose at checkout. Delivery is free on orders of{" "}
-          {formatKes(FREE_DELIVERY_THRESHOLD)} or more; below that, a {formatKes(DELIVERY_FEE)} delivery fee applies and
-          is shown before you pay.
+          We deliver to the location you choose at checkout. Delivery is currently free. If we ever introduce a
+          delivery fee, it will always be shown clearly before you pay.
         </p>
         <p>
           Delivery times we give are estimates. Please be reachable on your phone around delivery time. If we can&apos;t

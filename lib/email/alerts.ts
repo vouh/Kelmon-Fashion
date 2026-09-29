@@ -43,7 +43,7 @@ export async function getSavedAlertRecipients(): Promise<string[]> {
 }
 
 /** Every super admin's email: the owner plus anyone made super admin in Accounts. */
-async function getSuperAdminEmails(): Promise<string[]> {
+export async function getSuperAdminEmails(): Promise<string[]> {
   if (!isSupabaseConfigured() || !process.env.SUPABASE_SERVICE_ROLE_KEY) return [...PROTECTED_SUPER_ADMIN_EMAILS];
   const { data, error } = await createServiceClient()
     .from("profiles")

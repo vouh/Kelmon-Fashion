@@ -5,7 +5,7 @@ import Image from "next/image";
 import AppShell from "@/components/layout/AppShell";
 import { useCart } from "@/components/providers/CartProvider";
 import { useToast } from "@/components/ui/Toast";
-import { FREE_DELIVERY_THRESHOLD, quantityOfProduct } from "@/lib/cart";
+import { quantityOfProduct } from "@/lib/cart";
 import { formatKes } from "@/lib/products";
 
 export default function CartPage() {
@@ -156,16 +156,8 @@ export default function CartPage() {
                   </div>
                 </div>
 
-                {deliveryFee > 0 && (
-                  <p className="mt-3 text-xs text-on-surface-variant">
-                    Add {formatKes(FREE_DELIVERY_THRESHOLD - subtotal)} more for free
-                    delivery.
-                  </p>
-                )}
                 {deliveryFee === 0 && (
-                  <p className="mt-3 text-xs text-[#C5A059]">
-                    Free delivery unlocked — you&apos;re good.
-                  </p>
+                  <p className="mt-3 text-xs text-[#C5A059]">Free delivery on your order.</p>
                 )}
 
                 <div className="h-px w-full bg-primary/15 my-4" />

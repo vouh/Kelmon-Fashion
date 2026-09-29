@@ -247,7 +247,13 @@ export default function CircleCollection({
             {products.map((product) => (
               <Link
                 key={product.id}
-                href={"description" in product ? `/product/${product.id}` : "/shop"}
+                href={
+                  "product_id" in product
+                    ? product.product_id
+                      ? `/product/${product.product_id}`
+                      : "/shop"
+                    : `/product/${product.id}`
+                }
                 draggable={false}
                 onClick={(e) => {
                   if (dragRef.current.moved) {

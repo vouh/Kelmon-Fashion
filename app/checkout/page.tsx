@@ -9,7 +9,6 @@ import { useAuth } from "@/components/providers/AuthProvider";
 import { useAuthModal } from "@/components/auth/AuthModal";
 import { useCart } from "@/components/providers/CartProvider";
 import { MpesaPayModal, useMpesaPayment } from "@/components/payments/MpesaPayment";
-import { FREE_DELIVERY_THRESHOLD } from "@/lib/cart";
 import { formatKes } from "@/lib/products";
 import { KENYA_COUNTIES } from "@/lib/kenya";
 
@@ -410,11 +409,6 @@ export default function CheckoutPage() {
                       {deliveryFee === 0 ? "Free" : formatKes(deliveryFee)}
                     </span>
                   </div>
-                  {deliveryFee > 0 && (
-                    <p className="text-[11px] text-on-surface-variant">
-                      Free over {formatKes(FREE_DELIVERY_THRESHOLD)}.
-                    </p>
-                  )}
                 </div>
 
                 <div className="flex justify-between items-baseline pt-2 border-t border-primary/10">

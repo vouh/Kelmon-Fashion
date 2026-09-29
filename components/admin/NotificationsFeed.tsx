@@ -10,6 +10,8 @@ import {
   markNotificationsRead,
 } from "@/app/admin/inbox-actions";
 import { refreshAdminBadges } from "@/components/admin/useAdminBadges";
+import { bulkDeleteNotifications } from "@/app/admin/bulk-actions";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import type { AdminNotificationRow, NotificationType } from "@/lib/supabase/types";
 
 const TYPE_STYLE: Record<NotificationType, { icon: string; color: string; label: string }> = {
@@ -32,6 +34,8 @@ export default function NotificationsFeed({
   const [busy, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const confirm = useConfirm();
 
   function run(action: () => Promise<{ ok: boolean; error?: string }>) {
     setError(null);
@@ -50,6 +54,32 @@ export default function NotificationsFeed({
   const shown = notifications.filter((n) =>
     filter === "all" ? true : filter === "unread" ? !n.read : n.type === filter
   );
+
+  const shownSelected = shown.filter((n) => selected.has(n.id)).map((n) => n.id);
+  const allShownSelected = shown.length > 0 && shownSelected.length === shown.length;
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  async function deleteSelected() {
+    const ok = await confirm({
+      title: `Delete ${shownSelected.length} notification${shownSelected.length === 1 ? "" : "s"}?`,
+      message: "They'll be removed from the list. Orders and payments aren't affected.",
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!ok) return;
+    const ids = shownSelected;
+    run(async () => {
+      const result = await bulkDeleteNotifications(ids);
+      if (result.ok) setSelected(new Set());
+      return result;
+    });
+  }
 
   const chip = (value: Filter, label: string) => (
     <button
@@ -95,6 +125,48 @@ export default function NotificationsFeed({
         </button>
       </div>
 
+      {shown.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-white/5 bg-zinc-900 px-4 py-2">
+          <label className="flex cursor-pointer items-center gap-2 text-[11px] font-bold text-white/60">
+            <input
+              type="checkbox"
+              checked={allShownSelected}
+              onChange={() => setSelected(allShownSelected ? new Set() : new Set(shown.map((n) => n.id)))}
+              className="h-3.5 w-3.5 accent-purple-500"
+            />
+            {shownSelected.length ? `${shownSelected.length} selected` : "Select all"}
+          </label>
+          {shownSelected.length > 0 && (
+            <>
+              <span className="flex-1" />
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  const ids = shownSelected;
+                  run(async () => {
+                    const result = await markNotificationsRead(ids);
+                    if (result.ok) setSelected(new Set());
+                    return result;
+                  });
+                }}
+                className="rounded-lg border border-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white/70 hover:text-white disabled:opacity-40"
+              >
+                Mark read
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void deleteSelected()}
+                className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white hover:bg-red-500 disabled:opacity-40"
+              >
+                <span className="material-symbols-outlined text-sm">delete</span> Delete
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-xl border border-white/5 bg-zinc-900">
         {shown.length === 0 ? (
           <EmptyState icon="notifications" message="No notifications" />
@@ -107,6 +179,13 @@ export default function NotificationsFeed({
                   key={n.id}
                   className={`flex items-start gap-3 px-4 py-3 ${n.read ? "" : "bg-purple-500/[0.06]"}`}
                 >
+                  <input
+                    type="checkbox"
+                    checked={selected.has(n.id)}
+                    onChange={() => toggle(n.id)}
+                    aria-label={`Select “${n.title}”`}
+                    className="mt-1 h-3.5 w-3.5 shrink-0 accent-purple-500"
+                  />
                   <span className={`material-symbols-outlined mt-0.5 text-base ${style.color}`}>
                     {style.icon}
                   </span>

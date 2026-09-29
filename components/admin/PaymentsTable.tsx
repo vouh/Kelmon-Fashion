@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import ApprovalCodeModal from "@/components/admin/ApprovalCodeModal";
 import DateRangeFilter from "@/components/admin/DateRangeFilter";
 import { EmptyState, Panel, TD, TH, formatDateTime, formatKes } from "@/components/admin/ui";
 import { dateRangeBounds, dateRangeLabel, isInDateRange, writeDateRangeToUrl, type DateRange } from "@/lib/date-range";
@@ -47,6 +49,11 @@ export default function PaymentsTable({
   const [filter, setFilter] = useState<PaymentFilter>(initialFilter);
   const [range, setRange] = useState<DateRange>(initialRange);
   const [viewing, setViewing] = useState<PaymentEntry | null>(null);
+  const router = useRouter();
+  /** Entry ids ticked for bulk delete. */
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
 
   const bounds = dateRangeBounds(range);
   const entries = allEntries.filter((e) => isInDateRange(e.at, bounds));
@@ -65,6 +72,24 @@ export default function PaymentsTable({
     : null;
 
   const shown = filter === "all" ? entries : filter === "success" ? successes : failures;
+  const shownSelected = shown.filter((e) => selected.has(e.id));
+  const allShownSelected = shown.length > 0 && shownSelected.length === shown.length;
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function toggleAll() {
+    setSelected(allShownSelected ? new Set() : new Set(shown.map((e) => e.id)));
+  }
+
+  // Entry ids are "paid-<orderId>" and "failed-<failureId>".
+  const selectedOrderIds = shownSelected.filter((e) => e.kind === "success" && e.orderId).map((e) => e.orderId!);
+  const selectedFailureIds = shownSelected.filter((e) => e.kind === "failed").map((e) => e.id.replace(/^failed-/, ""));
   const count = (value: PaymentFilter) =>
     value === "all" ? entries.length : value === "success" ? successes.length : failures.length;
 
@@ -122,6 +147,28 @@ export default function PaymentsTable({
         <DateRangeFilter value={range} onChange={chooseRange} />
       </div>
 
+      {flash && (
+        <div className="rounded-xl border border-green-400/30 bg-green-400/10 px-4 py-3 text-xs text-green-300" role="status">
+          {flash}
+        </div>
+      )}
+      {shownSelected.length > 0 && (
+        <div className="sticky top-2 z-20 flex flex-wrap items-center gap-3 rounded-xl border border-purple-400/30 bg-zinc-900/95 px-4 py-2.5 shadow-lg backdrop-blur">
+          <span className="text-xs font-bold text-white">{shownSelected.length} selected</span>
+          <button type="button" onClick={() => setSelected(new Set())} className="text-[11px] text-white/50 hover:text-white">
+            Clear
+          </button>
+          <span className="flex-1" />
+          <button
+            type="button"
+            onClick={() => setDeleting(true)}
+            className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white hover:bg-red-500"
+          >
+            <span className="material-symbols-outlined text-sm">lock</span> Delete selected
+          </button>
+        </div>
+      )}
+
       <Panel
         title={FILTERS.find((f) => f.value === filter)!.label + " payments"}
         hint={`${shown.length} · ${formatKes(shown.reduce((s, e) => s + (e.amount ?? 0), 0))}${dated ? ` · ${dateRangeLabel(range)}` : ""}`}
@@ -142,6 +189,15 @@ export default function PaymentsTable({
             <table className="w-full text-left text-xs">
               <thead className="bg-white/5">
                 <tr>
+                  <th className={`${TH} w-8`}>
+                    <input
+                      type="checkbox"
+                      checked={allShownSelected}
+                      onChange={toggleAll}
+                      aria-label="Select all payments shown"
+                      className="h-3.5 w-3.5 accent-purple-500"
+                    />
+                  </th>
                   <th className={TH}>Status</th>
                   <th className={TH}>Order</th>
                   <th className={TH}>Customer</th>
@@ -157,6 +213,15 @@ export default function PaymentsTable({
                     className="cursor-pointer hover:bg-white/5"
                     onClick={() => setViewing(e)}
                   >
+                    <td className={TD} onClick={(event) => event.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selected.has(e.id)}
+                        onChange={() => toggle(e.id)}
+                        aria-label={`Select payment for ${e.orderId ?? "order"}`}
+                        className="h-3.5 w-3.5 accent-purple-500"
+                      />
+                    </td>
                     <td className={TD}>
                       <StatusPill kind={e.kind} />
                     </td>
@@ -189,6 +254,20 @@ export default function PaymentsTable({
       </Panel>
 
       {viewing && <PaymentDetails entry={viewing} onClose={() => setViewing(null)} />}
+      {deleting && (
+        <ApprovalCodeModal
+          orderIds={selectedOrderIds}
+          failureIds={selectedFailureIds}
+          summary={`${shownSelected.length} payment record${shownSelected.length === 1 ? "" : "s"}`}
+          onClose={() => setDeleting(false)}
+          onDone={(message) => {
+            setDeleting(false);
+            setSelected(new Set());
+            setFlash(message);
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

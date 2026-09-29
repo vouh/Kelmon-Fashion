@@ -4,28 +4,16 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { importProducts, type ImportRowResult } from "@/app/admin/actions";
 import { productImportRowSchema } from "@/lib/validation/schemas";
+import { IMPORT_FIELDS as FIELDS, type ImportField as Field } from "@/lib/product-import";
 
 /**
  * Import products from a CSV or Excel (.xlsx) file.
  *
  * The file is read in the browser and previewed, row by row, before anything
  * is saved; the server checks every row again. Imported products arrive
- * unpublished and without photos — add photos, then publish.
+ * unpublished and without photos — add photos, then publish. The column rules
+ * live in a downloadable PDF guide rather than on screen.
  */
-
-type Field = "name" | "price" | "quantity" | "category" | "for" | "description" | "wasPrice" | "sizes" | "colors";
-
-const FIELDS: { key: Field; header: string; required: boolean; help: string; example: string }[] = [
-  { key: "name", header: "name", required: true, help: "Product name as customers see it.", example: "Chanel No.5 Mini" },
-  { key: "price", header: "price", required: true, help: "Selling price in KES, numbers only.", example: "2500" },
-  { key: "quantity", header: "quantity", required: true, help: "How many are in stock (0 or more).", example: "10" },
-  { key: "category", header: "category", required: true, help: "Must match one of your categories.", example: "Perfumes" },
-  { key: "for", header: "for", required: false, help: "Men, Ladies or Unisex. Blank = Unisex.", example: "Ladies" },
-  { key: "description", header: "description", required: false, help: "A sentence or two about it.", example: "Classic floral scent, 30ml" },
-  { key: "wasPrice", header: "was price", required: false, help: "Old price, to show it's on sale. Higher than price.", example: "3000" },
-  { key: "sizes", header: "sizes", required: false, help: "Separate with commas, e.g. S, M, L.", example: "" },
-  { key: "colors", header: "colors", required: false, help: "Separate with commas, e.g. Black, Brown.", example: "" },
-];
 
 /** Header spellings people actually use, all mapped to one field. */
 const ALIASES: Record<string, Field> = {
@@ -73,6 +61,20 @@ export default function ProductImport({ categories }: { categories: string[] }) 
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<ImportRowResult[] | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const [guideBusy, setGuideBusy] = useState(false);
+
+  async function downloadGuide() {
+    setGuideBusy(true);
+    try {
+      const { downloadImportGuide } = await import("@/components/admin/productImportGuide");
+      await downloadImportGuide(categories);
+    } catch {
+      setError("Couldn't create the guide. Please try again.");
+    } finally {
+      setGuideBusy(false);
+    }
+  }
 
   const categorySet = new Set(categories.map((c) => c.trim().toLowerCase()));
 
@@ -238,67 +240,52 @@ export default function ProductImport({ categories }: { categories: string[] }) 
             <div className="space-y-4 overflow-y-auto px-5 py-4">
               {!parsed && !results && (
                 <>
-                  <div className="rounded-xl border border-purple-400/20 bg-purple-500/5 px-4 py-3 text-[11px] leading-relaxed text-white/60">
-                    Put one product per row, with these column headings in the first row. Imported products
-                    are saved <strong className="text-white/80">unpublished and without photos</strong> — then
-                    open each one to add photos and publish it. Each gets its product code (e.g. P002) straight away.
-                  </div>
+                  <label
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragging(true);
+                    }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragging(false);
+                      void onFile(e.dataTransfer.files?.[0]);
+                    }}
+                    className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-6 py-10 text-center transition ${
+                      dragging ? "border-purple-400 bg-purple-500/10" : "border-white/10 hover:border-purple-400/50 hover:bg-white/[0.02]"
+                    }`}
+                  >
+                    <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-500/20 text-purple-200">
+                      <span className="material-symbols-outlined text-2xl">folder_open</span>
+                    </span>
+                    <span className="text-sm font-black text-white">Choose a file</span>
+                    <span className="text-[11px] text-white/40">or drop it here · .csv or .xlsx</span>
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept=".csv,.xlsx,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                      className="hidden"
+                      onChange={(e) => void onFile(e.target.files?.[0])}
+                    />
+                  </label>
 
-                  <div className="overflow-hidden rounded-xl border border-white/5">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-white/5">
-                        <tr>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-white/30">Column</th>
-                          <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-white/30">What to put</th>
-                          <th className="hidden px-3 py-2 text-[9px] font-black uppercase tracking-widest text-white/30 sm:table-cell">Example</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5">
-                        {FIELDS.map((f) => (
-                          <tr key={f.key}>
-                            <td className="whitespace-nowrap px-3 py-2 font-mono font-bold text-white">
-                              {f.header}
-                              {f.required ? (
-                                <span className="ml-1.5 rounded bg-red-400/15 px-1 py-0.5 text-[8px] font-black uppercase text-red-300">required</span>
-                              ) : (
-                                <span className="ml-1.5 text-[9px] text-white/30">optional</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 text-white/60">
-                              {f.help}
-                              {f.key === "category" && categories.length > 0 && (
-                                <span className="mt-0.5 block text-[10px] text-white/40">Yours: {categories.join(", ")}</span>
-                              )}
-                            </td>
-                            <td className="hidden px-3 py-2 text-white/40 sm:table-cell">{f.example || "—"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className="text-[10px] text-white/35">
-                    Headings aren&apos;t fussy: “Qty” or “Stock” work for quantity, “Colours” for colors, “Gender” for for.
-                    Photos can&apos;t go in a spreadsheet — add them after importing.
-                  </p>
-
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={downloadGuide}
+                      disabled={guideBusy}
+                      className="flex items-center justify-center gap-1.5 rounded-lg border border-white/10 px-4 py-2.5 text-[11px] font-black uppercase tracking-widest text-white/70 transition hover:border-purple-400/40 hover:text-white disabled:opacity-60"
+                    >
+                      <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
+                      {guideBusy ? "Preparing…" : "Import guide (PDF)"}
+                    </button>
                     <button
                       type="button"
                       onClick={downloadTemplate}
-                      className="flex items-center gap-1.5 rounded-lg border border-white/10 px-4 py-2.5 text-[11px] font-black uppercase tracking-widest text-white/70 hover:text-white"
+                      className="flex items-center justify-center gap-1.5 rounded-lg border border-white/10 px-4 py-2.5 text-[11px] font-black uppercase tracking-widest text-white/70 transition hover:border-purple-400/40 hover:text-white"
                     >
-                      <span className="material-symbols-outlined text-sm">download</span> Download template
+                      <span className="material-symbols-outlined text-sm">download</span> Template (CSV)
                     </button>
-                    <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2.5 text-[11px] font-black uppercase tracking-widest text-white hover:bg-purple-500">
-                      <span className="material-symbols-outlined text-sm">folder_open</span> Choose file
-                      <input
-                        ref={fileRef}
-                        type="file"
-                        accept=".csv,.xlsx,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                        className="hidden"
-                        onChange={(e) => void onFile(e.target.files?.[0])}
-                      />
-                    </label>
                   </div>
                 </>
               )}

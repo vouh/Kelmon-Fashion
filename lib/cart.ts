@@ -47,11 +47,15 @@ export function cartItemCount(lines: CartLine[]): number {
   return lines.reduce((sum, line) => sum + line.quantity, 0);
 }
 
-/** Free campus delivery when subtotal ≥ KES 3,000; otherwise flat fee. */
-export const FREE_DELIVERY_THRESHOLD = 3000;
-export const DELIVERY_FEE = 150;
+/**
+ * Delivery is free on every order for now. To bring back a fee, set
+ * DELIVERY_FEE above 0 (and FREE_DELIVERY_THRESHOLD if it should be free over
+ * a certain amount) — checkout, the order API and the receipts all use this.
+ */
+export const FREE_DELIVERY_THRESHOLD = 0;
+export const DELIVERY_FEE = 0;
 
 export function deliveryFeeFor(subtotal: number): number {
-  if (subtotal <= 0) return 0;
+  if (subtotal <= 0 || DELIVERY_FEE === 0) return 0;
   return subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE;
 }

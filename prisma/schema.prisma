@@ -468,3 +468,23 @@ model LoyaltyWeeklyBonus {
   @@id([user_id, week_start])
   @@map("loyalty_weekly_bonuses")
 }
+
+/// One-time codes for sensitive deletions: emailed to super admins, usable
+/// once within 10 minutes, and only for the records stored with the request.
+/// Server (service role) only.
+model SensitiveActionCode {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  action          String
+  payload         Json
+  summary         String
+  code_hash       String
+  requested_by    String
+  requester_email String?
+  attempts        Int       @default(0)
+  expires_at      DateTime  @db.Timestamptz(6)
+  used_at         DateTime? @db.Timestamptz(6)
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([requested_by, created_at(sort: Desc)], map: "sensitive_action_codes_requester_idx")
+  @@map("sensitive_action_codes")
+}
