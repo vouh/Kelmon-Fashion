@@ -59,13 +59,12 @@ export default function FaqSection({ image }: FaqSectionProps) {
         </div>
 
         <div className="relative mx-auto w-full max-w-sm">
-          <div className="hero-arch relative aspect-[3/4] overflow-hidden bg-surface-container border border-primary/20">
+          <div className="hero-arch relative aspect-[3/4] overflow-hidden bg-white border border-primary/10">
             <Image
               src={image}
-              alt="Kelmon support"
+              alt="Young man in a purple and cream Kelmon fashion look"
               fill
-              unoptimized
-              className="object-cover"
+              className="object-contain"
               sizes="(max-width: 768px) 90vw, 384px"
             />
           </div>

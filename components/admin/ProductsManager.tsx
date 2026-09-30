@@ -64,6 +64,7 @@ interface Draft {
   colorImages: Record<string, string>;
   stock: string;
   badge: Badge;
+  preorder: boolean;
   active: boolean;
   /** True when editing an existing row, so the slug is locked. */
   existing: boolean;
@@ -84,6 +85,7 @@ function emptyDraft(category: string): Draft {
     colorImages: {},
     stock: "1",
     badge: "",
+    preorder: false,
     // New products stay off the shop until you publish them.
     active: false,
     existing: false,
@@ -105,6 +107,7 @@ function draftFrom(product: Product): Draft {
     colorImages: product.colorImages ?? {},
     stock: String(product.stock ?? 0),
     badge: (product.badge ?? "") as Badge,
+    preorder: product.preorder ?? false,
     active: product.active ?? true,
     existing: true,
   };
@@ -282,6 +285,7 @@ export default function ProductsManager({
           ),
           stock: Number(draft.stock) || 0,
           badge: draft.badge === "" ? null : draft.badge,
+          preorder: draft.preorder,
           active: draft.active,
         }),
       () => setDraft(null)
@@ -452,6 +456,20 @@ export default function ProductsManager({
                 className={inputClass}
               />
             </div>
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-3 py-2.5 sm:col-span-3">
+              <input
+                type="checkbox"
+                checked={draft.preorder}
+                onChange={(e) => setDraft({ ...draft, preorder: e.target.checked })}
+                className="mt-0.5 h-4 w-4 accent-amber-500"
+              />
+              <span className="text-xs font-bold text-white/80">
+                Pre-order
+                <span className="block font-normal text-white/45">
+                  Shows a gold P on the shop card and &ldquo;Available on pre-order&rdquo; on the product page.
+                </span>
+              </span>
+            </label>
           </div>
 
           {/* Photos */}
@@ -715,6 +733,11 @@ export default function ProductsManager({
                     {product.badge && (
                       <span className="rounded bg-purple-400/15 px-1.5 py-0.5 text-[9px] font-black uppercase text-purple-300">
                         {product.badge}
+                      </span>
+                    )}
+                    {product.preorder && (
+                      <span className="rounded bg-[#C5A059]/20 px-1.5 py-0.5 text-[9px] font-black uppercase text-[#E3C47E]" title="Sold on pre-order">
+                        Pre-order
                       </span>
                     )}
                   </div>

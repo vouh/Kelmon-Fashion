@@ -40,6 +40,7 @@ const PAGES: NavPage[] = [
   { href: "/admin/updates", icon: "campaign", label: "Updates", color: "text-blue-400" },
   { href: "/admin/reviews", icon: "star", label: "Reviews", color: "text-amber-300" },
   { href: "/admin/transactions", icon: "payments", label: "Payments", color: "text-green-400" },
+  { href: "/admin/finance", icon: "account_balance_wallet", label: "Finance", color: "text-emerald-400" },
   { href: "/admin/accounts", icon: "group", label: "Accounts", color: "text-pink-300", superAdminOnly: true },
   {
     href: "/admin/notifications",

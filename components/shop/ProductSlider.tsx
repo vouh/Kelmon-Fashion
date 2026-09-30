@@ -6,6 +6,7 @@ import Image from "next/image";
 import type { Product } from "@/lib/products";
 import { formatKes } from "@/lib/products";
 import StarRating from "@/components/ui/StarRating";
+import PreorderBadge from "@/components/shop/PreorderBadge";
 
 interface ProductSliderProps {
   products: Product[];
@@ -71,6 +72,7 @@ export default function ProductSlider({
                 {product.badge}
               </span>
             )}
+            {product.preorder && <PreorderBadge size="md" />}
           </div>
 
           <div className="flex flex-col justify-center p-8 md:p-12 gap-4 bg-surface">

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/products";
 import { formatKes } from "@/lib/products";
 import { useCart } from "@/components/providers/CartProvider";
+import PreorderBadge from "@/components/shop/PreorderBadge";
 
 interface FeatureProductCardProps {
   product: Product;
@@ -39,6 +40,7 @@ export default function FeatureProductCard({ product }: FeatureProductCardProps)
             {product.badge}
           </span>
         )}
+        {product.preorder && <PreorderBadge />}
 
         <Link href={`/product/${product.id}`} className="absolute inset-0 block" tabIndex={-1}>
           <Image

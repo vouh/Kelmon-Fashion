@@ -1,6 +1,7 @@
 import ShopClient from "@/components/shop/ShopClient";
 import { getProducts } from "@/lib/supabase/products";
 import { getFilterCategories } from "@/lib/supabase/categories";
+import { spreadByCategory } from "@/lib/mix-products";
 
 import { pageMetadata } from "@/lib/seo";
 
@@ -36,7 +37,8 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
 
   return (
     <ShopClient
-      products={products}
+      // Mixed so categories alternate; filtering and search keep this order.
+      products={spreadByCategory(products, "shop")}
       categories={categories}
       initialQuery={params.q ?? ""}
       initialCategory={params.category ?? "All"}

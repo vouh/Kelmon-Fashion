@@ -1,20 +1,11 @@
 "use client";
 
-import {
-  Suspense,
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { Suspense, createContext, useCallback, useContext, useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth, authErrorMessage, type SignInResult } from "@/components/providers/AuthProvider";
 import { useToast } from "@/components/ui/Toast";
-import PasswordRules from "@/components/auth/PasswordRules";
 import { EMAIL_PATTERN, passwordProblem } from "@/lib/validation/credentials";
 import logo from "@/lib/logo";
 import { getFirebaseAuth } from "@/lib/firebase/client";
@@ -152,7 +143,7 @@ function AuthModal({ options, onClose }: { options: OpenAuthOptions; onClose: ()
         role="dialog"
         aria-modal="true"
         aria-labelledby="auth-modal-title"
-        className="relative w-full max-w-[360px] rounded-3xl bg-white p-6 shadow-[0_24px_60px_rgba(45,20,70,0.25)] sm:max-w-[600px] sm:px-8 sm:py-7 dark:bg-surface"
+        className="relative w-full max-w-[350px] rounded-2xl bg-white px-4 py-4 shadow-[0_24px_60px_rgba(45,20,70,0.25)] sm:max-w-[600px] sm:rounded-3xl sm:px-8 sm:py-7 dark:bg-surface"
       >
         <button
           type="button"
@@ -170,9 +161,9 @@ function AuthModal({ options, onClose }: { options: OpenAuthOptions; onClose: ()
 }
 
 const inputClass =
-  "h-11 w-full rounded-xl border border-outline/40 bg-surface px-3.5 text-sm text-on-surface outline-none transition placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/15";
+  "h-10 w-full rounded-xl border border-outline/40 bg-surface px-3.5 text-sm sm:h-11 text-on-surface outline-none transition placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/15";
 const primaryButton =
-  "flex h-11 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-on-primary transition hover:bg-primary/90 disabled:opacity-60";
+  "flex h-10 w-full items-center justify-center rounded-xl bg-primary sm:h-11 text-sm font-semibold text-on-primary transition hover:bg-primary/90 disabled:opacity-60";
 const linkButton = "font-semibold text-primary hover:underline underline-offset-4";
 
 function AuthForm({
@@ -187,7 +178,7 @@ function AuthForm({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail, acceptTerms, configured } = useAuth();
+  const { signInWithGoogle, signInWithEmail, acceptTerms, configured } = useAuth();
   const { toast } = useToast();
 
   const next = options.next;
@@ -196,17 +187,28 @@ function AuthForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  /** Required before an email account can be created. */
+  /** Set after leaving the password field or submitting, so the hint doesn't nag while typing. */
+  const [passwordTouched, setPasswordTouched] = useState(false);
+  /** Required before creating an email account or continuing with Google. */
   const [agreed, setAgreed] = useState(false);
+  /** Set when Google was clicked before ticking the box, which highlights it. */
+  const [termsNudge, setTermsNudge] = useState(false);
+  const termsRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [resetSentTo, setResetSentTo] = useState<string | null>(null);
+  const [signupChallenge, setSignupChallenge] = useState<{ id: string; email: string } | null>(null);
+  const [verificationCode, setVerificationCode] = useState("");
   /** Set once an admin signs in, which swaps the form for the destination prompt. */
   const [adminRole, setAdminRole] = useState<SignInResult | null>(null);
+  const passwordHint = view === "signup" && passwordTouched ? passwordProblem(password) : null;
 
   function switchView(to: View) {
     setView(to);
     setError(null);
     setResetSentTo(null);
+    setSignupChallenge(null);
+    setVerificationCode("");
+    setPasswordTouched(false);
   }
 
   function finish(path?: string) {
@@ -242,11 +244,18 @@ function AuthForm({
 
   async function handleGoogle() {
     setError(null);
+    // Google can create an account in one step, so the terms box must be
+    // ticked before the Google window opens at all.
+    if (!agreed) {
+      setTermsNudge(true);
+      termsRef.current?.focus();
+      return;
+    }
     setBusy("google");
     try {
       const result = await signInWithGoogle();
-      // The Google button carries the "you agree" notice, so a first Google
-      // sign-in records acceptance (existing records are left as they were).
+      // Records acceptance on a first Google sign-in; existing records are
+      // left as they were.
       await acceptTerms();
       toast("Welcome!");
       await routeAfterSignIn(result);
@@ -267,19 +276,78 @@ function AuthForm({
         if (!fullName.trim()) throw new Error("Please enter your name.");
         if (fullName.trim().length > 120) throw new Error("Your name must be 120 characters or fewer.");
         if (!EMAIL_PATTERN.test(email.trim())) throw new Error("Please enter a valid email address.");
-        const problem = passwordProblem(password);
-        if (problem) throw new Error(problem);
+        if (passwordProblem(password)) {
+          setPasswordTouched(true);
+          return;
+        }
         if (!agreed) throw new Error("Please accept the Terms of Service and Privacy Policy.");
-        result = await signUpWithEmail(email.trim(), password, fullName.trim());
-        await acceptTerms();
-        toast("Account created. Welcome to Kelmon!");
-        await routeAfterSignIn(result, true);
+        const response = await fetch("/api/auth/signup-code", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email.trim() }),
+        });
+        const data = (await response.json().catch(() => ({}))) as { challengeId?: string; error?: string };
+        if (!response.ok || !data.challengeId) throw new Error(data.error ?? "We could not send the verification code.");
+        setSignupChallenge({ id: data.challengeId, email: email.trim().toLowerCase() });
+        toast("Verification code sent.");
         return;
       } else {
         result = await signInWithEmail(email.trim(), password);
         toast("Welcome back!");
       }
       await routeAfterSignIn(result);
+    } catch (err) {
+      setError(authErrorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleSignupVerification(event: React.FormEvent) {
+    event.preventDefault();
+    if (!signupChallenge) return;
+    setError(null);
+    setBusy("email");
+    try {
+      const response = await fetch("/api/auth/signup-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          challengeId: signupChallenge.id,
+          code: verificationCode,
+          email: signupChallenge.email,
+          password,
+          fullName: fullName.trim(),
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "We could not verify that code.");
+      const result = await signInWithEmail(signupChallenge.email, password);
+      await acceptTerms();
+      toast("Email verified. Welcome to Kelmon!");
+      await routeAfterSignIn(result, true);
+    } catch (err) {
+      setError(authErrorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function resendSignupCode() {
+    if (!signupChallenge) return;
+    setError(null);
+    setBusy("email");
+    try {
+      const response = await fetch("/api/auth/signup-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: signupChallenge.email }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { challengeId?: string; error?: string };
+      if (!response.ok || !data.challengeId) throw new Error(data.error ?? "We could not resend the code.");
+      setSignupChallenge({ id: data.challengeId, email: signupChallenge.email });
+      setVerificationCode("");
+      toast("A new verification code was sent.");
     } catch (err) {
       setError(authErrorMessage(err));
     } finally {
@@ -322,7 +390,47 @@ function AuthForm({
   }
 
   const title =
-    view === "signin" ? "Sign in" : view === "signup" ? "Create account" : "Reset password";
+    signupChallenge ? "Verify your email" : view === "signin" ? "Sign in" : view === "signup" ? "Create account" : "Reset password";
+
+  const termsBox = (
+    <div>
+      <label
+        className={`flex cursor-pointer items-start gap-2 rounded-xl px-2.5 py-1.5 text-[11px] leading-snug text-on-surface transition sm:gap-2.5 sm:px-3 sm:py-2.5 sm:text-xs sm:leading-relaxed ${
+          termsNudge && !agreed ? "bg-red-500/10 ring-1 ring-red-400" : "bg-primary/5"
+        }`}
+      >
+        <input
+          ref={termsRef}
+          type="checkbox"
+          checked={agreed}
+          onChange={(e) => {
+            setAgreed(e.target.checked);
+            if (e.target.checked) setTermsNudge(false);
+          }}
+          required={view === "signup"}
+          aria-invalid={termsNudge && !agreed ? true : undefined}
+          aria-describedby={termsNudge && !agreed ? "terms-hint" : undefined}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+        />
+        <span>
+          I agree to Kelmon&apos;s{" "}
+          <Link href="/terms" target="_blank" className={linkButton}>
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" target="_blank" className={linkButton}>
+            Privacy Policy
+          </Link>
+          .
+        </span>
+      </label>
+      {termsNudge && !agreed && (
+        <p id="terms-hint" role="alert" className="mt-1 px-1 text-[11px] leading-snug text-red-600">
+          Please tick the box to agree to the Terms and Privacy Policy before continuing with Google.
+        </p>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -332,10 +440,10 @@ function AuthForm({
           alt="Kelmon"
           width={48}
           height={48}
-          className="h-12 w-12 object-contain"
+          className="h-8 w-8 object-contain sm:h-12 sm:w-12"
         />
         <div>
-          <h2 id="auth-modal-title" className="mt-2 text-lg font-semibold text-on-surface sm:mt-0">
+          <h2 id="auth-modal-title" className="mt-1 text-base font-semibold text-on-surface sm:mt-0 sm:text-lg">
             {title}
           </h2>
           {view === "forgot" && !resetSentTo && (
@@ -370,7 +478,38 @@ function AuthForm({
         </p>
       )}
 
-      {view === "forgot" ? (
+      {signupChallenge ? (
+        <form onSubmit={handleSignupVerification} className="mt-3 space-y-3 text-center sm:mt-5">
+          <p className="text-xs leading-relaxed text-on-surface-variant">
+            Enter the six-digit code sent to <strong className="text-on-surface">{signupChallenge.email}</strong>.
+          </p>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9]{6}"
+            maxLength={6}
+            value={verificationCode}
+            onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+            placeholder="000000"
+            aria-label="Six-digit verification code"
+            autoFocus
+            required
+            className="h-12 w-full rounded-xl border border-outline/40 bg-surface px-4 text-center text-xl font-bold tracking-[0.45em] text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+          />
+          <button type="submit" disabled={busy !== null || verificationCode.length !== 6} className={primaryButton}>
+            {busy === "email" ? "Verifying…" : "Verify and create account"}
+          </button>
+          <div className="flex items-center justify-center gap-4 text-xs">
+            <button type="button" disabled={busy !== null} onClick={() => void resendSignupCode()} className={linkButton}>
+              Send another code
+            </button>
+            <button type="button" disabled={busy !== null} onClick={() => setSignupChallenge(null)} className="text-on-surface-variant hover:text-primary">
+              Change email
+            </button>
+          </div>
+        </form>
+      ) : view === "forgot" ? (
         resetSentTo ? (
           <div className="mt-5 text-center">
             <span className="material-symbols-outlined text-3xl text-primary" aria-hidden="true">
@@ -390,7 +529,7 @@ function AuthForm({
             </button>
           </div>
         ) : (
-          <form onSubmit={handleReset} className="mt-5 space-y-3">
+          <form onSubmit={handleReset} className="mt-4 space-y-2.5 sm:mt-5 sm:space-y-3">
             <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
               <input
                 type="email"
@@ -416,8 +555,8 @@ function AuthForm({
         )
       ) : (
         <>
-          <form onSubmit={handleEmail} className="mt-5 space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2">
+          <form onSubmit={handleEmail} className="mt-3 space-y-2 sm:mt-5 sm:space-y-3">
+            <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
               {view === "signup" && (
                 <input
                   type="text"
@@ -441,18 +580,23 @@ function AuthForm({
                 required
                 className={inputClass}
               />
+              <div>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onBlur={() => {
+                    if (view === "signup" && password) setPasswordTouched(true);
+                  }}
                   placeholder={view === "signup" ? "Create a password" : "Password"}
                   aria-label="Password"
+                  aria-invalid={passwordHint ? true : undefined}
+                  aria-describedby={passwordHint ? "password-hint" : undefined}
                   autoComplete={view === "signup" ? "new-password" : "current-password"}
-                  minLength={view === "signup" ? 8 : undefined}
                   maxLength={128}
                   required
-                  className={`${inputClass} pr-11`}
+                  className={`${inputClass} pr-11 ${passwordHint ? "!border-red-400 focus:!border-red-500 focus:!ring-red-500/20" : ""}`}
                 />
                 <button
                   type="button"
@@ -466,29 +610,13 @@ function AuthForm({
                   </span>
                 </button>
               </div>
-              {view === "signup" && <PasswordRules password={password} className="px-1 sm:col-span-2" />}
-              {view === "signup" && (
-                <label className="flex cursor-pointer items-start gap-2.5 rounded-xl bg-primary/5 px-3 py-2.5 text-xs leading-relaxed text-on-surface sm:col-span-2">
-                  <input
-                    type="checkbox"
-                    checked={agreed}
-                    onChange={(e) => setAgreed(e.target.checked)}
-                    required
-                    className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
-                  />
-                  <span>
-                    I agree to Kelmon&apos;s{" "}
-                    <Link href="/terms" target="_blank" className={linkButton}>
-                      Terms of Service
-                    </Link>{" "}
-                    and{" "}
-                    <Link href="/privacy" target="_blank" className={linkButton}>
-                      Privacy Policy
-                    </Link>
-                    .
-                  </span>
-                </label>
+              {passwordHint && (
+                <p id="password-hint" role="alert" className="mt-1 px-1 text-[11px] leading-snug text-red-600">
+                  {passwordHint}
+                </p>
               )}
+              </div>
+              {view === "signup" && <div className="sm:col-span-2">{termsBox}</div>}
               {view === "signup" && (
                 <button
                   type="submit"
@@ -500,7 +628,7 @@ function AuthForm({
               )}
             </div>
             {view === "signin" && (
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                 <button
                   type="button"
                   onClick={() => switchView("forgot")}
@@ -520,7 +648,7 @@ function AuthForm({
           </form>
 
           {configured && (
-            <div className="my-4 flex items-center gap-3">
+            <div className="my-2.5 flex items-center gap-3 sm:my-4">
               <span className="h-px flex-1 bg-outline/30" />
               <span className="text-[10px] uppercase tracking-widest text-on-surface-variant">
                 or
@@ -529,13 +657,14 @@ function AuthForm({
             </div>
           )}
 
-          <div className="grid items-center gap-3 sm:grid-cols-2">
+          <div className="grid items-center gap-2.5 sm:grid-cols-2 sm:gap-3">
+            {configured && view === "signin" && <div className="sm:col-span-2">{termsBox}</div>}
             {configured && (
               <button
                 type="button"
                 onClick={handleGoogle}
                 disabled={busy !== null}
-                className="flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-outline/40 bg-surface text-sm font-medium text-on-surface transition hover:bg-surface-container-high disabled:opacity-60"
+                className="flex h-10 w-full items-center justify-center gap-2.5 rounded-xl border border-outline/40 bg-surface sm:h-11 text-sm font-medium text-on-surface transition hover:bg-surface-container-high disabled:opacity-60"
               >
                 <svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true">
                   <path
@@ -566,22 +695,9 @@ function AuthForm({
                   onClick={() => switchView(view === "signin" ? "signup" : "signin")}
                   className={linkButton}
                 >
-                  {view === "signin" ? "Create one" : "Sign in"}
+                  {view === "signin" ? "Create account" : "Sign in"}
                 </button>
               </p>
-              {configured && (
-                <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
-                  By continuing, you agree to our{" "}
-                  <Link href="/terms" target="_blank" className="font-semibold text-primary underline underline-offset-2 hover:text-primary/80">
-                    Terms
-                  </Link>{" "}
-                  and{" "}
-                  <Link href="/privacy" target="_blank" className="font-semibold text-primary underline underline-offset-2 hover:text-primary/80">
-                    Privacy Policy
-                  </Link>
-                  .
-                </p>
-              )}
             </div>
           </div>
         </>

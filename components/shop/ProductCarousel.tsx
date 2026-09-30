@@ -6,6 +6,7 @@ import Image from "next/image";
 import type { Product } from "@/lib/products";
 import { formatKes } from "@/lib/products";
 import StarRating from "@/components/ui/StarRating";
+import PreorderBadge from "@/components/shop/PreorderBadge";
 
 interface ProductCarouselProps {
   products: Product[];
@@ -63,6 +64,7 @@ export default function ProductCarousel({ products, autoPlayMs = 5000 }: Product
                     {p.badge}
                   </span>
                 )}
+                {p.preorder && <PreorderBadge size="md" />}
               </div>
               <div className="flex flex-col justify-center p-8 md:p-12 gap-4">
                 <p className="font-label-caps text-label-caps text-secondary uppercase tracking-widest">

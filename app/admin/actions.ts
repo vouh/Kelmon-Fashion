@@ -329,6 +329,7 @@ export async function upsertProduct(input: ProductInput): Promise<ActionResult> 
       color_images: product.colorImages,
       stock: product.stock,
       badge: product.badge ?? null,
+      preorder: product.preorder,
       active: product.active,
     });
     if (error) throw new Error(error.message);

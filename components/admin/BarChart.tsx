@@ -38,11 +38,14 @@ export default function BarChart({
   data,
   valueFormat = "number",
   height = 160,
+  labelHeading = "Day",
 }: {
   title: string;
   data: BarDatum[];
   valueFormat?: ValueFormat;
   height?: number;
+  /** Heading for the label column in the table view. */
+  labelHeading?: string;
 }) {
   const id = useId();
   const formatValue = (value: number) => format(value, valueFormat);
@@ -80,7 +83,7 @@ export default function BarChart({
           <thead>
             <tr>
               <th className="py-1 text-[9px] font-black uppercase tracking-widest text-white/30">
-                Day
+                {labelHeading}
               </th>
               <th className="py-1 text-right text-[9px] font-black uppercase tracking-widest text-white/30">
                 Value

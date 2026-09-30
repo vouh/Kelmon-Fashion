@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import AppShell from "@/components/layout/AppShell";
 import StarRating from "@/components/ui/StarRating";
+import PreorderBadge from "@/components/shop/PreorderBadge";
 import { useCart } from "@/components/providers/CartProvider";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { useAuthModal } from "@/components/auth/AuthModal";
@@ -157,6 +158,7 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                   {product.badge}
                 </span>
               )}
+              {product.preorder && <PreorderBadge />}
               <Image
                 key={shownImage}
                 src={shownImage}
@@ -264,7 +266,9 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                 <li>
                   {soldOut
                     ? "Sold out"
-                    : stock <= 5
+                    : product.preorder
+                      ? <span className="font-semibold text-[#A8843F] dark:text-[#E3C47E]">Available on pre-order</span>
+                      : stock <= 5
                       ? `Only ${stock} left · Fast delivery available`
                       : "In stock · Fast delivery available"}
                 </li>

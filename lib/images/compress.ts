@@ -1,16 +1,17 @@
 /**
- * Browser-side image compression, run before a product photo is uploaded.
+ * Browser-side product-image normalisation, run before a product photo is uploaded.
  *
- * A phone photo is typically 3–8 MB at 4000px; a product card needs a few
- * hundred pixels. Downscaling to MAX_EDGE and re-encoding as WebP usually
- * lands at 60–200 KB, which is what makes the shop fast on campus data.
+ * Every product photo becomes the same 1200px white square, with the original
+ * image centred and fitted inside it without cropping or stretching. Re-encoding
+ * as WebP usually lands at 60–200 KB, which keeps the shop fast on campus data.
  * Uploaded objects are then served with a one-year Cache-Control
  * (see lib/supabase/storage.ts), so each browser downloads a photo once and
  * reuses it from its HTTP cache on every later visit.
  */
 
-/** Sharp on the largest product view (a ~450px-wide square at 2x density) with headroom. */
-const MAX_EDGE = 1200;
+/** Matches the approved Kelmon catalogue images and leaves 5% breathing room. */
+const CANVAS_SIZE = 1200;
+const PADDING = 60;
 const QUALITY = 0.82;
 
 function loadImage(file: File): Promise<HTMLImageElement> {
@@ -34,20 +35,24 @@ function toBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promi
 }
 
 export async function compressImage(file: File): Promise<File> {
-  // Animated GIFs would lose their animation on a canvas; leave them alone.
-  if (file.type === "image/gif") return file;
-
   const img = await loadImage(file);
-  const scale = Math.min(1, MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
+  const available = CANVAS_SIZE - PADDING * 2;
+  const scale = Math.min(available / img.naturalWidth, available / img.naturalHeight);
   const width = Math.round(img.naturalWidth * scale);
   const height = Math.round(img.naturalHeight * scale);
+  const x = Math.round((CANVAS_SIZE - width) / 2);
+  const y = Math.round((CANVAS_SIZE - height) / 2);
 
   const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = CANVAS_SIZE;
+  canvas.height = CANVAS_SIZE;
   const ctx = canvas.getContext("2d");
   if (!ctx) return file;
-  ctx.drawImage(img, 0, 0, width, height);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, x, y, width, height);
 
   // Safari before 17 can't encode WebP and silently hands back a PNG, so check
   // the type that actually came out and fall back to JPEG.
@@ -55,8 +60,7 @@ export async function compressImage(file: File): Promise<File> {
   if (!blob || blob.type !== "image/webp") {
     blob = await toBlob(canvas, "image/jpeg", QUALITY);
   }
-  // Never upload something bigger than the original.
-  if (!blob || blob.size >= file.size) return file;
+  if (!blob) return file;
 
   const ext = blob.type === "image/webp" ? "webp" : "jpg";
   const base = file.name.replace(/\.[^.]+$/, "") || "image";

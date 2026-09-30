@@ -12,12 +12,10 @@ import {
 import { useRouter } from "next/navigation";
 import {
   GoogleAuthProvider,
-  createUserWithEmailAndPassword,
   onIdTokenChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut as firebaseSignOut,
-  updateProfile as updateFirebaseProfile,
   type User,
 } from "firebase/auth";
 import { getFirebaseAuth, isFirebaseConfigured } from "@/lib/firebase/client";
@@ -54,7 +52,6 @@ interface AuthContextValue {
   isSuperAdmin: boolean;
   signInWithGoogle: () => Promise<SignInResult>;
   signInWithEmail: (email: string, password: string) => Promise<SignInResult>;
-  signUpWithEmail: (email: string, password: string, fullName: string) => Promise<SignInResult>;
   signOut: () => Promise<void>;
   updateProfile: (
     patch: Partial<Pick<ProfileRow, "full_name" | "phone" | "campus" | "county" | "location" | "avatar_url">>
@@ -96,7 +93,7 @@ export function authErrorMessage(error: unknown): string {
   if (code.includes("auth/invalid-credential") || code.includes("auth/wrong-password"))
     return "Invalid email or password.";
   if (code.includes("auth/user-not-found"))
-    return "No account with that email. Create one below.";
+    return "No account with that email. Create an account below.";
   if (code.includes("auth/email-already-in-use"))
     return "An account with this email already exists. Try signing in.";
   if (code.includes("auth/weak-password"))
@@ -293,17 +290,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [requireAuth, syncSession]
   );
 
-  const signUpWithEmail = useCallback(
-    async (email: string, password: string, fullName: string) => {
-      const credential = await createUserWithEmailAndPassword(requireAuth(), email, password);
-      // Set it on the Firebase user too, so the name is in the ID token's `name`
-      // claim and /api/auth/session can seed profiles.full_name from it.
-      await updateFirebaseProfile(credential.user, { displayName: fullName });
-      return syncSession(credential.user);
-    },
-    [requireAuth, syncSession]
-  );
-
   const signOut = useCallback(async () => {
     await firebaseSignOut(requireAuth());
     setProfile(null);
@@ -351,7 +337,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isSuperAdmin: role.superAdmin,
       signInWithGoogle,
       signInWithEmail,
-      signUpWithEmail,
       signOut,
       updateProfile,
       refreshProfile,
@@ -366,7 +351,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role,
       signInWithGoogle,
       signInWithEmail,
-      signUpWithEmail,
       signOut,
       updateProfile,
       refreshProfile,

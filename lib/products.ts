@@ -28,6 +28,8 @@ export interface Product {
   reviewCount: number;
   badge?: string;
   originalPrice?: number;
+  /** Sold on pre-order. */
+  preorder?: boolean;
 
   // Present when the product came from the database.
   description?: string;
@@ -63,6 +65,7 @@ export function productFromRow(row: ProductRow): Product {
     reviewCount: row.review_count,
     badge: row.badge ?? undefined,
     originalPrice: row.original_price ? Number(row.original_price) : undefined,
+    preorder: row.preorder ?? false,
     description: row.description ?? undefined,
     images: row.images ?? [],
     sizes: row.sizes ?? [],

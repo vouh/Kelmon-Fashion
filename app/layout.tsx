@@ -124,8 +124,11 @@ const structuredData = {
 const themeScript = `
 (function() {
   try {
-    var t = localStorage.getItem('kelmon-theme');
-    var d = t || 'light';
+    // The admin dashboard has its own setting; see ThemeProvider.
+    var p = location.pathname;
+    var admin = p === '/admin' || p.indexOf('/admin/') === 0;
+    var t = (admin && localStorage.getItem('kelmon-admin-theme')) || localStorage.getItem('kelmon-theme');
+    var d = t === 'dark' ? 'dark' : 'light';
     document.documentElement.classList.add(d);
   } catch (e) {
     document.documentElement.classList.add('light');

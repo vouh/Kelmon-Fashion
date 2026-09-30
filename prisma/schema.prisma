@@ -135,6 +135,8 @@ model Product {
   review_count   Int      @default(0)
   /// 'New' | 'Hot' | 'Sale' | null
   badge          String?
+  /// Sold on pre-order: gold "P" on shop cards, noted on the product page.
+  preorder       Boolean  @default(false)
   /// false hides it from the storefront without deleting it
   active         Boolean  @default(true)
   created_at     DateTime @default(now()) @db.Timestamptz(6)
@@ -144,6 +146,7 @@ model Product {
   reviews     Review[]
   homepage_drops HomepageDrop[]
   likes       ProductLike[]
+  inventory_items InventoryItem[]
 
   @@map("products")
 }
@@ -487,4 +490,72 @@ model SensitiveActionCode {
 
   @@index([requested_by, created_at(sort: Desc)], map: "sensitive_action_codes_requester_idx")
   @@map("sensitive_action_codes")
+}
+
+/// Short-lived email OTP used before creating a password-based Firebase user.
+/// Codes are hashed and this table is accessible only to the server.
+model SignupEmailCode {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email      String
+  code_hash  String
+  attempts   Int       @default(0)
+  expires_at DateTime  @db.Timestamptz(6)
+  used_at    DateTime? @db.Timestamptz(6)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([email, created_at(sort: Desc)], map: "signup_email_codes_email_created_idx")
+  @@map("signup_email_codes")
+}
+
+/// Short-lived email OTP used before creating a password-based Firebase user.
+/// Codes are hashed and this table is accessible only to the server.
+model SignupEmailCode {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email      String
+  code_hash  String
+  attempts   Int       @default(0)
+  expires_at DateTime  @db.Timestamptz(6)
+  used_at    DateTime? @db.Timestamptz(6)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([email, created_at(sort: Desc)], map: "signup_email_codes_email_created_idx")
+  @@map("signup_email_codes")
+}
+
+/// Finance: one buying trip ("Monday 15 May 2026") and the stock bought on it.
+/// Admin only.
+model Inventory {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  purchased_on DateTime @default(dbgenerated("CURRENT_DATE")) @db.Date
+  notes        String?
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  items InventoryItem[]
+
+  @@index([purchased_on(sort: Desc)], map: "inventories_purchased_on_idx")
+  @@map("inventories")
+}
+
+/// One line of an inventory: what a piece cost, what it sells for, how many
+/// were bought and how many have sold. The product link is optional.
+model InventoryItem {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  inventory_id String   @db.Uuid
+  name         String
+  product_id   String?
+  buy_price    Decimal  @db.Decimal(10, 2)
+  sell_price   Decimal  @db.Decimal(10, 2)
+  quantity     Int
+  sold         Int      @default(0)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  inventory Inventory @relation(fields: [inventory_id], references: [id], onDelete: Cascade)
+  product   Product?  @relation(fields: [product_id], references: [id], onDelete: SetNull)
+
+  @@index([inventory_id], map: "inventory_items_inventory_idx")
+  @@index([product_id], map: "inventory_items_product_idx")
+  @@map("inventory_items")
 }

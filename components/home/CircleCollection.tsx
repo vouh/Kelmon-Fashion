@@ -13,7 +13,8 @@ interface CircleCollectionProps {
 }
 
 const VISIBLE_DESKTOP = 4;
-const VISIBLE_MOBILE = 2;
+/** A fraction, so the next circle peeks in and invites a swipe. */
+const VISIBLE_MOBILE = 2.3;
 const MAX_CIRCLE = 240;
 /** Space around the circle inside its slot (the p-2 wrapper), so the ring and shadow fit. */
 const CIRCLE_INSET = 16;
@@ -121,8 +122,12 @@ export default function CircleCollection({
     return () => el.removeEventListener("wheel", onWheel);
   }, [syncButtons]);
 
+  // Mouse drag-to-scroll only. Touch uses the browser's own scrolling, and the
+  // pointer is captured only once a drag starts, so a plain click still
+  // reaches the product link.
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType === "mouse" && e.button !== 0) return;
+    dragRef.current.moved = false;
+    if (e.pointerType !== "mouse" || e.button !== 0) return;
     const el = viewportRef.current;
     if (!el) return;
 
@@ -133,8 +138,6 @@ export default function CircleCollection({
       moved: false,
       pointerId: e.pointerId,
     };
-    setDragging(true);
-    el.setPointerCapture(e.pointerId);
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -143,12 +146,17 @@ export default function CircleCollection({
     if (!drag.active || !el) return;
 
     const dx = e.clientX - drag.startX;
-    if (Math.abs(dx) > 6) drag.moved = true;
+    if (!drag.moved) {
+      if (Math.abs(dx) <= 6) return;
+      drag.moved = true;
+      setDragging(true);
+      el.setPointerCapture(e.pointerId);
+    }
     el.scrollLeft = drag.startScroll - dx;
     syncButtons();
   };
 
-  const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+  const endDrag = () => {
     const el = viewportRef.current;
     const drag = dragRef.current;
     if (el && drag.pointerId != null && el.hasPointerCapture(drag.pointerId)) {
@@ -233,7 +241,7 @@ export default function CircleCollection({
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
-          className={`min-w-0 overflow-x-auto overflow-y-hidden hide-scrollbar py-5 touch-pan-x overscroll-x-contain select-none ${
+          className={`min-w-0 snap-x snap-mandatory overflow-x-auto overflow-y-hidden hide-scrollbar py-5 overscroll-x-contain select-none md:snap-none ${
             dragging ? "cursor-grabbing" : "cursor-grab"
           }`}
           style={{ WebkitOverflowScrolling: "touch" }}
@@ -261,7 +269,7 @@ export default function CircleCollection({
                     dragRef.current.moved = false;
                   }
                 }}
-                className="shrink-0 grow-0 text-center group pt-2 pb-1"
+                className="shrink-0 grow-0 snap-start text-center group pt-2 pb-1"
                 style={
                   itemWidth > 0
                     ? { width: itemWidth, flexBasis: itemWidth }

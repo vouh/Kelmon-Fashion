@@ -183,6 +183,7 @@ export const productInputSchema = z
       .int("Stock must be a whole number.")
       .nonnegative("Stock cannot be negative."),
     badge: z.enum(["New", "Hot", "Sale"]).nullable().optional(),
+    preorder: z.boolean().default(false),
     active: z.boolean(),
   })
   // Mirrors the products_original_price_higher CHECK, so the message is about a

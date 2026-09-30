@@ -3,6 +3,7 @@ import Image from "next/image";
 import type { Product } from "@/lib/products";
 import { formatKes } from "@/lib/products";
 import StarRating from "@/components/ui/StarRating";
+import PreorderBadge from "@/components/shop/PreorderBadge";
 
 interface ProductCardProps {
   product: Product;
@@ -20,6 +21,7 @@ export default function ProductCard({ product, compact = false }: ProductCardPro
             {product.badge}
           </span>
         )}
+        {product.preorder && <PreorderBadge />}
         <Link href={`/product/${product.id}`} className="absolute inset-0 block">
           <Image
             src={product.image}

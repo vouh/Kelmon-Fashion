@@ -3,7 +3,6 @@ import Image from "next/image";
 import AppShell from "@/components/layout/AppShell";
 import FaqSection from "@/components/home/FaqSection";
 import AboutVideoHero from "@/components/about/AboutVideoHero";
-import { getProducts } from "@/lib/supabase/products";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata = pageMetadata({
@@ -20,33 +19,19 @@ const whyPoints = [
   "Delivery that matches your schedule, not the other way around.",
 ];
 
-const FALLBACK_IMAGE = "/logo.png";
-
-export default async function AboutPage() {
-  const shopProducts = await getProducts();
-
-  const aboutImage =
-    shopProducts.find((p) => p.category === "Perfumes")?.image ??
-    shopProducts[0]?.image ??
-    FALLBACK_IMAGE;
-  const faqImage =
-    shopProducts.find((p) => p.category === "Accessories")?.image ??
-    shopProducts[0]?.image ??
-    FALLBACK_IMAGE;
-
+export default function AboutPage() {
   return (
     <AppShell activeNav="about">
       <main className="flex-grow">
         <AboutVideoHero />
         <section id="story" className="scroll-mt-24 px-margin-mobile md:px-margin-desktop pt-14 md:pt-20 pb-xl">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center mb-xl">
-            <div className="relative aspect-[4/3] overflow-hidden rounded-3xl rounded-tl-[90px] border border-primary/20 bg-surface-container">
+            <div className="relative aspect-[4/3] overflow-hidden rounded-3xl rounded-tl-[90px] border border-primary/10 bg-white">
               <Image
-                src={aboutImage}
-                alt="Kelmon products"
+                src="/images/about/kelmon-young-woman.webp"
+                alt="Young woman in a lavender and cream Kelmon fashion look"
                 fill
-                unoptimized
-                className="object-cover"
+                className="object-contain"
                 sizes="(max-width: 768px) 100vw, 50vw"
                 priority
               />
@@ -90,7 +75,7 @@ export default async function AboutPage() {
           </div>
         </section>
 
-        <FaqSection image={faqImage} />
+        <FaqSection image="/images/about/kelmon-young-man.webp" />
       </main>
     </AppShell>
   );

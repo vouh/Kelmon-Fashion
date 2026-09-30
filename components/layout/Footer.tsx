@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { logoOnDark } from "@/lib/logo";
 import AccountLink from "@/components/layout/AccountLink";
+import FooterClock from "@/components/layout/FooterClock";
 
 export default function Footer() {
   return (
@@ -102,18 +103,34 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-14 md:mt-16 pt-8 border-t border-white/20 flex flex-col sm:flex-row justify-between gap-3">
-          <p className="font-body-md text-body-md text-white/70">
-            © 2026 Kelmon · Beauty · Fashion · Glamour
-            <span className="mx-2 text-white/40">·</span>
-            <Link href="/terms" className="hover:text-white underline-offset-4 hover:underline">
-              Terms
-            </Link>
-            <span className="mx-2 text-white/40">·</span>
-            <Link href="/privacy" className="hover:text-white underline-offset-4 hover:underline">
-              Privacy
-            </Link>
-          </p>
+        <div className="mt-14 md:mt-16 pt-8 border-t border-white/20 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col items-start gap-1.5 text-sm text-white/70 sm:flex-row sm:items-center sm:gap-0">
+            <p className="whitespace-nowrap">© {new Date().getFullYear()} Kelmon. All rights reserved.</p>
+            <p>
+              <span className="mx-2 hidden text-white/40 sm:inline">·</span>
+              <Link href="/terms" className="hover:text-white underline-offset-4 hover:underline">
+                Terms
+              </Link>
+              <span className="mx-2 text-white/40">·</span>
+              <Link href="/privacy" className="hover:text-white underline-offset-4 hover:underline">
+                Privacy
+              </Link>
+            </p>
+          </div>
+          <div className="flex flex-col items-center gap-2 border-t border-white/10 pt-5 text-center sm:flex-row sm:gap-4 lg:border-0 lg:pt-0 lg:text-left">
+            <FooterClock />
+            <p className="text-xs text-white/70">
+              Powered by{" "}
+              <a
+                href="https://spectretechltd.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-white underline-offset-4 hover:text-[#E3C47E] hover:underline"
+              >
+                Spectre Technologies Limited
+              </a>
+            </p>
+          </div>
         </div>
       </div>
     </footer>

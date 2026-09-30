@@ -7,6 +7,7 @@ import FeatureProductCard from "@/components/shop/FeatureProductCard";
 import { getProducts } from "@/lib/supabase/products";
 import { getHomepageDrops } from "@/lib/supabase/content";
 import { pageMetadata } from "@/lib/seo";
+import { roundRobinByCategory } from "@/lib/mix-products";
 
 export const metadata = pageMetadata({
   title: "Campus Fashion, Perfumes & Bags",
@@ -15,12 +16,25 @@ export const metadata = pageMetadata({
   path: "/home",
 });
 
+const CIRCLE_COUNT = 10;
+
 const brandStrip = ["Chanel", "Dior", "Louis Vuitton", "Gucci", "YSL", "Prada", "Armani"];
 
 export default async function HomePage() {
   const [shopProducts, homepageDrops] = await Promise.all([getProducts(), getHomepageDrops()]);
 
-  const gridProducts = shopProducts.slice(0, 8);
+  // The chosen drops, topped up from the shop, mixed so no category bunches up.
+  const linked = new Set(homepageDrops.map((drop) => drop.product_id).filter(Boolean));
+  const topUp = roundRobinByCategory(
+    shopProducts.filter((product) => !linked.has(product.id)),
+    "circles"
+  ).slice(0, Math.max(0, CIRCLE_COUNT - homepageDrops.length));
+  const circleItems = roundRobinByCategory([...homepageDrops.slice(0, CIRCLE_COUNT), ...topUp], "circles");
+
+  // Picks skip what the circles already show, unless that would leave the grid short.
+  const shown = new Set([...linked, ...topUp.map((product) => product.id)]);
+  const unseen = shopProducts.filter((product) => !shown.has(product.id));
+  const gridProducts = roundRobinByCategory(unseen.length >= 8 ? unseen : shopProducts, "picks").slice(0, 8);
 
   return (
     <AppShell activeNav="home" underNav>
@@ -42,7 +56,7 @@ export default async function HomePage() {
         </div>
 
         <Reveal>
-          <CircleCollection products={homepageDrops.length ? homepageDrops : shopProducts} />
+          <CircleCollection products={circleItems} />
         </Reveal>
 
         {/* Our Features — reference product grid */}
@@ -65,7 +79,7 @@ export default async function HomePage() {
                 href="/shop"
                 className="inline-flex h-11 px-9 rounded-full bg-primary text-white text-[11px] font-semibold uppercase tracking-[0.18em] items-center gap-2 hover:bg-[#7a3a96] transition-colors"
               >
-                Shop the fits
+                See all products
                 <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
                   arrow_forward
                 </span>

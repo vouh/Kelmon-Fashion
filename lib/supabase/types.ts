@@ -64,6 +64,7 @@ export type ProductRow = {
   rating: number;
   review_count: number;
   badge: string | null;
+  preorder: boolean;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -190,6 +191,16 @@ export type SensitiveActionCodeRow = {
   created_at: string;
 }
 
+export type SignupEmailCodeRow = {
+  id: string;
+  email: string;
+  code_hash: string;
+  attempts: number;
+  expires_at: string;
+  used_at: string | null;
+  created_at: string;
+}
+
 export type PaymentFailureRow = {
   id: string;
   order_id: string | null;
@@ -271,6 +282,33 @@ export type HomepageDropRow = {
   product_id: string | null;
 }
 
+/** Finance: one buying trip, e.g. "Monday 15 May 2026". */
+export type InventoryRow = {
+  id: string;
+  name: string;
+  /** Kenya-time day the stock was bought, YYYY-MM-DD. */
+  purchased_on: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Finance: one line of an inventory. Prices are per piece. */
+export type InventoryItemRow = {
+  id: string;
+  inventory_id: string;
+  name: string;
+  /** Optional link to a catalogue product. */
+  product_id: string | null;
+  buy_price: number;
+  sell_price: number;
+  quantity: number;
+  /** Adjusted by hand for now; never more than quantity. */
+  sold: number;
+  created_at: string;
+  updated_at: string;
+}
+
 /** Columns the database always fills in itself, so never required on insert. */
 type Generated = "created_at" | "updated_at";
 
@@ -340,11 +378,17 @@ export type Database = {
       deals: Table<DealRow, "title">;
       updates: Table<UpdateRow, "title" | "body">;
       homepage_drops: Table<HomepageDropRow, "name" | "price" | "category" | "image">;
+      inventories: Table<InventoryRow, "name">;
+      inventory_items: Table<
+        InventoryItemRow,
+        "inventory_id" | "name" | "buy_price" | "sell_price" | "quantity"
+      >;
       payment_failures: Table<PaymentFailureRow, "reason">;
       sensitive_action_codes: Table<
         SensitiveActionCodeRow,
         "action" | "payload" | "summary" | "code_hash" | "requested_by" | "expires_at"
       >;
+      signup_email_codes: Table<SignupEmailCodeRow, "email" | "code_hash" | "expires_at">;
       code_prefixes: Table<CodePrefixRow, "letter" | "name" | "category">;
       mpesa_requests: Table<MpesaRequestRow, "checkout_request_id" | "order_id" | "amount">;
       site_settings: Table<SiteSettingRow, "key" | "value">;

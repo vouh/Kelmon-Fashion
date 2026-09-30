@@ -3,7 +3,7 @@ interface StarRatingProps {
   size?: "sm" | "md";
 }
 
-/** Always five gold stars (#C5A059); the review count sits beside them. */
+/** Always five gold stars (#C5A059); the review count sits beside them once there is one. */
 export default function StarRating({ reviewCount, size = "sm" }: StarRatingProps) {
   const iconSize = size === "sm" ? "text-[15px]" : "text-base";
 
@@ -19,7 +19,7 @@ export default function StarRating({ reviewCount, size = "sm" }: StarRatingProps
           star
         </span>
       ))}
-      {typeof reviewCount === "number" && (
+      {typeof reviewCount === "number" && reviewCount > 0 && (
         <span className="text-xs text-on-surface-variant ml-1">({reviewCount})</span>
       )}
     </div>
