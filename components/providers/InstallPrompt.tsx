@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useAuth } from "@/components/providers/AuthProvider";
 import logo from "@/lib/logo";
 
 /**
@@ -15,11 +14,20 @@ import logo from "@/lib/logo";
  * on iPhone/iPad, where install is only ever manual, the card shows the
  * Share → Add to Home Screen steps.
  *
- * Kept deliberately quiet: it only appears once someone is signed in, hides
- * itself after a few seconds if ignored, and then stays away for 48 hours
- * (as it does after "Not now"). Once installed, or opened as the app, it
- * never shows again.
+ * Kept deliberately quiet: it appears a few seconds into a visit, hides
+ * itself after 15 seconds if ignored, and then stays away for 48 hours (as it
+ * does after "Not now"). Once installed, or opened as the app, it never shows
+ * again. Add ?install-prompt to any page URL to preview it regardless.
+ *
+ * The browser's install event is caught by an inline script in app/layout.tsx,
+ * because Chrome can fire it before this component has mounted.
  */
+
+declare global {
+  interface Window {
+    __kelmonInstallPrompt?: Event;
+  }
+}
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -29,8 +37,8 @@ interface BeforeInstallPromptEvent extends Event {
 const SNOOZE_KEY = "kelmon-install-snoozed-until";
 const INSTALLED_KEY = "kelmon-install-done";
 const SNOOZE_MS = 48 * 60 * 60 * 1000;
-/** Pause after sign-in before the card slides in. */
-const SHOW_AFTER_MS = 3000;
+/** Pause after arriving (or signing in) before the card slides in. */
+const SHOW_AFTER_MS = 4000;
 /** How long an ignored card stays up. Paused while the pointer or focus is on it. */
 const AUTO_HIDE_MS = 15000;
 /** Pages where a card would get in the way of something important. */
@@ -67,7 +75,6 @@ function remember(key: string, value: string) {
 
 export default function InstallPrompt() {
   const pathname = usePathname() ?? "/";
-  const { user } = useAuth();
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [mode, setMode] = useState<"install" | "ios" | null>(null);
   const [visible, setVisible] = useState(false);
@@ -77,14 +84,25 @@ export default function InstallPrompt() {
 
   const hiddenHere = HIDDEN_ON.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
-  useEffect(() => {
-    if (isStandalone() || snoozed()) return;
+  /** ?install-prompt in the URL shows the card now, ignoring any snooze. */
+  const [preview, setPreview] = useState(false);
 
+  useEffect(() => {
+    const forced = new URLSearchParams(window.location.search).has("install-prompt");
+    setPreview(forced);
+    if (isStandalone() || (!forced && snoozed())) return;
+
+    // Caught early by the inline script in app/layout.tsx.
+    function takeCaught() {
+      if (!window.__kelmonInstallPrompt) return;
+      setDeferred(window.__kelmonInstallPrompt as BeforeInstallPromptEvent);
+      setMode("install");
+    }
     function onBeforeInstall(event: Event) {
       // Keep the browser's own mini-bar away; the Kelmon card offers it instead.
       event.preventDefault();
-      setDeferred(event as BeforeInstallPromptEvent);
-      setMode("install");
+      window.__kelmonInstallPrompt = event;
+      takeCaught();
     }
     function onInstalled() {
       remember(INSTALLED_KEY, "1");
@@ -93,28 +111,34 @@ export default function InstallPrompt() {
     }
 
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
+    window.addEventListener("kelmon-install-available", takeCaught);
     window.addEventListener("appinstalled", onInstalled);
+    takeCaught();
     if (isIosBrowser()) setMode("ios");
+    // Previewing on a browser that can't install (or already has): show the
+    // iPhone-style steps so the card can still be seen.
+    else if (forced) setMode((current) => current ?? "ios");
     return () => {
       window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+      window.removeEventListener("kelmon-install-available", takeCaught);
       window.removeEventListener("appinstalled", onInstalled);
     };
   }, []);
 
-  // Appears a moment after sign-in (or on arriving already signed in).
+  // Appears a moment into the visit, once per page load.
   useEffect(() => {
-    if (!user || !mode || hiddenHere || shownThisVisit.current || snoozed()) return;
+    if (!mode || hiddenHere || shownThisVisit.current || (!preview && snoozed())) return;
     const timer = setTimeout(() => {
       shownThisVisit.current = true;
       setVisible(true);
-    }, SHOW_AFTER_MS);
+    }, preview ? 500 : SHOW_AFTER_MS);
     return () => clearTimeout(timer);
-  }, [user, mode, hiddenHere]);
+  }, [mode, hiddenHere, preview]);
 
   // Leaving for checkout etc. hides it without counting as a dismissal.
   useEffect(() => {
-    if (hiddenHere || !user) setVisible(false);
-  }, [hiddenHere, user]);
+    if (hiddenHere) setVisible(false);
+  }, [hiddenHere]);
 
   function snooze() {
     remember(SNOOZE_KEY, String(Date.now() + SNOOZE_MS));

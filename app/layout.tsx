@@ -137,11 +137,24 @@ const themeScript = `
 })();
 `;
 
+/**
+ * Chrome can fire beforeinstallprompt before React has hydrated (often on
+ * repeat visits), so catch it here and hand it to InstallPrompt later.
+ */
+const installScript = `
+window.addEventListener('beforeinstallprompt', function (e) {
+  e.preventDefault();
+  window.__kelmonInstallPrompt = e;
+  window.dispatchEvent(new Event('kelmon-install-available'));
+});
+`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-KE" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: installScript }} />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
