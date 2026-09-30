@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Playfair_Display, Cormorant_Garamond } from "next/font/google";
 import AppProviders from "@/components/providers/AppProviders";
 import PwaRegister from "@/components/providers/PwaRegister";
+import InstallPrompt from "@/components/providers/InstallPrompt";
 import "@/styles/design.css";
 import "./globals.css";
 import {
@@ -155,7 +156,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className={`${inter.variable} ${playfair.variable} ${cormorant.variable} kelmon-theme antialiased min-h-screen flex flex-col font-body-md text-body-md`}>
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          {children}
+          <InstallPrompt />
+        </AppProviders>
         <PwaRegister />
       </body>
     </html>
