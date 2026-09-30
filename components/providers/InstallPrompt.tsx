@@ -14,10 +14,10 @@ import logo from "@/lib/logo";
  * on iPhone/iPad, where install is only ever manual, the card shows the
  * Share → Add to Home Screen steps.
  *
- * Kept deliberately quiet: it appears a few seconds into a visit, hides
- * itself after 15 seconds if ignored, and then stays away for 48 hours (as it
- * does after "Not now"). Once installed, or opened as the app, it never shows
- * again. Add ?install-prompt to any page URL to preview it regardless.
+ * It appears a few seconds into a visit and stays up until it's closed (✕ or
+ * "Not now"), then stays away for 48 hours. Once installed, or opened as the
+ * app, it never shows again. Add ?install-prompt to any page URL to preview
+ * it regardless.
  *
  * The browser's install event is caught by an inline script in app/layout.tsx,
  * because Chrome can fire it before this component has mounted.
@@ -39,8 +39,6 @@ const INSTALLED_KEY = "kelmon-install-done";
 const SNOOZE_MS = 48 * 60 * 60 * 1000;
 /** Pause after arriving (or signing in) before the card slides in. */
 const SHOW_AFTER_MS = 4000;
-/** How long an ignored card stays up. Paused while the pointer or focus is on it. */
-const AUTO_HIDE_MS = 15000;
 /** Pages where a card would get in the way of something important. */
 const HIDDEN_ON = ["/admin", "/checkout", "/verify-email", "/reset-password", "/forgot-password"];
 
@@ -78,7 +76,6 @@ export default function InstallPrompt() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [mode, setMode] = useState<"install" | "ios" | null>(null);
   const [visible, setVisible] = useState(false);
-  const [paused, setPaused] = useState(false);
   /** Shown at most once per page load, even if the user signs out and in again. */
   const shownThisVisit = useRef(false);
 
@@ -145,12 +142,6 @@ export default function InstallPrompt() {
     setVisible(false);
   }
 
-  // Ignored: slip away on its own and come back in 48 hours.
-  useEffect(() => {
-    if (!visible || paused) return;
-    const timer = setTimeout(snooze, AUTO_HIDE_MS);
-    return () => clearTimeout(timer);
-  }, [visible, paused]);
 
   async function install() {
     if (!deferred) return;
@@ -173,10 +164,6 @@ export default function InstallPrompt() {
     <div
       role="dialog"
       aria-label="Install the Kelmon app"
-      onPointerEnter={() => setPaused(true)}
-      onPointerLeave={() => setPaused(false)}
-      onFocus={() => setPaused(true)}
-      onBlur={() => setPaused(false)}
       className="fixed inset-x-3 bottom-[5.75rem] z-[60] mx-auto max-w-md overflow-hidden rounded-2xl border border-primary/15 bg-white/95 p-3.5 shadow-[0_18px_50px_rgba(91,42,128,0.25)] backdrop-blur-xl md:bottom-5 md:left-auto md:right-5 md:mx-0 dark:bg-surface/95"
     >
       <div className="flex items-start gap-3">
@@ -228,18 +215,6 @@ export default function InstallPrompt() {
           </button>
         </div>
       )}
-      {/* Time left before it hides itself; freezes while being read. */}
-      <div className="absolute inset-x-0 bottom-0 h-0.5 bg-primary/10" aria-hidden="true">
-        <div
-          key={String(paused)}
-          className="h-full origin-left bg-primary/50"
-          style={{
-            animation: `kelmon-install-countdown ${AUTO_HIDE_MS}ms linear forwards`,
-            animationPlayState: paused ? "paused" : "running",
-          }}
-        />
-      </div>
-      <style>{`@keyframes kelmon-install-countdown { from { transform: scaleX(1); } to { transform: scaleX(0); } }`}</style>
     </div>
   );
 }
