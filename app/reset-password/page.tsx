@@ -39,6 +39,7 @@ function ResetPasswordForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   /** Hints stay hidden until the field is left or the form is sent. */
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [confirmTouched, setConfirmTouched] = useState(false);
@@ -163,19 +164,32 @@ function ResetPasswordForm() {
             )}
           </div>
           <div>
-            <input
-              type={showPassword ? "text" : "password"}
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              onBlur={() => confirm && setConfirmTouched(true)}
-              placeholder="Confirm password"
-              aria-label="Confirm password"
-              aria-invalid={confirmHint ? true : undefined}
-              aria-describedby={confirmHint ? "reset-confirm-hint" : undefined}
-              autoComplete="new-password"
-              maxLength={128}
-              className={`${inputClass} ${confirmHint ? invalidClass : ""}`}
-            />
+            <div className="relative">
+              <input
+                type={showConfirm ? "text" : "password"}
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                onBlur={() => confirm && setConfirmTouched(true)}
+                placeholder="Confirm password"
+                aria-label="Confirm password"
+                aria-invalid={confirmHint ? true : undefined}
+                aria-describedby={confirmHint ? "reset-confirm-hint" : undefined}
+                autoComplete="new-password"
+                maxLength={128}
+                className={`${inputClass} pr-11 ${confirmHint ? invalidClass : ""}`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm((shown) => !shown)}
+                aria-label={showConfirm ? "Hide confirmed password" : "Show confirmed password"}
+                aria-pressed={showConfirm}
+                className="absolute inset-y-0 right-1 my-auto flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant hover:text-primary"
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  {showConfirm ? "visibility_off" : "visibility"}
+                </span>
+              </button>
+            </div>
             {confirmHint && (
               <p id="reset-confirm-hint" role="alert" className="mt-1 px-1 text-[11px] leading-snug text-red-600">
                 {confirmHint}
