@@ -48,6 +48,14 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(redirect);
     }
   }
+  // Forgotten passwords are handled in the sign-in modal; old links land there.
+  if (pathname === "/forgot-password") {
+    const redirect = request.nextUrl.clone();
+    redirect.pathname = "/shop";
+    redirect.search = "";
+    redirect.searchParams.set("auth", "forgot");
+    return NextResponse.redirect(redirect);
+  }
   // The account page has nothing to show a signed-out visitor, so open the
   // sign-in modal over the shop instead of rendering an empty "sign in" page.
   if (pathname === "/profile" && !signedIn) {

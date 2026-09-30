@@ -115,7 +115,7 @@ export function authErrorMessage(error: unknown): string {
   if (code.includes("auth/expired-action-code"))
     return "This reset link has expired. Request a new one.";
   if (code.includes("auth/invalid-action-code"))
-    return "This reset link is invalid or has already been used. Request a new one.";
+    return "This link no longer works: it was already used, or a newer reset email replaced it. Open the most recent email from Kelmon, or request a new link.";
 
   return raw || "Something went wrong. Please try again.";
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { confirmPasswordReset, verifyPasswordResetCode } from "firebase/auth";
@@ -191,9 +190,9 @@ function ResetPasswordForm() {
       )}
 
       {status === "invalid" && (
-        <Link href="/forgot-password" className={`${primaryButton} mt-4`}>
+        <button type="button" onClick={() => openAuth({ mode: "forgot" })} className={`${primaryButton} mt-4`}>
           Request a new link
-        </Link>
+        </button>
       )}
 
       <p className="mt-4 text-center text-xs text-on-surface-variant">

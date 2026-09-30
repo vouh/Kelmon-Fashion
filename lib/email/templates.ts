@@ -150,12 +150,21 @@ export function emailLayout({
 }
 
 export function passwordResetEmail(link: string, origin: string | null) {
+  // Each new reset link cancels the earlier ones, so the send time goes in the
+  // subject: Gmail then keeps every request as its own email instead of
+  // threading them, where the oldest (dead) link is the one on top.
+  const sentAt = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Nairobi",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date());
   return {
-    subject: "Reset your Kelmon password",
+    subject: `Reset your Kelmon password (${sentAt})`,
     text:
       "We got a request to reset the password for your Kelmon account.\n\n" +
       `Choose a new password here:\n${link}\n\n` +
-      "This link expires in 1 hour and can only be used once. If you didn't ask for a reset, ignore this email and your password will stay the same.",
+      "This link expires in 1 hour and can only be used once. Asking for another reset cancels this link, so always use the newest email. If you didn't ask for a reset, ignore this email and your password will stay the same.",
     html: emailLayout({
       origin,
       preheader: "Choose a new password for your Kelmon account. The link expires in 1 hour.",
@@ -165,7 +174,7 @@ export function passwordResetEmail(link: string, origin: string | null) {
         "We got a request to reset the password for your Kelmon account. Tap the button below to choose a new one — you'll be signed straight back in.",
       cta: { label: "Choose a new password", url: link },
       footnoteHtml:
-        "This link expires in <strong>1 hour</strong> and can only be used once. If you didn't ask for a reset, you can safely ignore this email and your password will stay the same." +
+        "This link expires in <strong>1 hour</strong> and can only be used once. Asking for another reset cancels this link, so always use the <strong>newest</strong> email. If you didn't ask for a reset, you can safely ignore this email and your password will stay the same." +
         `<br /><br /><span style="font-size:12px;word-break:break-all;">Button not working? Paste this into your browser:<br /><a href="${link}" style="color:${brand.purple};">${link}</a></span>`,
     }),
   };

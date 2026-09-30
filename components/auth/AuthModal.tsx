@@ -33,7 +33,7 @@ type Mode = "signin" | "signup";
 type View = Mode | "forgot";
 
 interface OpenAuthOptions {
-  mode?: Mode;
+  mode?: View;
   /** Where to send the user once signed in. Omit to stay on the current page. */
   next?: string;
   /** A notice shown above the form, e.g. why sign-in is needed. */
@@ -58,8 +58,9 @@ function safeNext(value: string | null | undefined): string | undefined {
 }
 
 /**
- * Opens the modal for `?auth=signin` / `?auth=signup` links (the middleware's
- * /admin gate and the old /signin URL both land here), then strips the params.
+ * Opens the modal for `?auth=signin` / `?auth=signup` / `?auth=forgot` links
+ * (the middleware's /admin gate, the old /signin and /forgot-password URLs all
+ * land here), then strips the params.
  */
 function AuthQueryWatcher({ onOpen }: { onOpen: (options: OpenAuthOptions) => void }) {
   const params = useSearchParams();
@@ -69,7 +70,7 @@ function AuthQueryWatcher({ onOpen }: { onOpen: (options: OpenAuthOptions) => vo
 
   useEffect(() => {
     const auth = params.get("auth");
-    if ((auth !== "signin" && auth !== "signup") || loading) return;
+    if ((auth !== "signin" && auth !== "signup" && auth !== "forgot") || loading) return;
 
     const next = safeNext(params.get("next"));
     const rest = new URLSearchParams(params.toString());
@@ -521,7 +522,7 @@ function AuthForm({
             <p className="mt-2 text-sm text-on-surface">Check your email</p>
             <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
               We&apos;ve sent a reset link to {resetSentTo}. It expires in 1 hour. Check your spam
-              folder if you don&apos;t see it.
+              folder if you don&apos;t see it. Asking again cancels this link, so use the newest email.
             </p>
             <button
               type="button"
