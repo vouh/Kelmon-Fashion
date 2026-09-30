@@ -1,4 +1,5 @@
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { createClient, createServiceClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { HOMEPAGE_DROPS_SHUFFLE_KEY } from "@/lib/homepage-drops";
 import type { DealRow, HomepageDropRow, ReviewRow, UpdateRow } from "@/lib/supabase/types";
 
 /**
@@ -97,6 +98,22 @@ export async function getDeals(activeOnly = true): Promise<DealRow[]> {
     return [];
   }
   return data ?? [];
+}
+
+/**
+ * Whether the homepage carousel shuffles its order daily. On unless an admin
+ * turned it off. Read with the service role because site_settings is
+ * admin-only and the homepage is public.
+ */
+export async function getHomepageDropsShuffle(): Promise<boolean> {
+  if (!isSupabaseConfigured() || !process.env.SUPABASE_SERVICE_ROLE_KEY) return true;
+  const { data, error } = await createServiceClient()
+    .from("site_settings")
+    .select("value")
+    .eq("key", HOMEPAGE_DROPS_SHUFFLE_KEY)
+    .maybeSingle();
+  if (error) console.error("[content] getHomepageDropsShuffle:", error.message);
+  return data?.value !== false;
 }
 
 /** Cards for the homepage carousel, ordered by their admin-defined position. */

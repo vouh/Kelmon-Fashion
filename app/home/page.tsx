@@ -5,7 +5,7 @@ import FullScreenHeroBanners from "@/components/home/FullScreenHeroBanners";
 import CircleCollection from "@/components/home/CircleCollection";
 import FeatureProductCard from "@/components/shop/FeatureProductCard";
 import { getProducts } from "@/lib/supabase/products";
-import { getHomepageDrops } from "@/lib/supabase/content";
+import { getHomepageDrops, getHomepageDropsShuffle } from "@/lib/supabase/content";
 import { pageMetadata } from "@/lib/seo";
 import { roundRobinByCategory } from "@/lib/mix-products";
 import { MAX_HOMEPAGE_DROPS } from "@/lib/homepage-drops";
@@ -20,17 +20,24 @@ export const metadata = pageMetadata({
 const brandStrip = ["Chanel", "Dior", "Louis Vuitton", "Gucci", "YSL", "Prada", "Armani"];
 
 export default async function HomePage() {
-  const [shopProducts, homepageDrops] = await Promise.all([getProducts(), getHomepageDrops()]);
+  const [shopProducts, homepageDrops, shuffle] = await Promise.all([
+    getProducts(),
+    getHomepageDrops(),
+    getHomepageDropsShuffle(),
+  ]);
 
-  // "Just Dropped" shows exactly the admin's Homepage Drops list, in its order.
-  // Only when none are set does it fall back to a mix from the shop, so the
-  // section is never empty.
+  // "Just Dropped" shows exactly the admin's Homepage Drops list — reshuffled
+  // each day (categories kept apart) unless the admin turned that off, in which
+  // case it keeps their order. Only when none are set does it fall back to a
+  // mix from the shop, so the section is never empty.
   const linked = new Set(homepageDrops.map((drop) => drop.product_id).filter(Boolean));
   const topUp =
     homepageDrops.length > 0
       ? []
       : roundRobinByCategory(shopProducts, "circles").slice(0, MAX_HOMEPAGE_DROPS);
-  const circleItems = homepageDrops.length > 0 ? homepageDrops.slice(0, MAX_HOMEPAGE_DROPS) : topUp;
+  const chosen = homepageDrops.slice(0, MAX_HOMEPAGE_DROPS);
+  const circleItems =
+    homepageDrops.length === 0 ? topUp : shuffle ? roundRobinByCategory(chosen, "circles") : chosen;
 
   // Picks skip what the circles already show, unless that would leave the grid short.
   const shown = new Set([...linked, ...topUp.map((product) => product.id)]);

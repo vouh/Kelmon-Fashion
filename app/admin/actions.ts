@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { isOrderId } from "@/lib/order-ids";
-import { MAX_HOMEPAGE_DROPS } from "@/lib/homepage-drops";
+import { HOMEPAGE_DROPS_SHUFFLE_KEY, MAX_HOMEPAGE_DROPS } from "@/lib/homepage-drops";
 import { nextOrderId } from "@/lib/supabase/orders";
 import { after } from "next/server";
 import { sendManualPaymentEmails } from "@/lib/email/alerts";
@@ -672,6 +672,23 @@ export async function moveHomepageDrop(id: string, direction: "up" | "down"): Pr
     const third = await supabase.from("homepage_drops").update({ sort_order: adjacent.sort_order }).eq("id", current.id);
     if (third.error) throw new Error(third.error.message);
 
+    revalidatePath("/home");
+    revalidatePath("/admin/homepage-drops");
+    return ok();
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/** Turns the carousel's daily shuffle on or off. */
+export async function setHomepageDropsShuffle(on: boolean): Promise<ActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    if (typeof on !== "boolean") throw new Error("Invalid setting.");
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({ key: HOMEPAGE_DROPS_SHUFFLE_KEY, value: on, updated_at: new Date().toISOString() });
+    if (error) throw new Error(error.message);
     revalidatePath("/home");
     revalidatePath("/admin/homepage-drops");
     return ok();

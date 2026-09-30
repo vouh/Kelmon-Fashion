@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { deleteHomepageDrop, moveHomepageDrop, upsertHomepageDrop } from "@/app/admin/actions";
+import { deleteHomepageDrop, moveHomepageDrop, setHomepageDropsShuffle, upsertHomepageDrop } from "@/app/admin/actions";
 import { EmptyState } from "@/components/admin/ui";
 import { uploadDealImage } from "@/lib/supabase/storage";
 import type { HomepageDropRow } from "@/lib/supabase/types";
@@ -46,8 +46,11 @@ const MAX_DROPS = MAX_HOMEPAGE_DROPS;
 export default function HomepageDropsManager({
   drops,
   products,
+  shuffle,
 }: {
   drops: HomepageDropRow[];
+  /** Whether the homepage reshuffles this list daily. */
+  shuffle: boolean;
   /** Every product (published or not), for the "link to a product" picker. */
   products: Product[];
 }) {
@@ -121,6 +124,15 @@ export default function HomepageDropsManager({
     });
   }
 
+  function toggleShuffle() {
+    setError(null);
+    startTransition(async () => {
+      const result = await setHomepageDropsShuffle(!shuffle);
+      if (!result.ok) return setError(result.error);
+      router.refresh();
+    });
+  }
+
   function move(id: string, direction: "up" | "down") {
     setError(null);
     startTransition(async () => {
@@ -135,13 +147,34 @@ export default function HomepageDropsManager({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-2xl text-xs leading-relaxed text-white/55">
           Choose up to {MAX_DROPS} products for the homepage &ldquo;Just Dropped&rdquo; carousel — it shows exactly
-          this list, in this order. Their live name, price, category and cover photo stay in sync automatically.
-          Use the arrows below to change the order.
+          this list. Their live name, price, category and cover photo stay in sync automatically.
         </p>
         <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${drops.length === MAX_DROPS ? "bg-emerald-400/15 text-emerald-300" : "bg-amber-400/15 text-amber-300"}`}>
           {drops.length} / {MAX_DROPS} slots filled
         </span>
       </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-zinc-900 px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-xs font-black text-white">Shuffle order daily</p>
+          <p className="text-[11px] leading-relaxed text-white/45">
+            {shuffle
+              ? "On: the homepage shows these in a fresh order each day, with the same kinds of product kept apart."
+              : "Off: the homepage shows them in the order below. Use the arrows to change it."}
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={shuffle}
+          aria-label="Shuffle order daily"
+          disabled={busy}
+          onClick={toggleShuffle}
+          className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${shuffle ? "bg-purple-500" : "bg-white/15"}`}
+        >
+          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${shuffle ? "left-[22px]" : "left-0.5"}`} />
+        </button>
+      </div>
+
       {error && <div className="rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-xs text-red-300">{error}</div>}
 
       {draft ? (
@@ -271,10 +304,10 @@ export default function HomepageDropsManager({
                     </p>
                   </div>
                   <div className="flex flex-col">
-                    <button type="button" disabled={busy || index === 0} onClick={() => move(drop.id, "up")} className="rounded p-0.5 text-white/45 hover:bg-white/5 hover:text-white disabled:opacity-20" aria-label={`Move ${drop.name} earlier`}>
+                    <button type="button" disabled={busy || shuffle || index === 0} title={shuffle ? "Turn off Shuffle order daily to set the order" : undefined} onClick={() => move(drop.id, "up")} className="rounded p-0.5 text-white/45 hover:bg-white/5 hover:text-white disabled:opacity-20" aria-label={`Move ${drop.name} earlier`}>
                       <span className="material-symbols-outlined text-base">keyboard_arrow_up</span>
                     </button>
-                    <button type="button" disabled={busy || index === drops.length - 1} onClick={() => move(drop.id, "down")} className="rounded p-0.5 text-white/45 hover:bg-white/5 hover:text-white disabled:opacity-20" aria-label={`Move ${drop.name} later`}>
+                    <button type="button" disabled={busy || shuffle || index === drops.length - 1} title={shuffle ? "Turn off Shuffle order daily to set the order" : undefined} onClick={() => move(drop.id, "down")} className="rounded p-0.5 text-white/45 hover:bg-white/5 hover:text-white disabled:opacity-20" aria-label={`Move ${drop.name} later`}>
                       <span className="material-symbols-outlined text-base">keyboard_arrow_down</span>
                     </button>
                   </div>
