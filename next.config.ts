@@ -35,9 +35,10 @@ const createNextConfig = (phase: string): NextConfig => ({
   // Keep production output away from the development cache. Running
   // `next build` while `next dev` is open would otherwise replace the live
   // CSS/chunk manifest and leave pages rendering as unstyled HTML.
+  // Vercel only collects the default .next folder, so builds there must use it.
   distDir:
     process.env.NEXT_BUILD_DIR ||
-    (phase === PHASE_DEVELOPMENT_SERVER ? ".next" : ".next-build"),
+    (phase === PHASE_DEVELOPMENT_SERVER || process.env.VERCEL ? ".next" : ".next-build"),
   // The site opens on the shop; the editorial home page lives at /home.
   // Sign-in is a modal now, so old /signin links open it over the shop
   // (query params such as ?next= pass through).
