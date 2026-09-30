@@ -1,4 +1,7 @@
 import type { NextConfig } from "next";
+import {
+  PHASE_DEVELOPMENT_SERVER,
+} from "next/constants";
 
 /**
  * Supabase Storage public URLs look like:
@@ -9,7 +12,7 @@ const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
   : undefined;
 
-const nextConfig: NextConfig = {
+const createNextConfig = (phase: string): NextConfig => ({
   images: {
     remotePatterns: [
       // Preset avatar artwork in lib/avatars.ts.
@@ -29,9 +32,12 @@ const nextConfig: NextConfig = {
   },
   // Hide the Next.js "N" / DevTools bubble in the corner
   devIndicators: false,
-  // Lets a production build run beside `next dev` without clobbering its .next
-  // folder (NEXT_BUILD_DIR=.next-build npm run build). Unset on Vercel.
-  distDir: process.env.NEXT_BUILD_DIR || ".next",
+  // Keep production output away from the development cache. Running
+  // `next build` while `next dev` is open would otherwise replace the live
+  // CSS/chunk manifest and leave pages rendering as unstyled HTML.
+  distDir:
+    process.env.NEXT_BUILD_DIR ||
+    (phase === PHASE_DEVELOPMENT_SERVER ? ".next" : ".next-build"),
   // The site opens on the shop; the editorial home page lives at /home.
   // Sign-in is a modal now, so old /signin links open it over the shop
   // (query params such as ?next= pass through).
@@ -41,6 +47,6 @@ const nextConfig: NextConfig = {
       { source: "/signin", destination: "/shop?auth=signin", permanent: false },
     ];
   },
-};
+});
 
-export default nextConfig;
+export default createNextConfig;
