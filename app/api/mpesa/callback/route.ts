@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { applyPaymentFailure, applyPaymentSuccess } from "@/lib/payments";
+import { isMpesaConfigured, queryStkPush } from "@/lib/mpesa";
 
 /**
  * Safaricom STK callback.
@@ -48,6 +49,21 @@ export async function POST(request: Request) {
     );
 
     if (Number(ResultCode) === 0) {
+      // This URL is public and the checkout id reaches the customer's browser,
+      // so a "paid" callback is only believed once Safaricom confirms it. If
+      // the check can't be made now, the order stays pending and the status
+      // poll confirms it with Safaricom later.
+      let confirmed = false;
+      try {
+        confirmed = isMpesaConfigured() && (await queryStkPush(CheckoutRequestID)).state === "paid";
+      } catch (err) {
+        console.warn("[mpesa-callback] could not confirm with Safaricom:", err instanceof Error ? err.message : err);
+      }
+      if (!confirmed) {
+        console.warn("[mpesa-callback] success not confirmed by Safaricom; left pending", CheckoutRequestID);
+        return ack("ACK - pending confirmation");
+      }
+
       const items = CallbackMetadata?.Item ?? [];
       const receipt = metaValue(items, "MpesaReceiptNumber");
 
