@@ -171,12 +171,13 @@ export function passwordResetEmail(link: string, origin: string | null) {
   };
 }
 
-export function signupVerificationEmail(code: string, origin: string | null) {
+export function signupVerificationEmail(code: string, origin: string | null, link: string | null = null) {
   const codeBlock = `<div style="margin:22px 0;padding:18px 20px;border-radius:18px;background:${brand.bg};border:1px solid ${brand.border};font-family:${sans};font-size:32px;font-weight:800;letter-spacing:8px;text-align:center;color:${brand.purple};">${code}</div>`;
   return {
     subject: `${code} is your Kelmon verification code`,
     text:
       `Your Kelmon verification code is ${code}.\n\n` +
+      (link ? `Or verify in one click: ${link}\n\n` : "") +
       "It expires in 10 minutes. If you did not try to create a Kelmon account, you can ignore this email.",
     html: emailLayout({
       origin,
@@ -184,8 +185,11 @@ export function signupVerificationEmail(code: string, origin: string | null) {
       eyebrow: "Email verification",
       heading: "Confirm your email",
       bodyHtml:
-        "Enter this six-digit code in the Kelmon sign-up window to confirm this email belongs to you." +
+        (link
+          ? "Tap the button below to confirm this email belongs to you, or enter this six-digit code in the Kelmon sign-up window."
+          : "Enter this six-digit code in the Kelmon sign-up window to confirm this email belongs to you.") +
         codeBlock,
+      ...(link ? { cta: { label: "Verify my email", url: link } } : {}),
       footnoteHtml:
         "This code expires in <strong>10 minutes</strong> and can only be used once. If you did not try to create an account, you can safely ignore this message.",
     }),

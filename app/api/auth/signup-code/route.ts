@@ -62,10 +62,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "We could not start verification. Please try again." }, { status: 502 });
   }
 
+  // The same code, carried in a link: clicking it verifies without typing.
+  const origin = siteOrigin(request);
+  const link = origin
+    ? `${origin}/verify-email?id=${encodeURIComponent(id)}&code=${encodeURIComponent(code)}`
+    : null;
   const { error: sendError } = await resend.emails.send({
     from: settings.from,
     to: email,
-    ...signupVerificationEmail(code, siteOrigin(request)),
+    ...signupVerificationEmail(code, origin, link),
   });
   if (sendError) {
     await supabase.from("signup_email_codes").delete().eq("id", id);

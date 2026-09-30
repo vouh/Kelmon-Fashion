@@ -198,6 +198,8 @@ export type SignupEmailCodeRow = {
   attempts: number;
   expires_at: string;
   used_at: string | null;
+  /** Set when the email's one-click link was used instead of typing the code. */
+  verified_at: string | null;
   created_at: string;
 }
 

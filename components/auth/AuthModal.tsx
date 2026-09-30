@@ -8,6 +8,7 @@ import { useAuth, authErrorMessage, type SignInResult } from "@/components/provi
 import { useToast } from "@/components/ui/Toast";
 import { EMAIL_PATTERN, passwordProblem } from "@/lib/validation/credentials";
 import logo from "@/lib/logo";
+import { SIGNUP_CHANNEL } from "@/lib/signup-verify";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { createClient } from "@/lib/supabase/client";
 import { isProfileComplete } from "@/lib/kenya";
@@ -303,9 +304,13 @@ function AuthForm({
     }
   }
 
-  async function handleSignupVerification(event: React.FormEvent) {
-    event.preventDefault();
-    if (!signupChallenge) return;
+  /** Guards against the typed code and a clicked link both finishing at once. */
+  const finishing = useRef(false);
+
+  /** Creates the account, from the typed code or (viaLink) the clicked email link. */
+  async function finishSignup(viaLink: boolean) {
+    if (!signupChallenge || finishing.current) return;
+    finishing.current = true;
     setError(null);
     setBusy("email");
     try {
@@ -314,7 +319,7 @@ function AuthForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           challengeId: signupChallenge.id,
-          code: verificationCode,
+          ...(viaLink ? { viaLink: true } : { code: verificationCode }),
           email: signupChallenge.email,
           password,
           fullName: fullName.trim(),
@@ -327,11 +332,54 @@ function AuthForm({
       toast("Email verified. Welcome to Kelmon!");
       await routeAfterSignIn(result, true);
     } catch (err) {
+      finishing.current = false;
       setError(authErrorMessage(err));
     } finally {
       setBusy(null);
     }
   }
+
+  function handleSignupVerification(event: React.FormEvent) {
+    event.preventDefault();
+    void finishSignup(false);
+  }
+
+  // While waiting for the code, watch for the email's link being clicked —
+  // here or on another device — and finish without the code being typed.
+  const finishSignupRef = useRef(finishSignup);
+  finishSignupRef.current = finishSignup;
+  const challengeId = signupChallenge?.id;
+  useEffect(() => {
+    if (!challengeId) return;
+    let stopped = false;
+
+    async function check() {
+      if (stopped || finishing.current) return;
+      try {
+        const response = await fetch(`/api/auth/signup-link?id=${encodeURIComponent(challengeId!)}`, { cache: "no-store" });
+        const data = (await response.json().catch(() => ({}))) as { verified?: boolean };
+        if (!stopped && data.verified) void finishSignupRef.current(true);
+      } catch {}
+    }
+
+    const timer = setInterval(check, 4000);
+    const onFocus = () => void check();
+    window.addEventListener("focus", onFocus);
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel(SIGNUP_CHANNEL);
+      channel.onmessage = (event: MessageEvent<{ id?: string }>) => {
+        if (event.data?.id === challengeId) void check();
+      };
+    } catch {}
+
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+      channel?.close();
+    };
+  }, [challengeId]);
 
   async function resendSignupCode() {
     if (!signupChallenge) return;
@@ -481,7 +529,9 @@ function AuthForm({
       {signupChallenge ? (
         <form onSubmit={handleSignupVerification} className="mt-3 space-y-3 text-center sm:mt-5">
           <p className="text-xs leading-relaxed text-on-surface-variant">
-            Enter the six-digit code sent to <strong className="text-on-surface">{signupChallenge.email}</strong>.
+            Enter the six-digit code sent to <strong className="text-on-surface">{signupChallenge.email}</strong>, or
+            tap <strong className="text-on-surface">Verify my email</strong> in that email — this window will finish
+            signing you up by itself.
           </p>
           <input
             type="text"
@@ -517,8 +567,8 @@ function AuthForm({
             </span>
             <p className="mt-2 text-sm text-on-surface">Check your email</p>
             <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-              If there&apos;s an account for {resetSentTo}, a reset link is on its way. It expires
-              in 1 hour.
+              We&apos;ve sent a reset link to {resetSentTo}. It expires in 1 hour. Check your spam
+              folder if you don&apos;t see it.
             </p>
             <button
               type="button"

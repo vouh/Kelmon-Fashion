@@ -501,21 +501,8 @@ model SignupEmailCode {
   attempts   Int       @default(0)
   expires_at DateTime  @db.Timestamptz(6)
   used_at    DateTime? @db.Timestamptz(6)
-  created_at DateTime  @default(now()) @db.Timestamptz(6)
-
-  @@index([email, created_at(sort: Desc)], map: "signup_email_codes_email_created_idx")
-  @@map("signup_email_codes")
-}
-
-/// Short-lived email OTP used before creating a password-based Firebase user.
-/// Codes are hashed and this table is accessible only to the server.
-model SignupEmailCode {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email      String
-  code_hash  String
-  attempts   Int       @default(0)
-  expires_at DateTime  @db.Timestamptz(6)
-  used_at    DateTime? @db.Timestamptz(6)
+  /// Set when the link in the email is clicked, instead of typing the code.
+  verified_at DateTime? @db.Timestamptz(6)
   created_at DateTime  @default(now()) @db.Timestamptz(6)
 
   @@index([email, created_at(sort: Desc)], map: "signup_email_codes_email_created_idx")

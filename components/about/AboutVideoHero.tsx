@@ -38,7 +38,7 @@ export default function AboutVideoHero() {
         ref={videoRef}
         className="about-hero-video absolute inset-0 -z-20 h-full w-full object-cover"
         src="/videos/about-hero.mp4"
-        poster="/videos/about-hero-poster.jpg"
+        poster="/videos/about-hero-poster.webp"
         autoPlay
         muted
         loop

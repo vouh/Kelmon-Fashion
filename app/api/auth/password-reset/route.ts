@@ -10,6 +10,28 @@ export const runtime = "nodejs";
 const COOLDOWN_MS = 60_000;
 const recentRequests = new Map<string, number>();
 
+/**
+ * This endpoint says whether an email has an account, so cap how many lookups
+ * one address can make — enough for typos, not for checking a list of emails.
+ * Per server instance, like the cooldown above.
+ */
+const LOOKUP_WINDOW_MS = 10 * 60_000;
+const MAX_LOOKUPS = 10;
+const lookupsByIp = new Map<string, number[]>();
+
+function tooManyLookups(ip: string): boolean {
+  const now = Date.now();
+  for (const [key, times] of lookupsByIp) {
+    const recent = times.filter((at) => now - at < LOOKUP_WINDOW_MS);
+    if (recent.length === 0) lookupsByIp.delete(key);
+    else lookupsByIp.set(key, recent);
+  }
+  const times = lookupsByIp.get(ip) ?? [];
+  if (times.length >= MAX_LOOKUPS) return true;
+  lookupsByIp.set(ip, [...times, now]);
+  return false;
+}
+
 function isOnCooldown(email: string): boolean {
   const now = Date.now();
   for (const [key, at] of recentRequests) {
@@ -45,27 +67,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
   }
 
-  // The same response whether or not the account exists, so this endpoint can't
-  // be used to discover who has a Kelmon account.
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (tooManyLookups(ip)) {
+    return NextResponse.json(
+      { error: "Too many reset requests. Please wait a few minutes and try again." },
+      { status: 429 },
+    );
+  }
+
   const ok = NextResponse.json({ ok: true });
-
-  if (isOnCooldown(email)) return ok;
-
   const failed = () => {
     recentRequests.delete(email);
     return NextResponse.json({ error: "We could not send the reset email. Please try again." }, { status: 502 });
   };
 
+  // Check the account exists before anything else, and say so when it doesn't:
+  // no email is sent (and no Resend credit used) for an unknown address.
   // With email enumeration protection on, generatePasswordResetLink doesn't
   // report unknown emails as not found; it fails with an internal error instead.
   try {
     await getAdminAuth().getUserByEmail(email);
   } catch (error) {
     const code = (error as { code?: string } | null)?.code ?? "";
-    if (code === "auth/user-not-found") return ok;
+    if (code === "auth/user-not-found") {
+      return NextResponse.json(
+        { error: "There's no Kelmon account with this email. Check the spelling, or create an account." },
+        { status: 404 },
+      );
+    }
     console.error("Looking up user for password reset failed", error);
     return failed();
   }
+
+  // A link already went to this email in the last minute; don't send another.
+  if (isOnCooldown(email)) return ok;
 
   let oobCode: string | null;
   try {
