@@ -40,7 +40,7 @@ const SNOOZE_MS = 48 * 60 * 60 * 1000;
 /** Pause after arriving (or signing in) before the card slides in. */
 const SHOW_AFTER_MS = 4000;
 /** Pages where a card would get in the way of something important. */
-const HIDDEN_ON = ["/admin", "/checkout", "/verify-email", "/reset-password", "/forgot-password"];
+const HIDDEN_ON = ["/admin", "/checkout", "/reset-password", "/forgot-password"];
 
 function isStandalone(): boolean {
   return (

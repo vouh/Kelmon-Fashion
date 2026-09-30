@@ -8,8 +8,6 @@ import { EMAIL_PATTERN, passwordProblem } from "@/lib/validation/credentials";
 export const runtime = "nodejs";
 
 const MAX_ATTEMPTS = 5;
-/** How long after the email link is clicked the waiting window may finish. */
-const LINK_GRACE_MS = 30 * 60_000;
 const hashCode = (id: string, code: string) =>
   createHash("sha256").update(`${id}:${code}`).digest("hex");
 
@@ -23,7 +21,6 @@ export async function POST(request: Request) {
     email?: unknown;
     password?: unknown;
     fullName?: unknown;
-    viaLink?: unknown;
   } | null;
   const challengeId = typeof body?.challengeId === "string" ? body.challengeId : "";
   const code = typeof body?.code === "string" ? body.code.trim() : "";
@@ -31,9 +28,7 @@ export async function POST(request: Request) {
   const password = typeof body?.password === "string" ? body.password : "";
   const fullName = typeof body?.fullName === "string" ? body.fullName.trim() : "";
 
-  // No code is needed once the email's link has been clicked (see signup-link).
-  const viaLink = body?.viaLink === true;
-  if (!/^[0-9a-f-]{36}$/i.test(challengeId) || (!viaLink && !/^\d{6}$/.test(code))) {
+  if (!/^[0-9a-f-]{36}$/i.test(challengeId) || !/^\d{6}$/.test(code)) {
     return NextResponse.json({ error: "Enter the six-digit code from your email." }, { status: 400 });
   }
   if (!EMAIL_PATTERN.test(email) || !fullName || fullName.length > 120 || passwordProblem(password)) {
@@ -49,27 +44,18 @@ export async function POST(request: Request) {
   if (error || !challenge || challenge.email !== email || challenge.used_at) {
     return NextResponse.json({ error: "This verification code is invalid. Please request a new one." }, { status: 400 });
   }
-  if (viaLink) {
-    if (!challenge.verified_at) {
-      return NextResponse.json({ error: "Your email hasn't been verified yet. Click the link in the email or enter the code." }, { status: 400 });
-    }
-    if (Date.now() - new Date(challenge.verified_at).getTime() > LINK_GRACE_MS) {
-      return NextResponse.json({ error: "This verification has expired. Please request a new code." }, { status: 400 });
-    }
-  } else {
-    if (new Date(challenge.expires_at).getTime() <= Date.now()) {
-      return NextResponse.json({ error: "This verification code has expired. Please request a new one." }, { status: 400 });
-    }
-    if (challenge.attempts >= MAX_ATTEMPTS) {
-      return NextResponse.json({ error: "Too many incorrect attempts. Please request a new code." }, { status: 429 });
-    }
+  if (new Date(challenge.expires_at).getTime() <= Date.now()) {
+    return NextResponse.json({ error: "This verification code has expired. Please request a new one." }, { status: 400 });
+  }
+  if (challenge.attempts >= MAX_ATTEMPTS) {
+    return NextResponse.json({ error: "Too many incorrect attempts. Please request a new code." }, { status: 429 });
+  }
 
-    const actual = Buffer.from(hashCode(challengeId, code), "hex");
-    const expected = Buffer.from(challenge.code_hash, "hex");
-    if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
-      await supabase.from("signup_email_codes").update({ attempts: challenge.attempts + 1 }).eq("id", challengeId);
-      return NextResponse.json({ error: "That code is incorrect. Please check the email and try again." }, { status: 400 });
-    }
+  const actual = Buffer.from(hashCode(challengeId, code), "hex");
+  const expected = Buffer.from(challenge.code_hash, "hex");
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+    await supabase.from("signup_email_codes").update({ attempts: challenge.attempts + 1 }).eq("id", challengeId);
+    return NextResponse.json({ error: "That code is incorrect. Please check the email and try again." }, { status: 400 });
   }
 
   try {
