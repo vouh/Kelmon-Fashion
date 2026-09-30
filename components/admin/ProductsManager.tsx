@@ -591,6 +591,11 @@ export default function ProductsManager({
                   onChange={(e) => setDraft({ ...draft, originalPrice: e.target.value })}
                   className={inputClass}
                 />
+                {draft.originalPrice !== "" && Number(draft.originalPrice) > 0 && Number(draft.price) >= Number(draft.originalPrice) && (
+                  <p className="mt-1 text-[10px] font-bold text-amber-300">
+                    Not above the price, so the sale label will be removed when you save.
+                  </p>
+                )}
               </div>
               <div className="flex items-end">
                 <label className="flex cursor-pointer items-center gap-2 text-xs font-bold text-white/70">

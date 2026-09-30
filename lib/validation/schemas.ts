@@ -186,15 +186,6 @@ export const productInputSchema = z
     preorder: z.boolean().default(false),
     active: z.boolean(),
   })
-  // Mirrors the products_original_price_higher CHECK, so the message is about a
-  // "was" price rather than a constraint name.
-  .refine(
-    (input) => !input.originalPrice || input.originalPrice >= input.price,
-    {
-      path: ["originalPrice"],
-      message: "Original price must be higher than the sale price.",
-    }
-  )
   .refine(
     (input) => Object.keys(input.colorImages).every((color) => input.colors.includes(color)),
     { path: ["colorImages"], message: "Each colour photo must belong to one of the product's colours." }
@@ -202,7 +193,14 @@ export const productInputSchema = z
   .refine((input) => !input.active || input.images.length > 0, {
     path: ["images"],
     message: "Add at least one photo before publishing. You can save it unpublished for now.",
-  });
+  })
+  // A "was" price only means something above the price. Raising the price to
+  // or past it ends the sale, so drop it rather than refusing the edit (the
+  // products_original_price_higher CHECK would reject it otherwise).
+  .transform((input) => ({
+    ...input,
+    originalPrice: input.originalPrice && input.originalPrice > input.price ? input.originalPrice : null,
+  }));
 
 export type ProductInput = z.input<typeof productInputSchema>;
 
