@@ -53,6 +53,18 @@ export async function getInventories(): Promise<InventoryWithItems[]> {
   return (inventories.data ?? []).map((inv) => ({ ...inv, items: byInventory.get(inv.id) ?? [] }));
 }
 
+/** Product id → what one piece cost the shop. */
+export async function getProductCosts(): Promise<Record<string, number>> {
+  if (!isSupabaseConfigured()) return {};
+  const supabase = await db();
+  const { data, error } = await supabase.from("product_costs").select("product_id, buy_price");
+  if (error) {
+    if (error.code !== "PGRST205") console.error("[finance] getProductCosts:", error.message);
+    return {};
+  }
+  return Object.fromEntries((data ?? []).map((row) => [row.product_id, Number(row.buy_price)]));
+}
+
 export async function getPaidSales(): Promise<PaidSale[]> {
   if (!isSupabaseConfigured()) return [];
   const supabase = await db();

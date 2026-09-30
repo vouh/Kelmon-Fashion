@@ -169,6 +169,8 @@ export const productInputSchema = z
     description: optionalText(2000),
     price: money("Price").refine((value) => value > 0, "Price must be greater than zero."),
     originalPrice: money("Original price").nullable().optional(),
+    /** What one piece cost the shop. Admin only; never shown in the shop. */
+    buyPrice: money("Buying price").nullable().optional(),
     gender: z.enum(["men", "women", "unisex"], { message: "Choose Men, Ladies or Unisex." }),
     category: requiredText("Category", 60),
     // Drafts may have no photos yet (e.g. imported from a spreadsheet); a
@@ -190,6 +192,10 @@ export const productInputSchema = z
     (input) => Object.keys(input.colorImages).every((color) => input.colors.includes(color)),
     { path: ["colorImages"], message: "Each colour photo must belong to one of the product's colours." }
   )
+  .refine((input) => input.buyPrice == null || input.price >= input.buyPrice, {
+    path: ["price"],
+    message: "The selling price is lower than the buying price. Raise the selling price or correct the buying price.",
+  })
   .refine((input) => !input.active || input.images.length > 0, {
     path: ["images"],
     message: "Add at least one photo before publishing. You can save it unpublished for now.",

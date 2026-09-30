@@ -335,6 +335,12 @@ export async function upsertProduct(input: ProductInput): Promise<ActionResult> 
     });
     if (error) throw new Error(error.message);
 
+    const costWrite =
+      product.buyPrice == null
+        ? await supabase.from("product_costs").delete().eq("product_id", product.id)
+        : await supabase.from("product_costs").upsert({ product_id: product.id, buy_price: product.buyPrice });
+    if (costWrite.error) throw new Error(`Product saved, but the buying price wasn't: ${costWrite.error.message}`);
+
     // A category typed into the form joins the list, hidden from the shop
     // filter until switched on in /admin/categories.
     const { error: categoryError } = await supabase

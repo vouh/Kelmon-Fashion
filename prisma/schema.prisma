@@ -144,11 +144,24 @@ model Product {
 
   order_items OrderItem[]
   reviews     Review[]
+  cost        ProductCost?
   homepage_drops HomepageDrop[]
   likes       ProductLike[]
   inventory_items InventoryItem[]
 
   @@map("products")
+}
+
+/// What the shop paid for one piece of a product. Separate from products
+/// because products are public; this table is admin only.
+model ProductCost {
+  product_id String   @id
+  buy_price  Decimal  @db.Decimal(10, 2)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("product_costs")
 }
 
 /// A customer liking a product (the heart on the product page). The raw

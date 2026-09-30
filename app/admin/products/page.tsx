@@ -4,6 +4,7 @@ import { getCodePrefixes } from "@/lib/supabase/product-codes";
 import ProductsManager from "@/components/admin/ProductsManager";
 import { getAllProductsForAdmin } from "@/lib/supabase/products";
 import { getAllCategories } from "@/lib/supabase/categories";
+import { getProductCosts } from "@/lib/supabase/finance";
 import { getAdminEmail } from "@/lib/supabase/server";
 
 export const metadata = { title: "Products — Kelmon Admin" };
@@ -17,10 +18,11 @@ export default async function AdminProductsPage({
 }: {
   searchParams: Promise<{ edit?: string }>;
 }) {
-  const [products, categoryRows, prefixes, { edit }] = await Promise.all([
+  const [products, categoryRows, prefixes, costs, { edit }] = await Promise.all([
     getAllProductsForAdmin(),
     getAllCategories(),
     getCodePrefixes(),
+    getProductCosts(),
     searchParams,
   ]);
 
@@ -56,6 +58,7 @@ export default async function AdminProductsPage({
         key={edit ?? ""}
         initialEditId={edit}
         products={products}
+        costs={costs}
         categories={categories}
         codeLetters={Object.fromEntries(prefixes.map((p) => [p.category.trim().toLowerCase(), p.letter]))}
       />

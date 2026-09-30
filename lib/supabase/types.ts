@@ -311,6 +311,13 @@ export type InventoryItemRow = {
   updated_at: string;
 }
 
+/** What the shop paid for one piece of a product. Admin only. */
+export type ProductCostRow = {
+  product_id: string;
+  buy_price: number;
+  updated_at: string;
+}
+
 /** Columns the database always fills in itself, so never required on insert. */
 type Generated = "created_at" | "updated_at";
 
@@ -365,6 +372,7 @@ export type Database = {
     Tables: {
       profiles: Table<ProfileRow, "id">;
       products: Table<ProductRow, "id" | "name" | "price" | "category">;
+      product_costs: Table<ProductCostRow, "product_id" | "buy_price">;
       categories: Table<CategoryRow, "name">;
       orders: Table<
         OrderRow,

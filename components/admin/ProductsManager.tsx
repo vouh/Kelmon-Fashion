@@ -53,6 +53,8 @@ interface Draft {
   name: string;
   description: string;
   price: string;
+  /** What one piece cost the shop; admin only. */
+  buyPrice: string;
   originalPrice: string;
   category: string;
   /** Who it's for; there's no default for new products, so it's a deliberate choice. */
@@ -76,6 +78,7 @@ function emptyDraft(category: string): Draft {
     name: "",
     description: "",
     price: "",
+    buyPrice: "",
     originalPrice: "",
     category,
     gender: "",
@@ -92,12 +95,13 @@ function emptyDraft(category: string): Draft {
   };
 }
 
-function draftFrom(product: Product): Draft {
+function draftFrom(product: Product, buyPrice?: number): Draft {
   return {
     id: product.id,
     name: product.name,
     description: product.description ?? "",
     price: String(product.price),
+    buyPrice: buyPrice === undefined ? "" : String(buyPrice),
     originalPrice: product.originalPrice ? String(product.originalPrice) : "",
     category: product.category,
     gender: product.gender ?? "unisex",
@@ -115,11 +119,14 @@ function draftFrom(product: Product): Draft {
 
 export default function ProductsManager({
   products,
+  costs = {},
   categories,
   codeLetters = {},
   initialEditId,
 }: {
   products: Product[];
+  /** Product id → buying price, for the ones that have one. */
+  costs?: Record<string, number>;
   categories: string[];
   /** lower-cased category -> code letter, from Products → Settings. */
   codeLetters?: Record<string, string>;
@@ -131,7 +138,7 @@ export default function ProductsManager({
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(() => {
     const product = initialEditId ? products.find((p) => p.id === initialEditId) : undefined;
-    return product ? draftFrom(product) : null;
+    return product ? draftFrom(product, costs[product.id]) : null;
   });
   /** The draft as it was opened, to tell whether closing would lose edits. */
   const [baseline, setBaseline] = useState<string | null>(() => (draft ? JSON.stringify(draft) : null));
@@ -271,6 +278,7 @@ export default function ProductsManager({
           name: draft.name,
           description: draft.description,
           price: Number(draft.price),
+          buyPrice: draft.buyPrice.trim() === "" ? null : Number(draft.buyPrice),
           originalPrice: draft.originalPrice ? Number(draft.originalPrice) : null,
           category: draft.category,
           gender: draft.gender as "men" | "women" | "unisex",
@@ -395,7 +403,21 @@ export default function ProductsManager({
               />
             </div>
             <div>
-              <label className={labelClass}>Price (KES)</label>
+              <label className={labelClass}>
+                Buying price (KES) <span className="normal-case tracking-normal text-white/20">· admin only</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                inputMode="numeric"
+                value={draft.buyPrice}
+                onChange={(e) => setDraft({ ...draft, buyPrice: e.target.value })}
+                placeholder="What you paid"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Selling price (KES)</label>
               <input
                 type="number"
                 min="1"
@@ -405,6 +427,14 @@ export default function ProductsManager({
                 placeholder="1500"
                 className={inputClass}
               />
+              <ProfitHint buy={draft.buyPrice} sell={draft.price} />
+              {Number(draft.originalPrice) > 0 && (
+                <p className="mt-1 text-[10px] text-white/35">
+                  {Number(draft.originalPrice) > Number(draft.price)
+                    ? `On sale — was ${formatKes(Number(draft.originalPrice))} (More options).`
+                    : `Old "was" price ${formatKes(Number(draft.originalPrice))} will be removed on save.`}
+                </p>
+              )}
             </div>
             <div>
               <label className={labelClass}>Quantity in stock</label>
@@ -583,7 +613,7 @@ export default function ProductsManager({
                 </select>
               </div>
               <div>
-                <label className={labelClass}>Was (optional, for sale price)</label>
+                <label className={labelClass}>Was price (optional, shows it as on sale)</label>
                 <input
                   type="number"
                   min="0"
@@ -802,7 +832,7 @@ export default function ProductsManager({
                   )}
                   <button
                     type="button"
-                    onClick={() => openDraft(draftFrom(product))}
+                    onClick={() => openDraft(draftFrom(product, costs[product.id]))}
                     className="rounded p-1 text-purple-300/60 hover:bg-purple-500/10 hover:text-purple-300"
                     aria-label="Edit product"
                   >
@@ -1170,5 +1200,26 @@ function CodeHint({
         add one
       </a>
     </span>
+  );
+}
+
+/** Profit per piece once both prices are filled in; red when selling at a loss. */
+function ProfitHint({ buy, sell }: { buy: string; sell: string }) {
+  if (buy.trim() === "" || sell.trim() === "") return null;
+  const cost = Number(buy);
+  const price = Number(sell);
+  if (!Number.isFinite(cost) || !Number.isFinite(price) || price <= 0) return null;
+  const profit = price - cost;
+  if (profit < 0) {
+    return (
+      <p className="mt-1 text-[10px] font-bold text-red-400">
+        Below the buying price — you&apos;d lose {formatKes(-profit)} a piece.
+      </p>
+    );
+  }
+  return (
+    <p className="mt-1 text-[10px] font-bold text-green-400">
+      Profit {formatKes(profit)} a piece{cost > 0 ? ` (${Math.round((profit / cost) * 100)}%)` : ""}.
+    </p>
   );
 }
