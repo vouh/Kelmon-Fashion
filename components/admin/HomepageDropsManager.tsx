@@ -9,6 +9,7 @@ import { uploadDealImage } from "@/lib/supabase/storage";
 import type { HomepageDropRow } from "@/lib/supabase/types";
 import type { Product } from "@/lib/products";
 import { searchAnchor } from "@/lib/admin-search";
+import { MAX_HOMEPAGE_DROPS } from "@/lib/homepage-drops";
 
 const inputClass =
   "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2 text-xs text-white placeholder:text-white/25 focus:border-purple-400/50 focus:outline-none disabled:opacity-60";
@@ -40,7 +41,7 @@ function draftFrom(drop: HomepageDropRow): Draft {
 }
 
 const kes = (n: number) => `KES ${Number(n).toLocaleString("en-KE")}`;
-const MAX_DROPS = 4;
+const MAX_DROPS = MAX_HOMEPAGE_DROPS;
 
 export default function HomepageDropsManager({
   drops,
@@ -133,8 +134,9 @@ export default function HomepageDropsManager({
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-2xl text-xs leading-relaxed text-white/55">
-          Fill the four homepage &ldquo;Just Dropped&rdquo; slots with catalogue products. Their live name, price,
-          category and cover photo stay in sync automatically. Use the arrows below to control their order.
+          Choose up to {MAX_DROPS} products for the homepage &ldquo;Just Dropped&rdquo; carousel — it shows exactly
+          this list, in this order. Their live name, price, category and cover photo stay in sync automatically.
+          Use the arrows below to change the order.
         </p>
         <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${drops.length === MAX_DROPS ? "bg-emerald-400/15 text-emerald-300" : "bg-amber-400/15 text-amber-300"}`}>
           {drops.length} / {MAX_DROPS} slots filled
@@ -236,7 +238,7 @@ export default function HomepageDropsManager({
         </form>
       ) : (
         <button type="button" disabled={drops.length >= MAX_DROPS} onClick={() => setDraft(emptyDraft())} className="rounded-lg bg-purple-600 px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-40">
-          {drops.length >= MAX_DROPS ? "All four slots are filled" : "Add product to homepage"}
+          {drops.length >= MAX_DROPS ? `All ${MAX_DROPS} slots are filled` : "Add product to homepage"}
         </button>
       )}
 

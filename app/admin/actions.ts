@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { isOrderId } from "@/lib/order-ids";
+import { MAX_HOMEPAGE_DROPS } from "@/lib/homepage-drops";
 import { nextOrderId } from "@/lib/supabase/orders";
 import { after } from "next/server";
 import { sendManualPaymentEmails } from "@/lib/email/alerts";
@@ -627,8 +628,8 @@ export async function upsertHomepageDrop(input: {
     } else {
       const { data, error: listError } = await supabase.from("homepage_drops").select("sort_order");
       if (listError) throw new Error(listError.message);
-      if ((data ?? []).length >= 4) {
-        throw new Error("All four Just Dropped slots are already filled. Edit or remove a slot first.");
+      if ((data ?? []).length >= MAX_HOMEPAGE_DROPS) {
+        throw new Error(`All ${MAX_HOMEPAGE_DROPS} Just Dropped slots are already filled. Edit or remove a slot first.`);
       }
       const sortOrder = Math.max(0, ...(data ?? []).map((r) => r.sort_order)) + 1;
       const { error } = await supabase.from("homepage_drops").insert({ ...row, sort_order: sortOrder });

@@ -8,6 +8,7 @@ import { getProducts } from "@/lib/supabase/products";
 import { getHomepageDrops } from "@/lib/supabase/content";
 import { pageMetadata } from "@/lib/seo";
 import { roundRobinByCategory } from "@/lib/mix-products";
+import { MAX_HOMEPAGE_DROPS } from "@/lib/homepage-drops";
 
 export const metadata = pageMetadata({
   title: "Campus Fashion, Perfumes & Bags",
@@ -16,20 +17,20 @@ export const metadata = pageMetadata({
   path: "/home",
 });
 
-const CIRCLE_COUNT = 10;
-
 const brandStrip = ["Chanel", "Dior", "Louis Vuitton", "Gucci", "YSL", "Prada", "Armani"];
 
 export default async function HomePage() {
   const [shopProducts, homepageDrops] = await Promise.all([getProducts(), getHomepageDrops()]);
 
-  // The chosen drops, topped up from the shop, mixed so no category bunches up.
+  // "Just Dropped" shows exactly the admin's Homepage Drops list, in its order.
+  // Only when none are set does it fall back to a mix from the shop, so the
+  // section is never empty.
   const linked = new Set(homepageDrops.map((drop) => drop.product_id).filter(Boolean));
-  const topUp = roundRobinByCategory(
-    shopProducts.filter((product) => !linked.has(product.id)),
-    "circles"
-  ).slice(0, Math.max(0, CIRCLE_COUNT - homepageDrops.length));
-  const circleItems = roundRobinByCategory([...homepageDrops.slice(0, CIRCLE_COUNT), ...topUp], "circles");
+  const topUp =
+    homepageDrops.length > 0
+      ? []
+      : roundRobinByCategory(shopProducts, "circles").slice(0, MAX_HOMEPAGE_DROPS);
+  const circleItems = homepageDrops.length > 0 ? homepageDrops.slice(0, MAX_HOMEPAGE_DROPS) : topUp;
 
   // Picks skip what the circles already show, unless that would leave the grid short.
   const shown = new Set([...linked, ...topUp.map((product) => product.id)]);
