@@ -12,7 +12,10 @@ import {
   formatKes,
 } from "@/components/admin/ui";
 import { deleteOrder, updateOrderStatus, updatePaymentStatus } from "@/app/admin/actions";
+import { bulkDeleteOrders } from "@/app/admin/bulk-actions";
+import ApprovalCodeModal from "@/components/admin/ApprovalCodeModal";
 import OrderDetailsButton from "@/components/admin/OrderDetails";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import RequestPaymentModal from "@/components/admin/RequestPaymentModal";
 import { sendStkPrompt, waitForPaymentResult } from "@/components/payments/MpesaPayment";
 import type { Product } from "@/lib/products";
@@ -64,6 +67,12 @@ export default function OrdersManager({
   const [stkResult, setStkResult] = useState<
     Record<string, { tone: "info" | "success" | "error"; text: string }>
   >({});
+  /** Orders ticked for bulk delete. */
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  /** Paid orders waiting on the emailed approval code. */
+  const [paidToApprove, setPaidToApprove] = useState<string[] | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -80,6 +89,53 @@ export default function OrdersManager({
       );
     });
   }, [orders, filter, search]);
+
+  const shownSelected = visible.filter((order) => selected.has(order.id));
+  const allShownSelected = visible.length > 0 && shownSelected.length === visible.length;
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelected(allShownSelected ? new Set() : new Set(visible.map((order) => order.id)));
+  }
+
+  /** Unpaid orders go straight away; paid ones need a super admin's emailed code. */
+  async function deleteSelected() {
+    const paid = shownSelected.filter((order) => order.payment_status === "paid").map((order) => order.id);
+    const unpaid = shownSelected.filter((order) => order.payment_status !== "paid").map((order) => order.id);
+    const ok = await confirm({
+      title: `Delete ${shownSelected.length} order${shownSelected.length === 1 ? "" : "s"}?`,
+      message: paid.length
+        ? `${unpaid.length ? `${unpaid.length} unpaid will be deleted now. ` : ""}${paid.length} paid order${paid.length === 1 ? "" : "s"} need${paid.length === 1 ? "s" : ""} an approval code emailed to the super admins.`
+        : "Their items are deleted too. This can't be undone.",
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!ok) return;
+
+    setError(null);
+    setFlash(null);
+    startTransition(async () => {
+      if (unpaid.length) {
+        const result = await bulkDeleteOrders(unpaid);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        setFlash(result.message);
+      }
+      setSelected(new Set(paid));
+      if (paid.length) setPaidToApprove(paid);
+      router.refresh();
+    });
+  }
 
   function run(action: () => Promise<{ ok: boolean; error?: string }>) {
     setError(null);
@@ -164,6 +220,43 @@ export default function OrdersManager({
 
       <RequestPaymentModal open={showDirect} onClose={() => setShowDirect(false)} products={products} />
 
+      {flash && (
+        <div className="rounded-xl border border-green-400/30 bg-green-400/10 px-4 py-3 text-xs text-green-300" role="status">
+          {flash}
+        </div>
+      )}
+      {shownSelected.length > 0 && (
+        <div className="sticky top-2 z-20 flex flex-wrap items-center gap-3 rounded-xl border border-purple-400/30 bg-zinc-900/95 px-4 py-2.5 shadow-lg backdrop-blur">
+          <span className="text-xs font-bold text-white">{shownSelected.length} selected</span>
+          <button type="button" onClick={() => setSelected(new Set())} className="text-[11px] text-white/50 hover:text-white">
+            Clear
+          </button>
+          <span className="flex-1" />
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => void deleteSelected()}
+            className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white hover:bg-red-500 disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-sm">delete</span> Delete selected
+          </button>
+        </div>
+      )}
+      {paidToApprove && (
+        <ApprovalCodeModal
+          orderIds={paidToApprove}
+          failureIds={[]}
+          summary={`${paidToApprove.length} paid order${paidToApprove.length === 1 ? "" : "s"}`}
+          onClose={() => setPaidToApprove(null)}
+          onDone={(message) => {
+            setPaidToApprove(null);
+            setSelected(new Set());
+            setFlash(message);
+            router.refresh();
+          }}
+        />
+      )}
+
       <div className="overflow-hidden rounded-xl border border-white/5 bg-zinc-900">
         {visible.length === 0 ? (
           <EmptyState icon="receipt_long" message="No orders match this filter" />
@@ -174,6 +267,15 @@ export default function OrdersManager({
               <table className="w-full text-left text-xs">
                 <thead className="bg-white/5">
                   <tr>
+                    <th className={`${TH} w-8`}>
+                      <input
+                        type="checkbox"
+                        checked={allShownSelected}
+                        onChange={toggleAll}
+                        aria-label="Select all orders shown"
+                        className="h-3.5 w-3.5 accent-purple-500"
+                      />
+                    </th>
                     <th className={TH}>Order</th>
                     <th className={TH}>Customer</th>
                     <th className={TH}>Drop point</th>
@@ -187,7 +289,16 @@ export default function OrdersManager({
                 <tbody className="divide-y divide-white/5">
                   {visible.map((order) => (
                     <Fragment key={order.id}>
-                      <tr id={searchAnchor("order", order.id)} className="hover:bg-white/5">
+                      <tr id={searchAnchor("order", order.id)} className={selected.has(order.id) ? "bg-purple-500/10" : "hover:bg-white/5"}>
+                        <td className={TD}>
+                          <input
+                            type="checkbox"
+                            checked={selected.has(order.id)}
+                            onChange={() => toggle(order.id)}
+                            aria-label={`Select order ${order.id}`}
+                            className="h-3.5 w-3.5 accent-purple-500"
+                          />
+                        </td>
                         <td className={`${TD} font-mono font-bold text-white`}>
                           {order.id}
                           {order.source === "admin_direct" && (
@@ -283,14 +394,14 @@ export default function OrdersManager({
                       </tr>
                       {stkResult[order.id] && (
                         <tr>
-                          <td colSpan={8} className="px-4 pb-2.5 pt-0">
+                          <td colSpan={9} className="px-4 pb-2.5 pt-0">
                             <StkNotice {...stkResult[order.id]} />
                           </td>
                         </tr>
                       )}
                       {expanded === order.id && (
                         <tr className="bg-zinc-950/60">
-                          <td colSpan={8} className="px-6 py-3">
+                          <td colSpan={9} className="px-6 py-3">
                             <OrderItems order={order} />
                           </td>
                         </tr>
@@ -303,10 +414,26 @@ export default function OrdersManager({
 
             {/* Mobile */}
             <div className="divide-y divide-white/5 md:hidden">
+              <label className="flex items-center gap-2.5 bg-white/5 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white/40">
+                <input
+                  type="checkbox"
+                  checked={allShownSelected}
+                  onChange={toggleAll}
+                  className="h-4 w-4 accent-purple-500"
+                />
+                Select all
+              </label>
               {visible.map((order) => (
-                <div key={order.id} className="space-y-2 px-4 py-3">
+                <div key={order.id} className={`space-y-2 px-4 py-3 ${selected.has(order.id) ? "bg-purple-500/10" : ""}`}>
                   <div className="flex items-start justify-between gap-2">
-                    <div>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(order.id)}
+                      onChange={() => toggle(order.id)}
+                      aria-label={`Select order ${order.id}`}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-purple-500"
+                    />
+                    <div className="min-w-0 flex-1">
                       <p className="font-mono text-xs font-bold text-white">
                         {order.id}
                         {needsReconciling(order) && (

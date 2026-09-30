@@ -6,9 +6,10 @@ import { z } from "zod";
 import { getSuperAdminEmails, sendEmailSafely } from "@/lib/email/alerts";
 import { configuredSiteOrigin, sensitiveActionCodeEmail } from "@/lib/email/templates";
 import { createClient, createServiceClient, getAdminAccess } from "@/lib/supabase/server";
+import { ORDER_ID_PATTERN } from "@/lib/order-ids";
 
 /**
- * Bulk actions for Products, Notifications and Payments.
+ * Bulk actions for Products, Notifications, Orders and Payments.
  *
  * Products and notifications only need an admin. Payment records are
  * sensitive: deleting them takes a one-time code emailed to the super admins,
@@ -104,6 +105,41 @@ export async function bulkDeleteNotifications(ids: string[]): Promise<BulkResult
     if (error) throw new Error(error.message);
     revalidatePath("/admin/notifications");
     return { ok: true, message: `${plural(count ?? list.length, "notification")} deleted.` };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+// ── Orders ──────────────────────────────────────────────────────────────────
+
+/**
+ * Deletes many unpaid orders. Paid orders are financial records, so they are
+ * never deleted here — they go through the emailed-code flow below.
+ */
+export async function bulkDeleteOrders(ids: string[]): Promise<BulkResult> {
+  try {
+    const { db } = await requireAdminAccess();
+    const list = z
+      .array(z.string().regex(ORDER_ID_PATTERN, "Invalid order."))
+      .min(1, "Select at least one order.")
+      .max(MAX_BULK, `Select at most ${MAX_BULK} at a time.`)
+      .parse(ids);
+    // Order items go with them (FK cascade).
+    const { error, count } = await db
+      .from("orders")
+      .delete({ count: "exact" })
+      .in("id", list)
+      .neq("payment_status", "paid");
+    if (error) throw new Error(error.message);
+    const deleted = count ?? 0;
+    const skipped = list.length - deleted;
+    revalidatePath("/admin/orders");
+    revalidatePath("/admin/transactions");
+    revalidatePath("/admin");
+    return {
+      ok: true,
+      message: `${plural(deleted, "order")} deleted.${skipped ? ` ${plural(skipped, "paid order")} kept — paid orders need an approval code.` : ""}`,
+    };
   } catch (err) {
     return fail(err);
   }
