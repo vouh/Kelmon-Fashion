@@ -41,6 +41,8 @@ export interface Product {
   stock?: number;
   /** Published (visible in the shop). Drafts are admin-only. */
   active?: boolean;
+  /** Last edit, ISO time; the sitemap's lastmod. */
+  updatedAt?: string;
 }
 
 export interface CartItem {
@@ -73,6 +75,7 @@ export function productFromRow(row: ProductRow): Product {
     colorImages: row.color_images ?? {},
     stock: row.stock,
     active: row.active,
+    updatedAt: row.updated_at,
   };
 }
 
