@@ -515,16 +515,40 @@ body {
 .hero-slide-leave { animation: hero-slide-out 0.9s cubic-bezier(0.55, 0, 0.45, 1) both; }
 .hero-kenburns { animation: hero-kenburns 7.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .hero-rise { animation: hero-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* Hero text: pieces fly in alternately from the left (--hero-from: -1) and the
+   right (1) and merge into place (RevealText in FullScreenHeroBanners.tsx). */
+@keyframes hero-merge {
+  from { opacity: 0; transform: translateX(calc(var(--hero-from, 1) * 1.6em)); filter: blur(6px); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; transform: none; filter: blur(0); }
+}
+.hero-merge {
+  display: inline-block;
+  animation: hero-merge 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
 /* A hero slide dragged in by a swipe is already on screen: show its text as-is. */
-.hero-static .hero-rise { animation: none; }
+.hero-static .hero-rise, .hero-static .hero-merge { animation: none; }
 .hero-line { transform-origin: left; animation: hero-line 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .hero-progress { animation-name: hero-progress; animation-timing-function: linear; animation-fill-mode: both; }
 
+/* Reduced motion: slides crossfade instead of sliding and the button fades in
+   without rising. The photo zoom and the merging hero text stay, by choice. */
+@keyframes hero-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes hero-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .hero-slide-enter, .hero-slide-leave, .hero-kenburns, .hero-rise, .hero-line, .hero-progress {
+  .hero-line {
     animation: none !important;
   }
-  .hero-slide-leave { opacity: 0; }
+  .hero-slide-enter { animation: hero-fade-in 0.9s cubic-bezier(0.4, 0, 0.2, 1) both !important; }
+  .hero-slide-leave { animation: hero-fade-out 0.9s cubic-bezier(0.4, 0, 0.2, 1) both !important; }
+  .hero-rise { animation-name: hero-fade-in !important; animation-duration: 0.8s !important; }
+  .hero-static .hero-rise { animation: none !important; }
 }
 
 /* Confirmation dialog (components/ui/ConfirmDialog.tsx) */

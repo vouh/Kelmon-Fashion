@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -21,7 +21,7 @@ const allBanners: Banner[] = [
     image: "/images/heroes/kelmon-welcome.webp",
     eyebrow: "Who we are",
     title: "Welcome to Kelmon",
-    body: "Kelmon is a Kenyan online beauty and fashion store bringing stylish bags, memorable perfumes, earrings and accessories closer to you—at prices that make sense.",
+    body: "Kelmon is a Kenyan online beauty and fashion store bringing stylish bags, memorable perfumes, earrings and accessories closer to you—at affordable prices.",
     href: "/about",
     cta: "About us",
     focus: "object-[72%_center]",
@@ -41,6 +41,68 @@ const LEAVE_MS = 900;
 const SETTLE_MS = 420;
 const SETTLE_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 
+/** Text entrance: the title merges in letter by letter, the body word by word. */
+const TITLE_START_MS = 250;
+const TITLE_STEP_MS = 45;
+const BODY_STEP_MS = 30;
+
+const words = (text: string) => text.trim().split(/\s+/);
+const letterCount = (text: string) => words(text).join("").length;
+const bodyStartMs = (banner: Banner) => TITLE_START_MS + letterCount(banner.title) * TITLE_STEP_MS + 150;
+const ctaStartMs = (banner: Banner) => bodyStartMs(banner) + words(banner.body).length * BODY_STEP_MS + 150;
+
+/**
+ * Pieces fly in alternately from the left and the right and merge into place,
+ * one after another. Words never break across lines mid-letter-animation.
+ * Screen readers get the sentence once, from the hidden copy.
+ */
+function RevealText({
+  text,
+  by,
+  startMs,
+  stepMs,
+}: {
+  text: string;
+  by: "letter" | "word";
+  startMs: number;
+  stepMs: number;
+}) {
+  let piece = 0;
+  const animated = (content: string, key: number) => {
+    const index = piece++;
+    return (
+      <span
+        key={key}
+        className="hero-merge"
+        style={{
+          animationDelay: `${startMs + index * stepMs}ms`,
+          ["--hero-from" as string]: index % 2 === 0 ? -1 : 1,
+        }}
+      >
+        {content}
+      </span>
+    );
+  };
+  const list = words(text);
+  return (
+    <>
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true">
+        {list.map((word, w) => (
+          <Fragment key={w}>
+            {by === "letter" ? (
+              <span className="inline-block whitespace-nowrap">{Array.from(word).map(animated)}</span>
+            ) : (
+              animated(word, w)
+            )}
+            {w < list.length - 1 && " "}
+          </Fragment>
+        ))}
+      </span>
+    </>
+  );
+}
+
 /**
  * A touch swipe in progress. `dir` 1 means the next slide is being pulled in
  * from the right (finger moving left); -1 means the previous one from the left.
@@ -52,8 +114,10 @@ type Swipe = { peek: number; dir: 1 | -1; dx: number; phase: "drag" | "go" | "ba
  * fades and drifts back while the incoming image eases in with a slow
  * Ken Burns zoom and its text rises in line by line. On touch, the whole
  * slide follows the finger with the neighbouring slide attached beside it,
- * then glides the rest of the way (or springs back) on release. Autoplays,
- * pauses on hover/focus, and respects prefers-reduced-motion.
+ * then glides the rest of the way (or springs back) on release. Autoplays and
+ * pauses only while a swipe is in progress or a control has keyboard focus.
+ * Not on hover: the hero fills the screen, so a resting mouse would stop it for
+ * good. With prefers-reduced-motion it crossfades instead of sliding.
  */
 export default function FullScreenHeroBanners() {
   // A banner whose image fails to load is dropped rather than shown broken.
@@ -138,7 +202,6 @@ export default function FullScreenHeroBanners() {
 
   useEffect(() => {
     if (paused) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const id = window.setTimeout(next, AUTOPLAY_MS);
     return () => window.clearTimeout(id);
   }, [active, paused, next]);
@@ -160,14 +223,6 @@ export default function FullScreenHeroBanners() {
       className="hero-stage relative isolate overflow-hidden bg-background h-svh min-h-[560px] touch-pan-y select-none"
       aria-label="Kelmon collections"
       aria-roledescription="carousel"
-      // Mouse only: phones fire a synthetic hover on tap with no matching
-      // leave, which would pause autoplay for good after the first touch.
-      onPointerEnter={(event) => {
-        if (event.pointerType === "mouse") setPaused(true);
-      }}
-      onPointerLeave={(event) => {
-        if (event.pointerType === "mouse") setPaused(false);
-      }}
       // Keyboard focus only, for the same reason: a tapped dot keeps focus.
       onFocusCapture={(event) => {
         if ((event.target as HTMLElement).matches(":focus-visible")) setPaused(true);
@@ -273,16 +328,16 @@ export default function FullScreenHeroBanners() {
             {(isActive || isPeek) && (
               <div className="w-full px-margin-mobile md:px-margin-desktop">
                 <div className="max-w-xl pt-16 pb-44 md:py-10 text-white">
-                  <h1 className="hero-rise font-display-lg text-4xl leading-[0.98] md:text-6xl lg:text-7xl" style={{ animationDelay: "380ms" }}>
-                    {banner.title}
+                  <h1 className="font-display-lg text-4xl leading-[0.98] md:text-6xl lg:text-7xl">
+                    <RevealText text={banner.title} by="letter" startMs={TITLE_START_MS} stepMs={TITLE_STEP_MS} />
                   </h1>
-                  <p className="hero-rise mt-5 max-w-md text-base leading-relaxed text-white/85 md:text-lg" style={{ animationDelay: "520ms" }}>
-                    {banner.body}
+                  <p className="mt-5 max-w-md text-base leading-relaxed text-white/85 md:text-lg">
+                    <RevealText text={banner.body} by="word" startMs={bodyStartMs(banner)} stepMs={BODY_STEP_MS} />
                   </p>
                   <Link
                     href={banner.href}
                     className="hero-rise group mt-8 inline-flex h-12 items-center gap-2 rounded-full bg-white px-7 text-xs font-semibold uppercase tracking-[0.15em] text-primary transition hover:bg-[#ead2a1]"
-                    style={{ animationDelay: "660ms" }}
+                    style={{ animationDelay: `${ctaStartMs(banner)}ms` }}
                   >
                     {banner.cta}
                     <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1" aria-hidden="true">
