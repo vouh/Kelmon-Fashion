@@ -36,7 +36,8 @@ function textBlock({ x, y, width, kicker, title, lines, cta, align = "start", ti
     <text x="${lineX}" y="${y + 105}" text-anchor="${anchor}" font-family="Georgia, 'Times New Roman', serif" font-size="${titleSize}" font-weight="700" fill="${deep}">${esc(title)}</text>
     ${lines.map((line, index) => `<text x="${lineX}" y="${y + 168 + index * 40}" text-anchor="${anchor}" font-family="Arial, Helvetica, sans-serif" font-size="27" fill="#624c68">${esc(line)}</text>`).join("")}
     <rect x="${align === "middle" ? lineX - 155 : x}" y="${y + 240}" width="310" height="66" rx="33" fill="${purple}" />
-    <text x="${align === "middle" ? lineX : x + 155}" y="${y + 283}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="800" letter-spacing="2" fill="white">${esc(cta.toUpperCase())}</text>`;
+    <text x="${align === "middle" ? lineX : x + 155}" y="${y + 283}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="800" letter-spacing="2" fill="white">${esc(cta.toUpperCase())}</text>
+    <text x="${align === "middle" ? lineX : x}" y="${y + 338}" text-anchor="${anchor}" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" letter-spacing="1.5" fill="${purple}">kelmonfashion.com</text>`;
 }
 
 async function renderPoster(filename, width, height) {
@@ -77,7 +78,7 @@ const scenes = [
   { name: "03-bag-closeup", image: bagUri, title: "STYLE IN EVERY DETAIL", subtitle: "Your next favourite bag.", color: deep, imageY: 350, imageH: 1050 },
   { name: "04-perfume-model", image: manUri, title: "SMELL UNFORGETTABLE", subtitle: "Find your signature scent.", color: purple, imageY: 220, imageH: 1370 },
   { name: "05-products", image: accessoriesUri, title: "THE FINISHING TOUCH", subtitle: "Perfumes · Bags · Accessories", color: deep, imageY: 360, imageH: 1000 },
-  { name: "06-final", image: logoUri, title: "KELMON IS LIVE", subtitle: "Shop Kelmon — delivered to you.", color: purple, imageY: 330, imageH: 500 },
+  { name: "06-final", image: logoUri, title: "KELMON IS LIVE", subtitle: "Shop now · kelmonfashion.com", color: purple, imageY: 330, imageH: 500 },
 ];
 
 for (const [index, scene] of scenes.entries()) {
@@ -94,12 +95,13 @@ for (const [index, scene] of scenes.entries()) {
     <image href="${scene.image}" x="${x}" y="${scene.imageY}" width="${imageW}" height="${scene.imageH}" preserveAspectRatio="xMidYMid meet"/>
     <text x="540" y="${titleY}" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="54" font-weight="700" fill="${scene.color}">${scene.title}</text>
     <text x="540" y="${titleY + 68}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" fill="#604c68">${scene.subtitle}</text>
+    <text x="540" y="1790" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" letter-spacing="2" fill="${purple}">kelmonfashion.com</text>
     <text x="540" y="1840" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800" letter-spacing="4" fill="${gold}">BEAUTY · FASHION · GLAMOUR</text>
   </svg>`;
   await sharp(Buffer.from(svg)).png().toFile(path.join(frameOut, `${scene.name}.png`));
 }
 
-const brief = `# Kelmon launch campaign\n\n## Campaign\n\n- Campaign: **Your glam era starts here.**\n- Supporting line: **Look good. Smell unforgettable. Carry confidence.**\n- CTA: **Shop Kelmon — delivered to you.**\n\n## 15-second sequence\n\n1. 0–2s — Logo reveal: Your glam era starts here.\n2. 2–5s — Woman presents the lavender bag.\n3. 5–8s — Bag detail: Style in every detail.\n4. 8–11s — Man applies perfume: Smell unforgettable.\n5. 11–13s — Product montage: Perfumes · Bags · Accessories.\n6. 13–15s — Kelmon is live. Shop Kelmon — delivered to you.\n\n## Launch caption\n\n**Kelmon is live. 💜**\n\nYour glam era starts here. Discover perfumes that make an entrance, bags that carry your confidence, and accessories that finish the look.\n\nShop Kelmon today — delivered to you.\n\n#Kelmon #YourGlamEra #KenyanFashion #PerfumeKenya #CampusStyle #ShopKenya\n`;
+const brief = `# Kelmon launch campaign\n\n## Campaign\n\n- Campaign: **Your glam era starts here.**\n- Supporting line: **Look good. Smell unforgettable. Carry confidence.**\n- CTA: **Shop Kelmon — delivered to you.**\n- Website: **kelmonfashion.com**\n\n## 15-second sequence\n\n1. 0–2s — Logo reveal: Your glam era starts here.\n2. 2–5s — Woman presents the lavender bag.\n3. 5–8s — Bag detail: Style in every detail.\n4. 8–11s — Man applies perfume: Smell unforgettable.\n5. 11–13s — Product montage: Perfumes · Bags · Accessories.\n6. 13–15s — Kelmon is live. Shop now at kelmonfashion.com.\n\n## Launch caption\n\n**Kelmon is live. 💜**\n\nYour glam era starts here. Discover perfumes that make an entrance, bags that carry your confidence, and accessories that finish the look.\n\nShop now at kelmonfashion.com — delivered to you.\n\n#Kelmon #YourGlamEra #KenyanFashion #PerfumeKenya #CampusStyle #ShopKenya\n`;
 await fs.writeFile(path.join(out, "launch-brief.md"), brief, "utf8");
 
 console.log(`Launch kit generated in ${out}`);

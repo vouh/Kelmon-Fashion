@@ -17,6 +17,15 @@ interface Banner {
 }
 
 const allBanners: Banner[] = [
+  {
+    image: "/images/heroes/kelmon-welcome.webp",
+    eyebrow: "Who we are",
+    title: "Welcome to Kelmon",
+    body: "Kelmon is a Kenyan online beauty and fashion store bringing stylish bags, memorable perfumes, earrings and accessories closer to you—at prices that make sense.",
+    href: "/about",
+    cta: "About us",
+    focus: "object-[72%_center]",
+  },
   { image: "/images/heroes/kelmon-lifestyle.png", eyebrow: "Kelmon lifestyle", title: "Show up like you mean it.", body: "Campus style, beauty and accessories that make every day feel like your moment.", href: "/shop", cta: "Shop the edit" },
   { image: "/images/heroes/kelmon-men-cologne.png", eyebrow: "For him", title: "Two sprays. All the confidence.", body: "Fresh, bold colognes for the guy who walks in and owns the room.", href: "/shop?category=Perfumes", cta: "Shop men's scents", focus: "object-[70%_10%]" },
   { image: "/images/heroes/kelmon-perfume.png", eyebrow: "Signature scents", title: "Leave a little luxury behind.", body: "Find the fragrance that stays with you long after the lecture ends.", href: "/shop?category=Perfumes", cta: "Shop perfumes" },
