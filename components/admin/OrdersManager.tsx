@@ -214,7 +214,17 @@ export default function OrdersManager({
         </div>
       </div>
 
-      {linking && <LinkOrderModal order={linking} products={products} onClose={() => setLinking(null)} />}
+      {linking && (
+        <LinkOrderModal
+          order={linking}
+          products={products}
+          onClose={() => setLinking(null)}
+          onLinked={(newId) => {
+            const oldId = linking.id;
+            setFlash(newId === oldId ? `Linked order ${oldId}.` : `Linked. Order ${oldId} is now ${newId}.`);
+          }}
+        />
+      )}
 
       {/* Opened by ?new=1; the page header has the New Order button. */}
       <RequestPaymentModal open={showDirect} onClose={() => setShowDirect(false)} products={products} />
@@ -276,7 +286,7 @@ export default function OrdersManager({
                       />
                     </th>
                     <th className={TH}>Order</th>
-                    <th className={TH}>Customer</th>
+                    <th className={TH}>Client</th>
                     <th className={TH}>Drop point</th>
                     <th className={TH}>Total</th>
                     <th className={TH}>Status</th>

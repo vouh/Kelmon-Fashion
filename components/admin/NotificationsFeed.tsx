@@ -81,6 +81,79 @@ export default function NotificationsFeed({
     });
   }
 
+  const item = (n: AdminNotificationRow) => {
+    const style = TYPE_STYLE[n.type] ?? TYPE_STYLE.system;
+    return (
+      <li key={n.id} className={`flex items-start gap-3 px-4 py-3 ${n.read ? "" : "bg-purple-500/[0.06]"}`}>
+        <input
+          type="checkbox"
+          checked={selected.has(n.id)}
+          onChange={() => toggle(n.id)}
+          aria-label={`Select “${n.title}”`}
+          className="mt-1 h-3.5 w-3.5 shrink-0 accent-purple-500"
+        />
+        <span className={`material-symbols-outlined mt-0.5 text-base ${style.color}`}>{style.icon}</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            {!n.read && <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />}
+            {n.link ? (
+              <Link
+                href={n.link}
+                onClick={() => {
+                  if (!n.read) void markNotificationsRead([n.id]).then(refreshAdminBadges);
+                }}
+                className="text-xs font-black text-white hover:text-purple-300"
+              >
+                {n.title}
+              </Link>
+            ) : (
+              <p className="text-xs font-black text-white">{n.title}</p>
+            )}
+          </div>
+          {n.body && <p className="mt-0.5 text-[11px] text-white/50">{n.body}</p>}
+          <p className="mt-1 text-[9px] font-bold uppercase tracking-widest text-white/25">{timeAgo(n.created_at)}</p>
+        </div>
+        {!n.read && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => run(() => markNotificationsRead([n.id]))}
+            className="rounded p-1 text-white/30 hover:bg-white/10 hover:text-white disabled:opacity-50"
+            aria-label="Mark as read"
+            title="Mark as read"
+          >
+            <span className="material-symbols-outlined text-base">done</span>
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => run(() => deleteNotification(n.id))}
+          className="rounded p-1 text-red-400/50 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
+          aria-label="Delete notification"
+          title="Delete"
+        >
+          <span className="material-symbols-outlined text-base">delete</span>
+        </button>
+      </li>
+    );
+  };
+
+  /** Read ones sink to their own section below the unread. */
+  const shownUnread = shown.filter((n) => !n.read);
+  const shownRead = shown.filter((n) => n.read);
+
+  async function deleteAllRead() {
+    const count = notifications.length - unread;
+    const ok = await confirm({
+      title: `Delete all ${count} read notification${count === 1 ? "" : "s"}?`,
+      message: "They'll be removed for good. Unread ones, orders and payments aren't affected.",
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (ok) run(clearReadNotifications);
+  }
+
   const chip = (value: Filter, label: string) => (
     <button
       key={value}
@@ -114,14 +187,6 @@ export default function NotificationsFeed({
           className="rounded-lg border border-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-white disabled:opacity-40"
         >
           Mark all read
-        </button>
-        <button
-          type="button"
-          disabled={busy || notifications.length === unread}
-          onClick={() => run(clearReadNotifications)}
-          className="rounded-lg border border-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-white disabled:opacity-40"
-        >
-          Clear read
         </button>
       </div>
 
@@ -167,77 +232,43 @@ export default function NotificationsFeed({
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-white/5 bg-zinc-900">
-        {shown.length === 0 ? (
-          <EmptyState icon="notifications" message="No notifications" />
-        ) : (
-          <ul className="divide-y divide-white/5">
-            {shown.map((n) => {
-              const style = TYPE_STYLE[n.type] ?? TYPE_STYLE.system;
-              return (
-                <li
-                  key={n.id}
-                  className={`flex items-start gap-3 px-4 py-3 ${n.read ? "" : "bg-purple-500/[0.06]"}`}
+      {shown.length === 0 ? (
+        <div className="overflow-hidden rounded-xl border border-white/5 bg-zinc-900">
+          <EmptyState icon="notifications" message={filter === "unread" ? "No unread notifications" : "No notifications"} />
+        </div>
+      ) : (
+        <>
+          {shownUnread.length > 0 && (
+            <ul className="divide-y divide-white/5 overflow-hidden rounded-xl border border-white/5 bg-zinc-900">
+              {shownUnread.map(item)}
+            </ul>
+          )}
+
+          {shownRead.length > 0 && (
+            <section className="space-y-2">
+              <div className="flex items-center gap-2 px-1 pt-2">
+                <span className="material-symbols-outlined text-base text-white/30">done_all</span>
+                <h2 className="text-[10px] font-black uppercase tracking-widest text-white/40">
+                  Read · {shownRead.length}
+                </h2>
+                <span className="flex-1" />
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void deleteAllRead()}
+                  className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-widest text-red-400 hover:bg-red-500/10 disabled:opacity-40"
                 >
-                  <input
-                    type="checkbox"
-                    checked={selected.has(n.id)}
-                    onChange={() => toggle(n.id)}
-                    aria-label={`Select “${n.title}”`}
-                    className="mt-1 h-3.5 w-3.5 shrink-0 accent-purple-500"
-                  />
-                  <span className={`material-symbols-outlined mt-0.5 text-base ${style.color}`}>
-                    {style.icon}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      {!n.read && <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />}
-                      {n.link ? (
-                        <Link
-                          href={n.link}
-                          onClick={() => {
-                            if (!n.read) void markNotificationsRead([n.id]).then(refreshAdminBadges);
-                          }}
-                          className="text-xs font-black text-white hover:text-purple-300"
-                        >
-                          {n.title}
-                        </Link>
-                      ) : (
-                        <p className="text-xs font-black text-white">{n.title}</p>
-                      )}
-                    </div>
-                    {n.body && <p className="mt-0.5 text-[11px] text-white/50">{n.body}</p>}
-                    <p className="mt-1 text-[9px] font-bold uppercase tracking-widest text-white/25">
-                      {timeAgo(n.created_at)}
-                    </p>
-                  </div>
-                  {!n.read && (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => run(() => markNotificationsRead([n.id]))}
-                      className="rounded p-1 text-white/30 hover:bg-white/10 hover:text-white disabled:opacity-50"
-                      aria-label="Mark as read"
-                      title="Mark as read"
-                    >
-                      <span className="material-symbols-outlined text-base">done</span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => run(() => deleteNotification(n.id))}
-                    className="rounded p-1 text-red-400/50 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
-                    aria-label="Delete notification"
-                  >
-                    <span className="material-symbols-outlined text-base">delete</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+                  <span className="material-symbols-outlined text-sm">delete_sweep</span>
+                  Delete all read
+                </button>
+              </div>
+              <ul className="divide-y divide-white/5 overflow-hidden rounded-xl border border-white/5 bg-zinc-900 opacity-75">
+                {shownRead.map(item)}
+              </ul>
+            </section>
+          )}
+        </>
+      )}
     </div>
   );
 }

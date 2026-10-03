@@ -20,8 +20,8 @@ const labelClass = "block text-[9px] font-black uppercase tracking-widest text-w
 type Tab = "inbox" | "compose" | "sent";
 
 const AUDIENCE_LABEL: Record<EmailAudience, string> = {
-  all_customers: "All customers",
-  customers_with_orders: "Customers who ordered",
+  all_customers: "All clients",
+  customers_with_orders: "Clients who ordered",
   custom: "Specific people",
 };
 

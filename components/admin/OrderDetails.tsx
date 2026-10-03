@@ -172,7 +172,7 @@ function OrderBody({ details }: { details: OrderDetails }) {
 
       {/* Customer */}
       <section>
-        <p className={sectionTitle}>Customer</p>
+        <p className={sectionTitle}>Client</p>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
           <Field label="Name" value={order.customer_name} strong />
           <Field label="Phone" value={formatPhone(order.phone) ?? "—"} />

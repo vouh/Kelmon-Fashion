@@ -145,13 +145,13 @@ export default function QuickStkButton() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <button type="button" aria-label="Close" onClick={close} className="absolute inset-0 cursor-default" />
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="quick-stk-title"
-            className="relative w-full rounded-t-2xl border border-white/10 bg-zinc-900 shadow-2xl sm:max-w-sm sm:rounded-2xl"
+            className="relative w-full rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl max-w-sm"
           >
             <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
               <h2 id="quick-stk-title" className="flex-1 text-sm font-black text-white">

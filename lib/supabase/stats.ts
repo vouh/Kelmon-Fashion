@@ -42,7 +42,8 @@ export async function getAdminStats(): Promise<AdminStats> {
   // head:true returns only the count, so these two never transfer rows.
   const [orders, users] = await Promise.all([
     supabase.from("orders").select("total, status, payment_status"),
-    supabase.from("profiles").select("id", { count: "exact", head: true }),
+    // Clients only: admin and super admin accounts aren't customers.
+    supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "customer"),
   ]);
 
   if (orders.error) {

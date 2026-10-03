@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import {
+  dropdownInputClass,
+  dropdownListClass,
+  useAnchoredDropdown,
+} from "@/components/admin/useAnchoredDropdown";
 import { useRouter } from "next/navigation";
 import { formatKes } from "@/components/admin/ui";
 import { linkOrder, listLinkableClients, type LinkableClient } from "@/app/admin/actions";
@@ -9,8 +14,6 @@ import type { Product } from "@/lib/products";
 import type { OrderWithItems } from "@/lib/supabase/orders";
 
 // text-base on phones: iOS zooms the page into any input under 16px.
-const inputClass =
-  "w-full rounded-xl border border-white/10 bg-zinc-800 px-3 py-3 text-base text-white placeholder:text-white/25 focus:border-purple-400/50 focus:outline-none sm:text-sm";
 const miniInputClass =
   "rounded-lg border border-white/10 bg-zinc-800 px-2 py-1.5 text-base text-white focus:border-purple-400/50 focus:outline-none sm:text-xs";
 const labelText = "mb-1.5 block text-[10px] font-black uppercase tracking-widest text-white/40";
@@ -34,17 +37,19 @@ export default function LinkOrderModal({
   order,
   products,
   onClose,
+  onLinked,
 }: {
   order: OrderWithItems;
   products: Product[];
   onClose: () => void;
+  /** After a save, with the order's id — new if linking products renamed it. */
+  onLinked?: (orderId: string) => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const [clients, setClients] = useState<LinkableClient[] | null>(null);
-  const [clientQuery, setClientQuery] = useState("");
   const [client, setClient] = useState<LinkableClient | null>(null);
   const [picks, setPicks] = useState<Pick[]>([]);
 
@@ -74,27 +79,6 @@ export default function LinkOrderModal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, pending]);
-
-  const clientMatches = useMemo(() => {
-    const term = clientQuery.trim().toLowerCase();
-    const digits = term.replace(/\D/g, "").replace(/^(254|0)/, "");
-    if (!clients || !term) return [];
-    return clients
-      .filter(
-        (c) =>
-          (c.name ?? "").toLowerCase().includes(term) ||
-          (c.email ?? "").toLowerCase().includes(term) ||
-          (digits.length >= 3 && (c.phone ?? "").replace(/\D/g, "").includes(digits))
-      )
-      .slice(0, 8);
-  }, [clients, clientQuery]);
-
-  /** Clients whose saved phone matches the number that paid. */
-  const phoneMatches = useMemo(() => {
-    const paid = order.phone.replace(/\D/g, "").slice(-9);
-    if (!clients || paid.length < 9) return [];
-    return clients.filter((c) => (c.phone ?? "").replace(/\D/g, "").slice(-9) === paid).slice(0, 3);
-  }, [clients, order.phone]);
 
   function addPick(product: Product) {
     setPicks((prev) => [
@@ -136,19 +120,20 @@ export default function LinkOrderModal({
         setError(result.error);
         return;
       }
+      onLinked?.(result.orderId);
       router.refresh();
       onClose();
     });
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <button type="button" aria-label="Close" onClick={() => !pending && onClose()} className="absolute inset-0 cursor-default" />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="link-order-title"
-        className="relative flex max-h-[92dvh] w-full flex-col rounded-t-2xl border border-amber-400/20 bg-zinc-900 shadow-2xl sm:max-w-md sm:rounded-2xl"
+        className="relative flex max-h-full w-full flex-col rounded-2xl border border-amber-400/20 bg-zinc-900 shadow-2xl max-w-md"
       >
         <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-400 text-sm font-black text-black">!</span>
@@ -197,43 +182,7 @@ export default function LinkOrderModal({
                 </button>
               </div>
             ) : (
-              <>
-                <input
-                  type="search"
-                  value={clientQuery}
-                  onChange={(e) => setClientQuery(e.target.value)}
-                  placeholder={clients ? "Search name, email or phone…" : "Loading clients…"}
-                  disabled={!clients}
-                  className={inputClass}
-                />
-                {(clientQuery.trim() ? clientMatches : phoneMatches).length > 0 && (
-                  <ul className="mt-1 max-h-56 overflow-y-auto rounded-xl border border-white/10 bg-zinc-800">
-                    {!clientQuery.trim() && (
-                      <li className="px-3 pt-2 text-[10px] font-black uppercase tracking-widest text-green-300/70">
-                        Same phone as the payment
-                      </li>
-                    )}
-                    {(clientQuery.trim() ? clientMatches : phoneMatches).map((c) => (
-                      <li key={c.id} className="border-b border-white/5 last:border-0">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setClient(c);
-                            setClientQuery("");
-                          }}
-                          className="w-full px-3 py-2.5 text-left active:bg-white/10 sm:hover:bg-white/5"
-                        >
-                          <p className="truncate text-sm font-bold text-white">{c.name || c.email || "No name"}</p>
-                          <p className="truncate text-[11px] text-white/40">{[c.phone, c.email].filter(Boolean).join(" · ")}</p>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {clientQuery.trim() && clients && clientMatches.length === 0 && (
-                  <p className="mt-1 px-1 text-[11px] text-white/35">No client matches. They may not have an account yet.</p>
-                )}
-              </>
+              <ClientPicker clients={clients} paidPhone={order.phone} onPick={setClient} />
             )}
           </section>
 
@@ -361,11 +310,137 @@ export default function LinkOrderModal({
             <span className="material-symbols-outlined text-base">link</span>
             {pending ? "Saving…" : "Save links"}
           </button>
-          {order.payment_status === "paid" && picks.length > 0 && (
-            <p className="mt-2 text-center text-[10px] text-white/30">Already paid, so these products&apos; stock comes off now.</p>
+          {picks.length > 0 && (
+            <p className="mt-2 text-center text-[10px] text-white/30">{order.payment_status === "paid" ? "Stock comes off now. " : ""}The order number changes to the product&apos;s code.</p>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Last 9 digits, so 07…, 2547… and +2547… compare equal. */
+function phoneKey(phone: string | null): string {
+  return (phone ?? "").replace(/\D/g, "").slice(-9);
+}
+
+/**
+ * Client search with the same floating dropdown as the product picker:
+ * tapping the box lists every client — those whose phone matches the payment
+ * first — and typing narrows it down by name, email or phone.
+ */
+function ClientPicker({
+  clients,
+  paidPhone,
+  onPick,
+}: {
+  clients: LinkableClient[] | null;
+  paidPhone: string;
+  onPick: (client: LinkableClient) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const { open, setOpen, anchorRef, listRef, box } = useAnchoredDropdown();
+
+  const paidKey = phoneKey(paidPhone);
+  const { samePhone, others } = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    const digits = term.replace(/\D/g, "").replace(/^(254|0)/, "");
+    const list = (clients ?? []).filter(
+      (c) =>
+        !term ||
+        (c.name ?? "").toLowerCase().includes(term) ||
+        (c.email ?? "").toLowerCase().includes(term) ||
+        (digits.length >= 3 && (c.phone ?? "").replace(/\D/g, "").includes(digits))
+    );
+    const matchesPaid = (c: LinkableClient) => paidKey.length === 9 && phoneKey(c.phone) === paidKey;
+    return { samePhone: list.filter(matchesPaid), others: list.filter((c) => !matchesPaid(c)) };
+  }, [clients, query, paidKey]);
+
+  function pick(client: LinkableClient) {
+    onPick(client);
+    setQuery("");
+    setOpen(false);
+  }
+
+  const row = (c: LinkableClient) => (
+    <li key={c.id} className="border-b border-white/5 last:border-0">
+      <button
+        type="button"
+        onClick={() => pick(c)}
+        className="w-full px-3 py-2.5 text-left active:bg-white/10 sm:hover:bg-white/5"
+      >
+        <p className="truncate text-sm font-bold text-white">{c.name || c.email || "No name"}</p>
+        <p className="truncate text-[11px] text-white/40">{[c.phone, c.email].filter(Boolean).join(" · ")}</p>
+      </button>
+    </li>
+  );
+
+  return (
+    <div>
+      <div ref={anchorRef} className="relative">
+        <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lg text-white/30">
+          person_search
+        </span>
+        <input
+          type="search"
+          value={query}
+          disabled={!clients}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onClick={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && open) {
+              e.stopPropagation();
+              setOpen(false);
+            }
+          }}
+          placeholder={clients ? "Search or pick a client…" : "Loading clients…"}
+          role="combobox"
+          aria-expanded={open}
+          aria-controls="client-picker-list"
+          className={dropdownInputClass}
+        />
+        <button
+          type="button"
+          disabled={!clients}
+          onClick={() => setOpen((o) => !o)}
+          aria-label={open ? "Hide clients" : "Show all clients"}
+          className="absolute right-1 top-1/2 -translate-y-1/2 rounded-lg p-2 text-white/50 hover:text-white disabled:opacity-40"
+        >
+          <span className={`material-symbols-outlined text-xl transition-transform ${open ? "rotate-180" : ""}`}>
+            expand_more
+          </span>
+        </button>
+      </div>
+
+      {open && box && clients && (
+        <ul
+          ref={listRef}
+          id="client-picker-list"
+          style={{ top: box.top, left: box.left, width: box.width, maxHeight: box.maxHeight }}
+          className={dropdownListClass}
+        >
+          {samePhone.length > 0 && (
+            <li className="px-3 pt-2 text-[10px] font-black uppercase tracking-widest text-green-300">
+              Same phone as the payment
+            </li>
+          )}
+          {samePhone.map(row)}
+          {samePhone.length > 0 && others.length > 0 && (
+            <li className="border-t border-white/10 px-3 pt-2 text-[10px] font-black uppercase tracking-widest text-white/35">
+              All clients
+            </li>
+          )}
+          {others.map(row)}
+          {samePhone.length + others.length === 0 && (
+            <li className="px-3 py-2.5 text-xs text-white/40">
+              {clients.length === 0 ? "No client accounts yet." : "No client matches. They may not have an account yet."}
+            </li>
+          )}
+        </ul>
+      )}
     </div>
   );
 }

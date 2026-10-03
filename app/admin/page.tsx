@@ -66,7 +66,7 @@ export default async function AdminOverviewPage() {
           iconColor="text-amber-400"
         />
         <StatCard
-          label="Customers"
+          label="Clients"
           value={stats.totalUsers}
           hint="Registered"
           icon="group"
@@ -118,7 +118,7 @@ export default async function AdminOverviewPage() {
                   <tr>
                     <th className={TH}>Order</th>
                     <th className={TH}>Value</th>
-                    <th className={TH}>Customer</th>
+                    <th className={TH}>Client</th>
                     <th className={TH}>Status</th>
                     <th className={TH}>Payment</th>
                     <th className={TH}>Time</th>

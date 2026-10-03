@@ -346,6 +346,8 @@ export async function listLinkableClients(): Promise<
     const { data, error } = await supabase
       .from("profiles")
       .select("id, full_name, email, phone")
+      // Clients only: admin accounts aren't who orders get linked to.
+      .eq("role", "customer")
       .order("created_at", { ascending: false })
       .limit(1000);
     if (error) throw new Error(error.message);
@@ -366,6 +368,11 @@ export async function listLinkableClients(): Promise<
  * If the order was already paid, its stock came off before these products
  * were known, so they are taken off here instead; and a newly linked client
  * gets the loyalty points the payment earned.
+ *
+ * Linking products also renames the order after the priciest one's code, the
+ * way a normal order is numbered: KM-20261003-01 becomes P001-20261003-01.
+ * Only the prefix changes — the date and day number stay, so the new id can't
+ * clash, and every table pointing at the order follows (ON UPDATE CASCADE).
  */
 export async function linkOrder(
   orderId: string,
@@ -373,10 +380,13 @@ export async function linkOrder(
     userId?: string;
     items?: { productId: string; variant?: string; price: number; quantity: number }[];
   }
-): Promise<ActionResult> {
+): Promise<{ ok: true; orderId: string } | { ok: false; error: string }> {
   try {
     const supabase = await requireAdmin();
     const id = validOrderId(orderId);
+    let finalId = id;
+    /** Code of the priciest linked product: the order is renamed after it. */
+    let renameTo: string | null | undefined;
     const parsed = parseInput(linkOrderSchema, input);
     if (!parsed.ok) return { ok: false, error: parsed.error };
     const link = parsed.data;
@@ -393,7 +403,7 @@ export async function linkOrder(
       const ids = [...new Set(link.items.map((item) => item.productId))];
       const { data: rows, error: productError } = await supabase
         .from("products")
-        .select("id, name, images, category")
+        .select("id, name, images, category, code")
         .in("id", ids);
       if (productError) throw new Error(productError.message);
       const products = new Map((rows ?? []).map((row) => [row.id, row]));
@@ -423,6 +433,9 @@ export async function linkOrder(
         .eq("order_id", id)
         .is("product_id", null);
       if (deleteError) throw new Error(deleteError.message);
+
+      const priciest = [...link.items].sort((a, b) => b.price * b.quantity - a.price * a.quantity)[0];
+      renameTo = products.get(priciest.productId)?.code;
 
       if (order.stock_deducted) {
         for (const item of link.items) {
@@ -463,12 +476,51 @@ export async function linkOrder(
       revalidatePath("/admin/accounts");
     }
 
+    if (renameTo) finalId = await renameOrderPrefix(supabase, id, renameTo);
+
     revalidatePath("/admin/orders");
     revalidatePath("/admin");
-    return ok();
+    revalidatePath("/admin/notifications");
+    return { ok: true, orderId: finalId };
   } catch (err) {
-    return fail(err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+/**
+ * Renames an order to a new prefix, keeping its date and day number. Returns
+ * the id it ends up with (the old one if nothing changed).
+ */
+async function renameOrderPrefix(
+  supabase: Awaited<ReturnType<typeof requireAdmin>>,
+  id: string,
+  code: string | null | undefined
+): Promise<string> {
+  const prefix = (code ?? "").trim().toUpperCase();
+  const match = /^[A-Z]{1,3}[0-9]{0,7}(-\d{8}-\d+)$/.exec(id);
+  if (!match || !/^[A-Z]{1,3}[0-9]{0,7}$/.test(prefix)) return id;
+  const newId = `${prefix}${match[1]}`;
+  if (newId === id) return id;
+
+  const { error } = await supabase.from("orders").update({ id: newId }).eq("id", id);
+  if (error) throw new Error(`Linked, but the order number couldn't change: ${error.message}`);
+
+  // Notification titles name the order in plain text; keep them in step.
+  const { data: notes } = await supabase
+    .from("admin_notifications")
+    .select("id, title, body, link")
+    .or(`title.ilike.*${id}*,body.ilike.*${id}*,link.ilike.*${id}*`);
+  for (const note of notes ?? []) {
+    await supabase
+      .from("admin_notifications")
+      .update({
+        title: note.title.replaceAll(id, newId),
+        body: note.body?.replaceAll(id, newId) ?? null,
+        link: note.link?.replaceAll(id, newId) ?? null,
+      })
+      .eq("id", note.id);
+  }
+  return newId;
 }
 
 // ── Products (new — no EzyBite equivalent) ──────────────────────────────────

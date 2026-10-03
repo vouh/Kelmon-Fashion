@@ -200,7 +200,7 @@ export default function PaymentsTable({
                   </th>
                   <th className={TH}>Status</th>
                   <th className={TH}>Order</th>
-                  <th className={TH}>Customer</th>
+                  <th className={TH}>Client</th>
                   <th className={TH}>Amount</th>
                   <th className={TH}>When</th>
                   <th className={`${TH} text-right`}>Details</th>
@@ -304,7 +304,7 @@ function PaymentDetails({ entry: e, onClose }: { entry: PaymentEntry; onClose: (
   const success = e.kind === "success";
   const rows: [string, React.ReactNode][] = [
     ["Order", e.orderId ? <span className="font-mono font-bold text-white">{e.orderId}</span> : "—"],
-    ["Customer", e.customer ?? "—"],
+    ["Client", e.customer ?? "—"],
     ["Phone", e.phone ?? "—"],
     ["Amount", e.amount !== null ? <span className="font-bold text-white">{formatKes(e.amount)}</span> : "—"],
     ["Method", e.method === "cod" ? "Pay on delivery" : "M-Pesa"],

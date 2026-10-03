@@ -1,21 +1,15 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
 import { formatKes } from "@/components/admin/ui";
 import type { Product } from "@/lib/products";
-
-// text-base on phones: iOS zooms the page into any input under 16px.
-const inputClass =
-  "w-full rounded-xl border border-white/10 bg-zinc-800 py-3 pl-10 pr-11 text-base text-white placeholder:text-white/25 focus:border-purple-400/50 focus:outline-none sm:text-sm";
+import { dropdownInputClass, dropdownListClass, useAnchoredDropdown } from "@/components/admin/useAnchoredDropdown";
 
 /**
  * Search box with a dropdown of the catalogue. Tapping the box (or the arrow)
  * lists every product to scroll through; typing narrows it down.
- *
- * The list floats just under the box (fixed, measured from it) rather than
- * sitting in the flow, so it overlays the popup instead of pushing it down —
- * and isn't clipped by the popup's scrolling body.
+ * The list floats under the box (see useAnchoredDropdown).
  */
 export default function ProductPicker({
   products,
@@ -32,49 +26,7 @@ export default function ProductPicker({
   onTypeIn?: (text: string) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
-  const anchorRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
-  const [box, setBox] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
-
-  // Keep the list pinned under the box as the page scrolls, resizes, or the
-  // phone keyboard opens.
-  useLayoutEffect(() => {
-    if (!open) return;
-    const place = () => {
-      const rect = anchorRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const viewport = window.visualViewport?.height ?? window.innerHeight;
-      const top = rect.bottom + 4;
-      setBox({
-        top,
-        left: rect.left,
-        width: rect.width,
-        maxHeight: Math.max(160, Math.min(viewport * 0.5, viewport - top - 12)),
-      });
-    };
-    place();
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    window.visualViewport?.addEventListener("resize", place);
-    return () => {
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
-      window.visualViewport?.removeEventListener("resize", place);
-    };
-  }, [open]);
-
-  // A tap anywhere outside the box and the list closes it.
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: PointerEvent) => {
-      const target = e.target as Node;
-      if (anchorRef.current?.contains(target) || listRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    document.addEventListener("pointerdown", onDown);
-    return () => document.removeEventListener("pointerdown", onDown);
-  }, [open]);
+  const { open, setOpen, anchorRef, listRef, box } = useAnchoredDropdown();
 
   const matches = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -121,7 +73,7 @@ export default function ProductPicker({
           role="combobox"
           aria-expanded={open}
           aria-controls="product-picker-list"
-          className={inputClass}
+          className={dropdownInputClass}
         />
         <button
           type="button"
@@ -140,7 +92,7 @@ export default function ProductPicker({
           ref={listRef}
           id="product-picker-list"
           style={{ top: box.top, left: box.left, width: box.width, maxHeight: box.maxHeight }}
-          className="fixed z-[130] overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-zinc-900 shadow-2xl shadow-black/40"
+          className={dropdownListClass}
         >
           {matches.map((product) => {
             const stock = product.stock ?? 0;

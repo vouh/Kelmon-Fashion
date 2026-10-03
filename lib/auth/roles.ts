@@ -5,7 +5,7 @@
 export type AccountRole = "customer" | "admin" | "super_admin";
 
 export const ROLE_LABELS: Record<AccountRole, string> = {
-  customer: "User",
+  customer: "Client",
   admin: "Admin",
   super_admin: "Super admin",
 };

@@ -316,14 +316,14 @@ export default function RequestPaymentModal({ open, onClose, products }: Request
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <button type="button" aria-label="Close" onClick={close} className="absolute inset-0 cursor-default" />
 
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="new-order-title"
-        className="relative flex max-h-[92dvh] w-full flex-col rounded-t-2xl border border-white/10 bg-zinc-900 shadow-2xl sm:max-w-md sm:rounded-2xl"
+        className="relative flex max-h-full w-full flex-col rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl max-w-md"
       >
         <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
           <h2 id="new-order-title" className="flex-1 text-sm font-black text-white">
@@ -546,13 +546,13 @@ function StkWindow({
   const showStatus = step === "waiting" || step === "paid" || step === "failed";
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/60 sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60">
       <button type="button" aria-label="Back to the order" onClick={onBack} className="absolute inset-0 cursor-default" />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="stk-title"
-        className="relative w-full rounded-t-2xl border border-purple-400/20 bg-zinc-900 shadow-2xl sm:max-w-sm sm:rounded-2xl"
+        className="relative w-full rounded-2xl border border-purple-400/20 bg-zinc-900 shadow-2xl max-w-sm"
       >
         <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
           <button
