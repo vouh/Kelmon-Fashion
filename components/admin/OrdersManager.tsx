@@ -17,6 +17,7 @@ import ApprovalCodeModal from "@/components/admin/ApprovalCodeModal";
 import OrderDetailsButton from "@/components/admin/OrderDetails";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import RequestPaymentModal from "@/components/admin/RequestPaymentModal";
+import LinkOrderModal from "@/components/admin/LinkOrderModal";
 import { sendStkPrompt, waitForPaymentResult } from "@/components/payments/MpesaPayment";
 import type { Product } from "@/lib/products";
 import type { OrderWithItems } from "@/lib/supabase/orders";
@@ -36,7 +37,7 @@ const PAYMENT_STATUSES: PaymentStatus[] = ["unpaid", "initiated", "paid", "faile
 
 type Filter = "all" | "pending" | "paid" | "unpaid" | "delivered";
 
-/** A direct order with a typed-in item, still to be matched to a product. */
+/** A direct order (quick STK or typed-in item) still to be matched to a product. */
 function needsReconciling(order: OrderWithItems): boolean {
   return order.source === "admin_direct" && (order.order_items ?? []).some((item) => !item.product_id);
 }
@@ -72,6 +73,8 @@ export default function OrdersManager({
   /** Paid orders waiting on the emailed approval code. */
   const [paidToApprove, setPaidToApprove] = useState<string[] | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  /** The order whose yellow "!" was tapped: link it to a client / products. */
+  const [linking, setLinking] = useState<OrderWithItems | null>(null);
   const confirm = useConfirm();
 
   const visible = useMemo(() => {
@@ -209,15 +212,11 @@ export default function OrdersManager({
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() => setShowDirect(true)}
-          className="flex items-center gap-1.5 rounded-lg border border-purple-400/20 bg-purple-400/10 px-3 py-1.5 text-xs font-black text-purple-300 transition-all hover:bg-purple-400/20"
-        >
-          <span className="material-symbols-outlined text-sm">send_to_mobile</span> Request Payment
-        </button>
       </div>
 
+      {linking && <LinkOrderModal order={linking} products={products} onClose={() => setLinking(null)} />}
+
+      {/* Opened by ?new=1; the page header has the New Order button. */}
       <RequestPaymentModal open={showDirect} onClose={() => setShowDirect(false)} products={products} />
 
       {flash && (
@@ -306,11 +305,7 @@ export default function OrdersManager({
                               direct
                             </span>
                           )}
-                          {needsReconciling(order) && (
-                            <span className="ml-1 rounded bg-amber-400/15 px-1 py-0.5 text-[8px] font-black uppercase text-amber-300">
-                              reconcile
-                            </span>
-                          )}
+                          {needsReconciling(order) && <LinkFlag onClick={() => setLinking(order)} />}
                         </td>
                         <td className={TD}>
                           <span className="block text-white/80">{order.customer_name}</span>
@@ -436,11 +431,7 @@ export default function OrdersManager({
                     <div className="min-w-0 flex-1">
                       <p className="font-mono text-xs font-bold text-white">
                         {order.id}
-                        {needsReconciling(order) && (
-                          <span className="ml-1.5 rounded bg-amber-400/15 px-1 py-0.5 text-[8px] font-black uppercase text-amber-300">
-                            reconcile
-                          </span>
-                        )}
+                        {needsReconciling(order) && <LinkFlag onClick={() => setLinking(order)} />}
                       </p>
                       <p className="text-[11px] text-white/50">{order.customer_name}</p>
                       <p className="text-[10px] text-white/30">{order.phone}</p>
@@ -580,7 +571,6 @@ function DeleteButton({ busy, onConfirm }: { busy: boolean; onConfirm: () => voi
   );
 }
 
-/** Road-sale order form. Replaces the openRequestPaymentModal() flow. */
 const STK_TONES = {
   info: "border-blue-400/25 bg-blue-400/10 text-blue-200",
   success: "border-green-400/25 bg-green-400/10 text-green-300",
@@ -592,5 +582,20 @@ function StkNotice({ tone, text }: { tone: keyof typeof STK_TONES; text: string 
     <p role={tone === "error" ? "alert" : "status"} className={`rounded-lg border px-2.5 py-1.5 text-[11px] ${STK_TONES[tone]}`}>
       {text}
     </p>
+  );
+}
+
+/** Yellow "!" on an order that still needs its client / products linked. */
+function LinkFlag({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="Link a client and products"
+      aria-label="Link a client and products"
+      className="ml-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-400 align-middle text-xs font-black text-black shadow shadow-amber-500/40 transition hover:scale-110"
+    >
+      !
+    </button>
   );
 }

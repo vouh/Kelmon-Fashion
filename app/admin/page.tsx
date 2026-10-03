@@ -12,6 +12,7 @@ import {
   timeAgo,
 } from "@/components/admin/ui";
 import OrderDetailsButton from "@/components/admin/OrderDetails";
+import QuickStkButton from "@/components/admin/QuickStkButton";
 import RequestPaymentButton from "@/components/admin/RequestPaymentButton";
 import { getAdminStats, getOrdersWithStats } from "@/lib/supabase/stats";
 import { getProducts } from "@/lib/supabase/products";
@@ -32,7 +33,17 @@ export default async function AdminOverviewPage() {
   const adminEmail = await getAdminEmail();
 
   return (
-    <AdminShell adminEmail={adminEmail} title="Overview" subtitle="Dashboard summary">
+    <AdminShell
+      adminEmail={adminEmail}
+      title="Overview"
+      subtitle="Dashboard summary"
+      actions={
+        <>
+          <QuickStkButton />
+          <RequestPaymentButton products={products} />
+        </>
+      }
+    >
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <StatCard
           label="Total Orders"
@@ -83,8 +94,6 @@ export default async function AdminOverviewPage() {
           </div>
         </div>
       </div>
-
-      <RequestPaymentButton products={products} />
 
       <Panel
         title="Recent Orders"

@@ -165,6 +165,34 @@ body {
 .kelmon-admin .admin-active,
 .kelmon-admin .admin-active .text-white { color: #fff !important; }
 
+/* Solid colour buttons keep white labels: the text-white remap above would
+   otherwise put dark plum text on purple/green/red. */
+.kelmon-admin :is(.bg-purple-500, .bg-purple-600, .bg-green-500, .bg-green-600, .bg-red-500, .bg-red-600).text-white,
+.kelmon-admin :is(.bg-purple-500, .bg-purple-600, .bg-green-500, .bg-green-600, .bg-red-500, .bg-red-600) .text-white {
+  color: #fff !important;
+}
+
+/* Placeholders were written for the dark admin; remap them like text-white. */
+.kelmon-admin .placeholder\:text-white\/25::placeholder,
+.kelmon-admin .placeholder\:text-white\/30::placeholder {
+  color: color-mix(in srgb, var(--admin-text) 45%, transparent) !important;
+}
+.kelmon-admin .hover\:bg-white\/5:hover,
+.kelmon-admin .hover\:bg-white\/10:hover,
+.kelmon-admin .active\:bg-white\/10:active { background-color: var(--kelmon-purple-muted) !important; }
+
+/* Light theme: the pale tints (purple-300, green-200…) are made for a dark
+   panel and all but vanish on white, so they get their deep shades. */
+.light .kelmon-admin :is(.text-purple-200, .text-purple-300, .text-purple-400, .text-purple-300\/60) { color: #7030a0 !important; }
+.light .kelmon-admin :is(.text-green-200, .text-green-300, .text-green-400, .text-green-200\/60, .text-green-300\/70) {
+  color: #15803d !important;
+}
+.light .kelmon-admin :is(.text-amber-200, .text-amber-300, .text-amber-400, .text-amber-200\/60, .text-amber-200\/70, .text-amber-200\/80, .text-amber-300\/60, .text-amber-300\/80) {
+  color: #b45309 !important;
+}
+.light .kelmon-admin :is(.text-red-300, .text-red-400, .text-red-400\/50) { color: #b91c1c !important; }
+.light .kelmon-admin :is(.text-blue-200, .text-blue-300, .text-blue-400) { color: #1d4ed8 !important; }
+
 .admin-command-bar {
   background: color-mix(in srgb, var(--kelmon-bg-elevated) 94%, transparent);
   border-color: var(--kelmon-border-default);

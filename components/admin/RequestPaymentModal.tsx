@@ -1,21 +1,58 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatKes } from "@/components/admin/ui";
 import { createDirectOrder } from "@/app/admin/actions";
+import ProductPicker from "@/components/admin/ProductPicker";
 import type { Product } from "@/lib/products";
 
-type Step = "form" | "sending" | "waiting" | "paid" | "failed";
+type Step = "form" | "sending" | "waiting" | "paid" | "failed" | "recorded";
+type PaidMethod = "mpesa" | "cash";
+
+/** One row of the order. No `product` means a typed-in item. */
+interface Line {
+  key: number;
+  product: Product | null;
+  name: string;
+  size: string;
+  color: string;
+  price: string;
+  quantity: number;
+}
 
 const POLL_MS = 4_000;
 const GIVE_UP_MS = 150_000;
 
+// text-base on phones: iOS zooms the page into any input under 16px.
 const inputClass =
-  "w-full rounded-lg border border-white/10 bg-zinc-800 px-3 py-2.5 text-sm text-white placeholder:text-white/25 focus:border-purple-400/50 focus:outline-none";
-const labelText = "text-[10px] font-black uppercase tracking-widest text-white/40";
-const labelClass = `mb-1 block ${labelText}`;
+  "w-full rounded-xl border border-white/10 bg-zinc-800 px-3 py-3 text-base text-white placeholder:text-white/25 focus:border-purple-400/50 focus:outline-none disabled:opacity-60 sm:text-sm";
+const miniInputClass =
+  "rounded-lg border border-white/10 bg-zinc-800 px-2 py-1.5 text-base text-white placeholder:text-white/25 focus:border-purple-400/50 focus:outline-none disabled:opacity-60 sm:text-xs";
+
+let nextKey = 1;
+
+function lineFor(product: Product | null, name = ""): Line {
+  return {
+    key: nextKey++,
+    product,
+    name: product?.name ?? name,
+    size: "",
+    color: "",
+    price: product ? String(product.price) : "",
+    quantity: 1,
+  };
+}
+
+function lineTotal(line: Line): number {
+  const price = Number(line.price);
+  return price > 0 ? price * line.quantity : 0;
+}
+
+/** "Black / M", the same shape the storefront saves. */
+function variantOf(line: Line): string | undefined {
+  return [line.color, line.size].filter(Boolean).join(" / ") || undefined;
+}
 
 interface RequestPaymentModalProps {
   open: boolean;
@@ -23,18 +60,23 @@ interface RequestPaymentModalProps {
   products: Product[];
 }
 
+/**
+ * New order, entered by staff — mostly on a phone. Search, tap a product, set
+ * the quantity, then either send the customer an M-Pesa prompt or mark it as
+ * already paid (cash, or M-Pesa sent straight to the till). Customer details
+ * aren't asked for; the order is filed as a walk-in.
+ */
 export default function RequestPaymentModal({ open, onClose, products }: RequestPaymentModalProps) {
   const router = useRouter();
 
   const [phone, setPhone] = useState("");
-  const [customerName, setCustomerName] = useState("");
-  const [query, setQuery] = useState("");
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [selected, setSelected] = useState<Product | null>(null);
-  const [manual, setManual] = useState(false);
-  const [manualName, setManualName] = useState("");
-  const [unitPrice, setUnitPrice] = useState("");
-  const [quantity, setQuantity] = useState(1);
+  const [lines, setLines] = useState<Line[]>([]);
+  /** The "how was it paid?" step under Mark as paid. */
+  const [paidOpen, setPaidOpen] = useState(false);
+  /** The Send STK window stacked on top of the order. */
+  const [stkOpen, setStkOpen] = useState(false);
+  const [paidMethod, setPaidMethod] = useState<PaidMethod>("mpesa");
+  const [reference, setReference] = useState("");
 
   const [step, setStep] = useState<Step>("form");
   const [error, setError] = useState<string | null>(null);
@@ -43,32 +85,21 @@ export default function RequestPaymentModal({ open, onClose, products }: Request
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const busy = step === "sending";
-  const price = Number(unitPrice);
-  const total = price > 0 ? price * quantity : 0;
-  const itemName = manual ? manualName.trim() : selected?.name ?? "";
+  /** Once an STK order exists the form only resends the prompt. */
+  const locked = orderId !== null;
+  const total = lines.reduce((sum, line) => sum + lineTotal(line), 0);
+  const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
 
-  const matches = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    const list = term
-      ? products.filter(
-          (p) => p.name.toLowerCase().includes(term) || p.category.toLowerCase().includes(term)
-        )
-      : products;
-    return list.slice(0, 6);
-  }, [products, query]);
 
   function reset() {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = null;
     setPhone("");
-    setCustomerName("");
-    setQuery("");
-    setPickerOpen(false);
-    setSelected(null);
-    setManual(false);
-    setManualName("");
-    setUnitPrice("");
-    setQuantity(1);
+    setLines([]);
+    setPaidOpen(false);
+    setStkOpen(false);
+    setPaidMethod("mpesa");
+    setReference("");
     setStep("form");
     setError(null);
     setOrderId(null);
@@ -86,38 +117,48 @@ export default function RequestPaymentModal({ open, onClose, products }: Request
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key !== "Escape") return;
+      // Esc steps back out of the STK window before closing the order.
+      if (stkOpen && !orderId) {
+        if (!busy) setStkOpen(false);
+      } else close();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // close() only reads state that is current on each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, busy, orderId]);
+  }, [open, busy, orderId, stkOpen]);
 
   useEffect(() => () => {
     if (pollRef.current) clearInterval(pollRef.current);
   }, []);
 
-  function pickProduct(product: Product) {
-    setSelected(product);
-    setManual(false);
-    setUnitPrice(String(product.price));
-    setQuery("");
-    setPickerOpen(false);
+  function addProduct(product: Product) {
+    setLines((prev) => {
+      // Picking the same plain product again just adds one more.
+      const hasOptions = (product.sizes?.length ?? 0) > 0 || (product.colors?.length ?? 0) > 0;
+      const existing = !hasOptions && prev.find((line) => line.product?.id === product.id);
+      if (existing) {
+        return prev.map((line) =>
+          line.key === existing.key ? { ...line, quantity: Math.min(99, line.quantity + 1) } : line
+        );
+      }
+      return [...prev, lineFor(product)];
+    });
+    setError(null);
   }
 
-  function typeItInstead() {
-    setManual(true);
-    setManualName(selected?.name ?? query.trim());
-    if (!unitPrice && selected) setUnitPrice(String(selected.price));
-    setSelected(null);
-    setPickerOpen(false);
+  function addTypedItem(name: string) {
+    setLines((prev) => [...prev, lineFor(null, name)]);
+    setError(null);
   }
 
-  function backToCatalogue() {
-    setManual(false);
-    setManualName("");
-    setUnitPrice("");
+  function updateLine(key: number, patch: Partial<Line>) {
+    setLines((prev) => prev.map((line) => (line.key === key ? { ...line, ...patch } : line)));
+  }
+
+  function removeLine(key: number) {
+    setLines((prev) => prev.filter((line) => line.key !== key));
   }
 
   function watchPayment(id: string) {
@@ -147,12 +188,76 @@ export default function RequestPaymentModal({ open, onClose, products }: Request
     }, POLL_MS);
   }
 
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    setError(null);
+  /** Checks the items; returns an error message, or null when they're good. */
+  function itemsProblem(): string | null {
+    if (lines.length === 0) return "Add a product first.";
+    for (const line of lines) {
+      if (!line.name.trim()) return "Type a name for the typed-in item.";
+      if (!(Number(line.price) > 0)) return `Enter a price for ${line.name.trim()}.`;
+    }
+    return null;
+  }
 
-    if (!itemName) return setError(manual ? "Type what they're buying." : "Pick a product, or tap the pencil to type one in.");
-    if (!(price > 0)) return setError("Enter the price.");
+  async function createOrder(paid?: { method: PaidMethod; reference?: string }): Promise<string | null> {
+    const typedIn = lines.some((line) => !line.product);
+    const result = await createDirectOrder({
+      customerName: "Walk-in customer",
+      phone: phone.trim() || undefined,
+      dropPoint: "Road sale",
+      notes:
+        [
+          paid?.method === "cash" ? "Paid in cash." : null,
+          paid?.method === "mpesa" ? "Paid by M-Pesa outside the system." : null,
+          typedIn ? "Typed-in item. Reconcile with the catalogue later." : null,
+        ]
+          .filter(Boolean)
+          .join(" ") || undefined,
+      items: lines.map((line) => ({
+        productId: line.product?.id,
+        name: line.name.trim(),
+        variant: variantOf(line),
+        price: Number(line.price),
+        quantity: line.quantity,
+      })),
+      paid,
+    });
+    if (!result.ok) {
+      setError(result.error);
+      setStep("form");
+      return null;
+    }
+    setOrderId(result.orderId);
+    return result.orderId;
+  }
+
+  async function markPaid() {
+    setError(null);
+    const issue = itemsProblem();
+    if (issue) return setError(issue);
+
+    setStep("sending");
+    try {
+      const id = await createOrder({
+        method: paidMethod,
+        reference: paidMethod === "mpesa" ? reference.trim() || undefined : undefined,
+      });
+      if (id) setStep("recorded");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the order. Please try again.");
+      setStep("form");
+    }
+  }
+
+  function openStk() {
+    setError(null);
+    const issue = itemsProblem();
+    if (issue) return setError(issue);
+    setStkOpen(true);
+  }
+
+  async function sendStk() {
+    setError(null);
+    if (!phone.trim()) return setError("Enter the customer's M-Pesa number to send the prompt.");
 
     setStep("sending");
 
@@ -162,26 +267,8 @@ export default function RequestPaymentModal({ open, onClose, products }: Request
     let id = orderId;
     try {
       if (!id) {
-        const result = await createDirectOrder({
-          customerName: customerName.trim() || "Walk-in customer",
-          phone,
-          dropPoint: "Road sale",
-          total,
-          notes: manual ? "Typed-in item. Reconcile with the catalogue later." : undefined,
-          item: {
-            productId: manual ? undefined : selected?.id,
-            name: itemName,
-            price,
-            quantity,
-          },
-        });
-        if (!result.ok) {
-          setError(result.error);
-          setStep("form");
-          return;
-        }
-        id = result.orderId;
-        setOrderId(id);
+        id = await createOrder();
+        if (!id) return;
       }
 
       const response = await fetch("/api/mpesa/stk-push", {
@@ -229,43 +316,38 @@ export default function RequestPaymentModal({ open, onClose, products }: Request
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4">
       <button type="button" aria-label="Close" onClick={close} className="absolute inset-0 cursor-default" />
 
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="request-payment-title"
-        className="relative max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-white/10 bg-zinc-900 shadow-2xl sm:max-w-md sm:rounded-2xl"
+        aria-labelledby="new-order-title"
+        className="relative flex max-h-[92dvh] w-full flex-col rounded-t-2xl border border-white/10 bg-zinc-900 shadow-2xl sm:max-w-md sm:rounded-2xl"
       >
-        <div className="flex items-center gap-3 border-b border-white/5 px-5 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-400/20">
-            <span className="material-symbols-outlined text-lg text-purple-300">send_to_mobile</span>
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 id="request-payment-title" className="text-sm font-black text-white">
-              Request Payment
-            </h2>
-            <p className="text-[10px] font-bold text-white/30">Creates an order and sends an M-Pesa prompt</p>
-          </div>
+        <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
+          <h2 id="new-order-title" className="flex-1 text-sm font-black text-white">
+            New Order
+          </h2>
           <button
             type="button"
             onClick={close}
             disabled={busy}
-            className="rounded-lg p-1.5 text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-40"
+            className="-mr-1 rounded-lg p-2 text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-40"
             aria-label="Close"
           >
-            <span className="material-symbols-outlined text-lg">close</span>
+            <span className="material-symbols-outlined text-xl">close</span>
           </button>
         </div>
 
-        {step === "waiting" || step === "paid" || step === "failed" ? (
+        {step === "recorded" ? (
           <StatusPanel
             step={step}
             phone={phone}
             total={total}
             orderId={orderId}
             reason={failReason}
+            paidMethod={paidMethod}
             onDone={close}
             onRetry={() => {
               setFailReason(null);
@@ -274,216 +356,399 @@ export default function RequestPaymentModal({ open, onClose, products }: Request
             }}
           />
         ) : (
-          <form onSubmit={submit} className="space-y-4 px-5 py-5">
-            {error && (
-              <div className="flex items-start gap-2 rounded-xl border border-red-400/30 bg-red-400/10 px-3 py-2.5">
-                <span className="material-symbols-outlined text-base text-red-400">error</span>
-                <p className="text-xs text-red-300">{error}</p>
-              </div>
-            )}
+          <>
+            {/* Body: search, items, phone */}
+            <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+              {!locked && (
+                <ProductPicker
+                  products={products}
+                  onPick={addProduct}
+                  onTypeIn={addTypedItem}
+                  autoFocus
+                  placeholder={lines.length ? "Add another product…" : "Search or pick a product…"}
+                />
+              )}
 
-            <div>
-              <label htmlFor="rp-phone" className={labelClass}>
-                M-Pesa phone number
-              </label>
-              <input
-                id="rp-phone"
-                required
-                autoFocus
-                inputMode="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="0712 345 678"
-                disabled={orderId !== null}
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <div className="mb-1 flex items-center justify-between">
-                <span className={labelText}>Product</span>
-                {!orderId && (
-                  <button
-                    type="button"
-                    onClick={manual ? backToCatalogue : typeItInstead}
-                    className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-black uppercase tracking-widest text-purple-300 hover:bg-purple-400/10"
-                  >
-                    <span className="material-symbols-outlined text-sm">{manual ? "search" : "edit"}</span>
-                    {manual ? "Pick from catalogue" : "Type it in"}
-                  </button>
-                )}
-              </div>
-
-              {manual ? (
-                <div className="space-y-2 rounded-xl border border-amber-400/20 bg-amber-400/5 p-3">
-                  <input
-                    required
-                    value={manualName}
-                    onChange={(e) => setManualName(e.target.value)}
-                    placeholder="What are they buying? e.g. Product X"
-                    disabled={orderId !== null}
-                    className={inputClass}
-                  />
-                  <p className="flex items-start gap-1.5 text-[10px] leading-relaxed text-amber-200/70">
-                    <span className="material-symbols-outlined text-sm text-amber-300">schedule</span>
-                    Saved with a &ldquo;reconcile&rdquo; tag so you can match it to a product later. It
-                    won&apos;t take stock off.
-                  </p>
-                </div>
-              ) : selected ? (
-                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-zinc-800/60 p-2.5">
-                  <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-zinc-800">
-                    <Image src={selected.image} alt="" fill unoptimized className="object-cover" sizes="48px" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-white">{selected.name}</p>
-                    <p className="text-[11px] text-white/40">
-                      {formatKes(selected.price)} · {selected.stock ?? 0} in stock
-                    </p>
-                  </div>
-                  {!orderId && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelected(null);
-                        setUnitPrice("");
-                        setPickerOpen(true);
-                      }}
-                      className="rounded-lg p-1.5 text-white/40 hover:bg-white/10 hover:text-white"
-                      aria-label="Change product"
-                    >
-                      <span className="material-symbols-outlined text-base">swap_horiz</span>
-                    </button>
-                  )}
-                </div>
+              {lines.length > 0 ? (
+                <ul className="divide-y divide-white/5 rounded-xl border border-white/10 bg-zinc-800/40">
+                  {lines.map((line) => (
+                    <LineRow
+                      key={line.key}
+                      line={line}
+                      locked={locked}
+                      onChange={(patch) => updateLine(line.key, patch)}
+                      onRemove={() => removeLine(line.key)}
+                    />
+                  ))}
+                </ul>
               ) : (
-                <div className="relative">
-                  <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base text-white/30">
-                    search
-                  </span>
-                  <input
-                    value={query}
-                    onChange={(e) => {
-                      setQuery(e.target.value);
-                      setPickerOpen(true);
-                    }}
-                    onFocus={() => setPickerOpen(true)}
-                    placeholder="Search products…"
-                    className={`${inputClass} pl-9`}
-                  />
-                  {pickerOpen && (
-                    <ul className="absolute left-0 right-0 top-full z-10 mt-1 max-h-64 overflow-y-auto rounded-xl border border-white/10 bg-zinc-800 py-1 shadow-xl">
-                      {matches.length === 0 ? (
-                        <li className="px-3 py-3 text-xs text-white/40">
-                          No match.{" "}
-                          <button type="button" onClick={typeItInstead} className="font-bold text-purple-300 hover:underline">
-                            Type it in instead
-                          </button>
-                        </li>
-                      ) : (
-                        matches.map((product) => (
-                          <li key={product.id}>
-                            <button
-                              type="button"
-                              onClick={() => pickProduct(product)}
-                              className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-white/5"
-                            >
-                              <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md bg-zinc-700">
-                                <Image src={product.image} alt="" fill unoptimized className="object-cover" sizes="36px" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-xs font-bold text-white">{product.name}</p>
-                                <p className="text-[10px] text-white/35">
-                                  {product.category} · {(product.stock ?? 0) > 0 ? `${product.stock} in stock` : "sold out"}
-                                </p>
-                              </div>
-                              <span className="text-xs font-bold text-purple-300">{formatKes(product.price)}</span>
-                            </button>
-                          </li>
-                        ))
-                      )}
-                    </ul>
-                  )}
-                </div>
+                <p className="py-4 text-center text-xs text-white/30">Tap the search box to pick a product.</p>
+              )}
+
+              {error && !stkOpen && (
+                <p role="alert" className="rounded-xl border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs text-red-300">
+                  {error}
+                </p>
               )}
             </div>
 
-            <div className="grid grid-cols-[1fr_auto] gap-3">
-              <div>
-                <label htmlFor="rp-price" className={labelClass}>
-                  Price each (KES)
-                </label>
-                <input
-                  id="rp-price"
-                  required
-                  type="number"
-                  min="1"
-                  step="1"
-                  inputMode="numeric"
-                  value={unitPrice}
-                  onChange={(e) => setUnitPrice(e.target.value)}
-                  placeholder="0"
-                  disabled={orderId !== null}
-                  className={inputClass}
-                />
+            {/* Footer: total and the two actions */}
+            <div className="space-y-2.5 border-t border-white/5 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-white/40">
+                  Total{itemCount > 0 && ` · ${itemCount} item${itemCount === 1 ? "" : "s"}`}
+                </span>
+                <span className="text-xl font-black text-white">{formatKes(total)}</span>
               </div>
-              <div>
-                <span className={labelClass}>Qty</span>
-                <div className="flex h-[42px] items-center rounded-lg border border-white/10 bg-zinc-800">
-                  <button
-                    type="button"
-                    disabled={quantity <= 1 || orderId !== null}
-                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                    className="px-2.5 text-white/50 hover:text-white disabled:opacity-30"
-                    aria-label="Fewer"
-                  >
-                    <span className="material-symbols-outlined text-base">remove</span>
-                  </button>
-                  <span className="w-6 text-center text-sm font-bold text-white">{quantity}</span>
-                  <button
-                    type="button"
-                    disabled={quantity >= 99 || orderId !== null}
-                    onClick={() => setQuantity((q) => Math.min(99, q + 1))}
-                    className="px-2.5 text-white/50 hover:text-white disabled:opacity-30"
-                    aria-label="More"
-                  >
-                    <span className="material-symbols-outlined text-base">add</span>
-                  </button>
+
+              {paidOpen && !locked && (
+                <div className="space-y-2 rounded-xl border border-green-400/20 bg-green-400/5 p-2.5">
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {(["mpesa", "cash"] as PaidMethod[]).map((method) => (
+                      <button
+                        key={method}
+                        type="button"
+                        onClick={() => setPaidMethod(method)}
+                        aria-pressed={paidMethod === method}
+                        className={`rounded-lg py-2.5 text-xs font-black uppercase tracking-widest transition ${
+                          paidMethod === method
+                            ? "bg-green-500/25 text-green-200 ring-1 ring-green-400/40"
+                            : "bg-white/5 text-white/40"
+                        }`}
+                      >
+                        {method === "mpesa" ? "M-Pesa" : "Cash"}
+                      </button>
+                    ))}
+                  </div>
+                  {paidMethod === "mpesa" && (
+                    <input
+                      value={reference}
+                      onChange={(e) => setReference(e.target.value.toUpperCase())}
+                      placeholder="M-Pesa code (optional)"
+                      maxLength={20}
+                      autoCapitalize="characters"
+                      aria-label="M-Pesa code"
+                      className={`${inputClass} font-mono uppercase`}
+                    />
+                  )}
                 </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={openStk}
+                  disabled={busy || lines.length === 0 || (paidOpen && !locked)}
+                  className="flex items-center justify-center gap-1.5 rounded-xl bg-purple-600 px-3 py-3.5 text-xs font-black uppercase tracking-widest text-white transition hover:bg-purple-500 disabled:opacity-40"
+                >
+                  <span className="material-symbols-outlined text-base">send_to_mobile</span>
+                  Send STK
+                </button>
+                {paidOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => void markPaid()}
+                    disabled={busy || lines.length === 0}
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-green-600 px-3 py-3.5 text-xs font-black uppercase tracking-widest text-white transition hover:bg-green-500 disabled:opacity-40"
+                  >
+                    <span className="material-symbols-outlined text-base">check</span>
+                    {busy ? "Saving…" : "Confirm paid"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setPaidOpen(true)}
+                    disabled={busy || lines.length === 0 || locked}
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-green-600 px-3 py-3.5 text-xs font-black uppercase tracking-widest text-white transition hover:bg-green-500 disabled:opacity-40"
+                  >
+                    <span className="material-symbols-outlined text-base">task_alt</span>
+                    Mark as paid
+                  </button>
+                )}
               </div>
+              {paidOpen && !locked && (
+                <button
+                  type="button"
+                  onClick={() => setPaidOpen(false)}
+                  disabled={busy}
+                  className="w-full py-1 text-[11px] font-bold text-white/40 hover:text-white"
+                >
+                  Not paid yet? Back to Send STK
+                </button>
+              )}
             </div>
+          </>
+        )}
+      </div>
 
-            <div>
-              <label htmlFor="rp-name" className={labelClass}>
-                Customer name <span className="normal-case tracking-normal text-white/25">(optional)</span>
-              </label>
-              <input
-                id="rp-name"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Walk-in customer"
-                disabled={orderId !== null}
-                className={inputClass}
-              />
+      {stkOpen && (
+        <StkWindow
+          step={step}
+          phone={phone}
+          onPhone={setPhone}
+          total={total}
+          itemCount={itemCount}
+          orderId={orderId}
+          error={error}
+          failReason={failReason}
+          onSend={() => void sendStk()}
+          onBack={() => {
+            if (busy) return;
+            // Before an order exists this just goes back to editing it;
+            // after, the order is saved, so the whole popup closes.
+            if (orderId) close();
+            else {
+              setError(null);
+              setStkOpen(false);
+            }
+          }}
+          onDone={close}
+          onRetry={() => {
+            setFailReason(null);
+            setError(null);
+            setStep("form");
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** The Send STK prompt, stacked over the order: phone, send, then the outcome. */
+function StkWindow({
+  step,
+  phone,
+  onPhone,
+  total,
+  itemCount,
+  orderId,
+  error,
+  failReason,
+  onSend,
+  onBack,
+  onDone,
+  onRetry,
+}: {
+  step: Step;
+  phone: string;
+  onPhone: (value: string) => void;
+  total: number;
+  itemCount: number;
+  orderId: string | null;
+  error: string | null;
+  failReason: string | null;
+  onSend: () => void;
+  onBack: () => void;
+  onDone: () => void;
+  onRetry: () => void;
+}) {
+  const busy = step === "sending";
+  const showStatus = step === "waiting" || step === "paid" || step === "failed";
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/60 sm:items-center sm:p-4">
+      <button type="button" aria-label="Back to the order" onClick={onBack} className="absolute inset-0 cursor-default" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stk-title"
+        className="relative w-full rounded-t-2xl border border-purple-400/20 bg-zinc-900 shadow-2xl sm:max-w-sm sm:rounded-2xl"
+      >
+        <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
+          <button
+            type="button"
+            onClick={onBack}
+            disabled={busy}
+            className="-ml-1 rounded-lg p-2 text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-40"
+            aria-label={orderId ? "Close" : "Back to the order"}
+          >
+            <span className="material-symbols-outlined text-xl">{orderId ? "close" : "arrow_back"}</span>
+          </button>
+          <h2 id="stk-title" className="flex-1 text-sm font-black text-white">
+            Send STK push
+          </h2>
+        </div>
+
+        {showStatus ? (
+          <StatusPanel
+            step={step}
+            phone={phone}
+            total={total}
+            orderId={orderId}
+            reason={failReason}
+            paidMethod="mpesa"
+            onDone={onDone}
+            onRetry={onRetry}
+          />
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSend();
+            }}
+            className="space-y-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4"
+          >
+            <div className="flex items-baseline justify-between rounded-xl bg-white/5 px-3 py-2.5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/40">
+                {itemCount} item{itemCount === 1 ? "" : "s"}
+              </span>
+              <span className="text-xl font-black text-white">{formatKes(total)}</span>
             </div>
-
-            <div className="flex items-center justify-between rounded-xl bg-white/5 px-4 py-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Total</span>
-              <span className="text-lg font-black text-white">{formatKes(total)}</span>
-            </div>
-
+            <input
+              type="tel"
+              inputMode="tel"
+              autoComplete="off"
+              autoFocus
+              required
+              value={phone}
+              onChange={(e) => onPhone(e.target.value)}
+              placeholder="Customer M-Pesa number"
+              disabled={orderId !== null}
+              aria-label="Customer M-Pesa number"
+              className={inputClass}
+            />
+            {error && (
+              <p role="alert" className="rounded-xl border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs text-red-300">
+                {error}
+              </p>
+            )}
             <button
               type="submit"
               disabled={busy}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-3 text-xs font-black uppercase tracking-widest text-white transition hover:bg-purple-500 disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-3.5 text-xs font-black uppercase tracking-widest text-white transition hover:bg-purple-500 disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-base">send_to_mobile</span>
-              {busy ? "Sending prompt…" : orderId ? "Resend M-Pesa prompt" : "Send M-Pesa prompt"}
+              {busy ? "Sending…" : orderId ? "Resend prompt" : "Send prompt"}
             </button>
           </form>
         )}
       </div>
     </div>
+  );
+}
+
+function LineRow({
+  line,
+  locked,
+  onChange,
+  onRemove,
+}: {
+  line: Line;
+  locked: boolean;
+  onChange: (patch: Partial<Line>) => void;
+  onRemove: () => void;
+}) {
+  const product = line.product;
+  const sizes = product?.sizes ?? [];
+  const colors = product?.colors ?? [];
+  const stock = product?.stock ?? 0;
+  const short = product !== null && line.quantity > stock;
+
+  return (
+    <li className="space-y-1.5 px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        {product ? (
+          <p className="min-w-0 flex-1 truncate text-sm font-bold text-white">{product.name}</p>
+        ) : (
+          <input
+            value={line.name}
+            autoFocus={!line.name}
+            onChange={(e) => onChange({ name: e.target.value })}
+            placeholder="Item name"
+            disabled={locked}
+            aria-label="Item name"
+            className={`${miniInputClass} min-w-0 flex-1`}
+          />
+        )}
+        <span className="shrink-0 text-sm font-black text-white">{formatKes(lineTotal(line))}</span>
+        {!locked && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="-mr-1 shrink-0 rounded-lg p-1.5 text-white/30 hover:text-red-300"
+            aria-label={`Remove ${line.name || "item"}`}
+          >
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <input
+          type="number"
+          min="1"
+          step="1"
+          inputMode="numeric"
+          value={line.price}
+          onChange={(e) => onChange({ price: e.target.value })}
+          placeholder="Price"
+          disabled={locked}
+          aria-label="Price each"
+          className={`${miniInputClass} w-20`}
+        />
+        <span className="text-xs text-white/30">×</span>
+        <div className="flex items-center rounded-lg border border-white/10 bg-zinc-800">
+          <button
+            type="button"
+            disabled={line.quantity <= 1 || locked}
+            onClick={() => onChange({ quantity: Math.max(1, line.quantity - 1) })}
+            className="px-2.5 py-1.5 text-white/60 disabled:opacity-30"
+            aria-label="Fewer"
+          >
+            <span className="material-symbols-outlined text-base">remove</span>
+          </button>
+          <span className="w-6 text-center text-sm font-bold text-white">{line.quantity}</span>
+          <button
+            type="button"
+            disabled={line.quantity >= 99 || locked}
+            onClick={() => onChange({ quantity: Math.min(99, line.quantity + 1) })}
+            className="px-2.5 py-1.5 text-white/60 disabled:opacity-30"
+            aria-label="More"
+          >
+            <span className="material-symbols-outlined text-base">add</span>
+          </button>
+        </div>
+        {colors.length > 0 && (
+          <select
+            value={line.color}
+            onChange={(e) => onChange({ color: e.target.value })}
+            disabled={locked}
+            aria-label="Colour"
+            className={miniInputClass}
+          >
+            <option value="">Colour</option>
+            {colors.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        )}
+        {sizes.length > 0 && (
+          <select
+            value={line.size}
+            onChange={(e) => onChange({ size: e.target.value })}
+            disabled={locked}
+            aria-label="Size"
+            className={miniInputClass}
+          >
+            <option value="">Size</option>
+            {sizes.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {short && (
+        <p className="text-[11px] text-amber-300/80">
+          {stock <= 0 ? "Out of stock" : `Only ${stock} in stock`}. You can still save it.
+        </p>
+      )}
+      {!product && <p className="text-[11px] text-white/30">Typed item: reconcile later, takes no stock.</p>}
+    </li>
   );
 }
 
@@ -493,14 +758,16 @@ function StatusPanel({
   total,
   orderId,
   reason,
+  paidMethod,
   onDone,
   onRetry,
 }: {
-  step: "waiting" | "paid" | "failed";
+  step: "waiting" | "paid" | "failed" | "recorded";
   phone: string;
   total: number;
   orderId: string | null;
   reason: string | null;
+  paidMethod: PaidMethod;
   onDone: () => void;
   onRetry: () => void;
 }) {
@@ -517,6 +784,12 @@ function StatusPanel({
       title: "Paid",
       body: `${formatKes(total)} received. The order is confirmed.`,
     },
+    recorded: {
+      icon: "check_circle",
+      color: "text-green-300 bg-green-400/15",
+      title: "Marked as paid",
+      body: `${formatKes(total)} ${paidMethod === "cash" ? "in cash" : "by M-Pesa"}. The order is confirmed and stock updated.`,
+    },
     failed: {
       icon: "cancel",
       color: "text-red-300 bg-red-400/15",
@@ -526,7 +799,7 @@ function StatusPanel({
   }[step];
 
   return (
-    <div className="space-y-5 px-5 py-8 text-center">
+    <div className="space-y-5 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-8 text-center">
       <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${content.color}`}>
         <span className={`material-symbols-outlined text-3xl ${step === "waiting" ? "animate-pulse" : ""}`}>
           {content.icon}
@@ -542,7 +815,7 @@ function StatusPanel({
           <button
             type="button"
             onClick={onRetry}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-purple-500"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-3.5 text-xs font-black uppercase tracking-widest text-white hover:bg-purple-500"
           >
             <span className="material-symbols-outlined text-base">refresh</span>
             Try again
@@ -551,7 +824,7 @@ function StatusPanel({
         <button
           type="button"
           onClick={onDone}
-          className="w-full rounded-xl bg-white/10 px-4 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-white/15"
+          className="w-full rounded-xl bg-white/10 px-4 py-3.5 text-xs font-black uppercase tracking-widest text-white hover:bg-white/15"
         >
           {step === "waiting" ? "Close. It'll update in the orders list" : "Done"}
         </button>

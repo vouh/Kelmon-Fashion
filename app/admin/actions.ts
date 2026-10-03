@@ -19,6 +19,7 @@ import {
   dealInputSchema,
   directOrderSchema,
   homepageDropInputSchema,
+  linkOrderSchema,
   parseInput,
   productImportRowSchema,
   productInputSchema,
@@ -215,16 +216,20 @@ export async function deleteOrder(orderId: string): Promise<ActionResult> {
 }
 
 /**
- * Admin-created order for a walk-up / road sale.
+ * Admin-created order for a walk-up / road sale, or one paid outside the
+ * system (cash, or M-Pesa sent straight to the till).
  * Ports fb_createDirectOrder — source='admin_direct' and no user_id.
+ *
+ * A paid order is still inserted unpaid and then flipped to paid: the stock
+ * and paid_at triggers only act on that update, never on an insert.
  */
 export async function createDirectOrder(input: {
   customerName: string;
-  phone: string;
+  phone?: string;
   dropPoint: string;
-  total: number;
   notes?: string;
-  item?: { productId?: string; name: string; price: number; quantity: number };
+  items: { productId?: string; name: string; variant?: string; price: number; quantity: number }[];
+  paid?: { method: "mpesa" | "cash"; reference?: string };
 }): Promise<{ ok: true; orderId: string } | { ok: false; error: string }> {
   try {
     const supabase = await requireAdmin();
@@ -232,23 +237,27 @@ export async function createDirectOrder(input: {
     const parsed = parseInput(directOrderSchema, input);
     if (!parsed.ok) return { ok: false, error: parsed.error };
     const order = parsed.data;
-    const item = order.item;
+    const items = order.items;
+    const paid = order.paid;
 
-    let product: { images: string[]; category: string } | null = null;
-    if (item?.productId) {
+    const productIds = [...new Set(items.flatMap((item) => (item.productId ? [item.productId] : [])))];
+    const products = new Map<string, { images: string[]; category: string }>();
+    if (productIds.length) {
       const { data, error: productError } = await supabase
         .from("products")
-        .select("images, category")
-        .eq("id", item.productId)
-        .maybeSingle();
+        .select("id, images, category")
+        .in("id", productIds);
       if (productError) throw new Error(productError.message);
-      if (!data) throw new Error("That product no longer exists. Pick another or type it in.");
-      product = data;
+      for (const row of data ?? []) products.set(row.id, row);
+      const missing = items.find((item) => item.productId && !products.has(item.productId));
+      if (missing) throw new Error(`"${missing.name}" no longer exists. Remove it or type it in.`);
     }
+
+    const total = Math.round(items.reduce((sum, item) => sum + item.price * item.quantity, 0) * 100) / 100;
 
     const orderId = await nextOrderId(
       supabase,
-      item ? [{ productId: item.productId ?? null, price: item.price, quantity: item.quantity }] : []
+      items.map((item) => ({ productId: item.productId ?? null, price: item.price, quantity: item.quantity }))
     );
 
     const { error } = await supabase.from("orders").insert({
@@ -257,38 +266,60 @@ export async function createDirectOrder(input: {
       customer_name: order.customerName,
       // Normalised to 2547… by the schema, so it can be charged by STK push
       // without further cleaning.
-      phone: order.phone,
+      phone: order.phone ?? "",
       drop_point: order.dropPoint,
       notes: order.notes ?? null,
-      payment_method: "mpesa",
-      subtotal: order.total,
+      payment_method: paid?.method === "cash" ? "cod" : "mpesa",
+      subtotal: total,
       delivery_fee: 0,
-      total: order.total,
+      total,
       status: "pending",
       payment_status: "unpaid",
       source: "admin_direct",
     });
     if (error) throw new Error(error.message);
 
-    if (item) {
-      const { error: itemError } = await supabase.from("order_items").insert({
+    const { error: itemError } = await supabase.from("order_items").insert(
+      items.map((item) => ({
         order_id: orderId,
         // No product_id marks a typed-in item: it takes no stock and shows as
         // "reconcile" in the orders list.
         product_id: item.productId ?? null,
         name: item.name,
+        variant: item.variant ?? null,
         price: item.price,
         quantity: item.quantity,
-        image: product?.images[0] ?? null,
-        category: product?.category ?? null,
-      });
-      if (itemError) {
-        await supabase.from("orders").delete().eq("id", orderId);
-        throw new Error(itemError.message);
-      }
+        image: (item.productId && products.get(item.productId)?.images[0]) || null,
+        category: (item.productId && products.get(item.productId)?.category) || null,
+      }))
+    );
+    if (itemError) {
+      await supabase.from("orders").delete().eq("id", orderId);
+      throw new Error(itemError.message);
     }
 
-    // Staff are emailed when this order's payment succeeds (sendPaymentSuccessEmails).
+    if (paid) {
+      // Takes the stock off and stamps paid_at (orders_deduct_stock,
+      // orders_set_paid_at), the same as marking an order paid in the list.
+      const { error: paidError } = await supabase
+        .from("orders")
+        .update({
+          payment_status: "paid",
+          status: "confirmed",
+          mpesa_receipt_number: paid.method === "mpesa" ? paid.reference ?? null : null,
+        })
+        .eq("id", orderId);
+      if (paidError) {
+        await supabase.from("orders").delete().eq("id", orderId);
+        throw new Error(paidError.message);
+      }
+      after(() => sendManualPaymentEmails(orderId));
+      revalidatePath("/admin/transactions");
+      revalidatePath("/admin/products");
+      revalidatePath("/shop");
+      revalidatePath("/home");
+    }
+    // Otherwise staff are emailed when the STK payment succeeds (sendPaymentSuccessEmails).
 
     revalidatePath("/admin/orders");
     revalidatePath("/admin");
@@ -296,6 +327,147 @@ export async function createDirectOrder(input: {
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
     return { ok: false, error };
+  }
+}
+
+export interface LinkableClient {
+  id: string;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
+/** Accounts to choose from when linking a quick order to a client. */
+export async function listLinkableClients(): Promise<
+  { ok: true; clients: LinkableClient[] } | { ok: false; error: string }
+> {
+  try {
+    const supabase = await requireAdmin();
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, email, phone")
+      .order("created_at", { ascending: false })
+      .limit(1000);
+    if (error) throw new Error(error.message);
+    return {
+      ok: true,
+      clients: (data ?? []).map((p) => ({ id: p.id, name: p.full_name, email: p.email, phone: p.phone })),
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Fills in a quick order after the fact: links it to a client's account
+ * and/or swaps its typed-in lines for catalogue products. The order total is
+ * left alone — it is what the customer was charged.
+ *
+ * If the order was already paid, its stock came off before these products
+ * were known, so they are taken off here instead; and a newly linked client
+ * gets the loyalty points the payment earned.
+ */
+export async function linkOrder(
+  orderId: string,
+  input: {
+    userId?: string;
+    items?: { productId: string; variant?: string; price: number; quantity: number }[];
+  }
+): Promise<ActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    const id = validOrderId(orderId);
+    const parsed = parseInput(linkOrderSchema, input);
+    if (!parsed.ok) return { ok: false, error: parsed.error };
+    const link = parsed.data;
+
+    const { data: order, error: orderError } = await supabase
+      .from("orders")
+      .select("id, payment_status, stock_deducted, customer_name")
+      .eq("id", id)
+      .maybeSingle();
+    if (orderError) throw new Error(orderError.message);
+    if (!order) throw new Error("Order not found.");
+
+    if (link.items) {
+      const ids = [...new Set(link.items.map((item) => item.productId))];
+      const { data: rows, error: productError } = await supabase
+        .from("products")
+        .select("id, name, images, category")
+        .in("id", ids);
+      if (productError) throw new Error(productError.message);
+      const products = new Map((rows ?? []).map((row) => [row.id, row]));
+      if (products.size !== ids.length) throw new Error("One of those products no longer exists.");
+
+      const { error: insertError } = await supabase.from("order_items").insert(
+        link.items.map((item) => {
+          const product = products.get(item.productId)!;
+          return {
+            order_id: id,
+            product_id: item.productId,
+            name: product.name,
+            variant: item.variant ?? null,
+            price: item.price,
+            quantity: item.quantity,
+            image: product.images[0] ?? null,
+            category: product.category,
+          };
+        })
+      );
+      if (insertError) throw new Error(insertError.message);
+
+      // The typed-in placeholder lines are replaced by the products above.
+      const { error: deleteError } = await supabase
+        .from("order_items")
+        .delete()
+        .eq("order_id", id)
+        .is("product_id", null);
+      if (deleteError) throw new Error(deleteError.message);
+
+      if (order.stock_deducted) {
+        for (const item of link.items) {
+          const { error } = await supabase.rpc("adjust_product_stock", {
+            p_product_id: item.productId,
+            p_delta: -item.quantity,
+          });
+          if (error) throw new Error(error.message);
+        }
+        revalidatePath("/admin/products");
+        revalidatePath("/shop");
+        revalidatePath("/home");
+      }
+    }
+
+    if (link.userId) {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", link.userId)
+        .maybeSingle();
+      if (profileError) throw new Error(profileError.message);
+      if (!profile) throw new Error("That client's account no longer exists.");
+
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          user_id: link.userId,
+          customer_name: profile.full_name || profile.email || order.customer_name,
+        })
+        .eq("id", id);
+      if (error) throw new Error(error.message);
+
+      if (order.payment_status === "paid") {
+        // Idempotent: skips an order whose points were already given.
+        await supabase.rpc("award_loyalty_points", { p_order_id: id });
+      }
+      revalidatePath("/admin/accounts");
+    }
+
+    revalidatePath("/admin/orders");
+    revalidatePath("/admin");
+    return ok();
+  } catch (err) {
+    return fail(err);
   }
 }
 

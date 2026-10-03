@@ -144,21 +144,74 @@ export type CreateOrderInput = z.infer<typeof createOrderSchema>;
  * a typed-in one (no productId) to be reconciled later. Admins may override the
  * unit price, so it is taken from the input rather than the products table.
  */
-export const directOrderSchema = z.object({
-  customerName: requiredText("Customer name", 120),
-  phone: phoneSchema,
-  dropPoint: requiredText("Drop point", 160),
-  total: money("Total").refine((value) => value > 0, "Total must be greater than zero."),
-  notes: optionalText(1000),
-  item: z
-    .object({
-      productId: productSlugSchema.optional(),
-      name: requiredText("Item name", 200),
-      price: money("Price").refine((value) => value > 0, "Price must be greater than zero."),
-      quantity: z.number().int("Quantity must be a whole number.").min(1).max(99),
-    })
-    .optional(),
-});
+/**
+ * An admin-entered order: either sent an STK prompt next, or recorded as
+ * already paid (cash, or M-Pesa sent straight to the till). The total is
+ * worked out on the server from the lines, never taken from the browser.
+ */
+export const directOrderSchema = z
+  .object({
+    customerName: requiredText("Customer name", 120),
+    // Optional only for a paid order: a cash buyer may not leave a number.
+    phone: phoneSchema.optional(),
+    dropPoint: requiredText("Drop point", 160),
+    notes: optionalText(1000),
+    items: z
+      .array(
+        z.object({
+          productId: productSlugSchema.optional(),
+          name: requiredText("Item name", 200),
+          variant: optionalText(80),
+          price: money("Price").refine((value) => value > 0, "Price must be greater than zero."),
+          quantity: z.number().int("Quantity must be a whole number.").min(1).max(99),
+        })
+      )
+      .min(1, "Add at least one item.")
+      .max(20, "At most 20 items per order."),
+    paid: z
+      .object({
+        method: z.enum(["mpesa", "cash"], { message: "Choose M-Pesa or cash." }),
+        reference: z
+          .string()
+          .trim()
+          .toUpperCase()
+          .max(20, "The M-Pesa code is too long.")
+          .regex(/^[A-Z0-9]*$/, "The M-Pesa code is letters and numbers only.")
+          .optional()
+          .transform((value) => (value ? value : undefined)),
+      })
+      .optional(),
+  })
+  .refine((order) => order.paid || order.phone, {
+    message: "Phone number is required to send an M-Pesa prompt.",
+    path: ["phone"],
+  });
+
+/**
+ * Filling in a quick order later: who the client was, and/or which catalogue
+ * products replace its typed-in lines. Either part may be left out.
+ */
+export const linkOrderSchema = z
+  .object({
+    userId: z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z0-9_-]{1,128}$/, "Invalid account id.")
+      .optional(),
+    items: z
+      .array(
+        z.object({
+          productId: productSlugSchema,
+          variant: optionalText(80),
+          price: money("Price").refine((value) => value > 0, "Price must be greater than zero."),
+          quantity: z.number().int("Quantity must be a whole number.").min(1).max(99),
+        })
+      )
+      .min(1, "Pick at least one product.")
+      .max(20, "At most 20 items per order.")
+      .optional(),
+  })
+  .refine((link) => link.userId || link.items, { message: "Pick a client or a product to link." });
 
 // ── Products ────────────────────────────────────────────────────────────────
 

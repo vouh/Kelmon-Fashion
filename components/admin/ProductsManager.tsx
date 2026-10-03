@@ -117,6 +117,17 @@ function draftFrom(product: Product, buyPrice?: number): Draft {
   };
 }
 
+/** At or below this many left, a product counts as low (the same line the stock alerts use). */
+const LOW_STOCK = 3;
+
+type StockFilter = "all" | "low" | "out";
+
+function stockLevel(product: Product): "out" | "low" | "ok" {
+  const stock = product.stock ?? 0;
+  if (stock <= 0) return "out";
+  return stock <= LOW_STOCK ? "low" : "ok";
+}
+
 export default function ProductsManager({
   products,
   costs = {},
@@ -181,8 +192,25 @@ export default function ProductsManager({
   /** Products ticked for bulk publish / unpublish / delete. */
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+  /** Stock filter and search over the catalogue list. */
+  const [stockFilter, setStockFilter] = useState<StockFilter>("all");
+  const [search, setSearch] = useState("");
+  const stockCounts = {
+    all: products.length,
+    low: products.filter((p) => stockLevel(p) === "low").length,
+    out: products.filter((p) => stockLevel(p) === "out").length,
+  };
+  const term = search.trim().toLowerCase();
+  const shown = products.filter(
+    (p) =>
+      (stockFilter === "all" || stockLevel(p) === stockFilter) &&
+      (!term ||
+        p.name.toLowerCase().includes(term) ||
+        p.category.toLowerCase().includes(term) ||
+        (p.code ?? "").toLowerCase().includes(term))
+  );
   const selectedIds = products.filter((p) => selected.has(p.id)).map((p) => p.id);
-  const allSelected = products.length > 0 && selectedIds.length === products.length;
+  const allSelected = shown.length > 0 && shown.every((p) => selected.has(p.id));
 
   function toggleSelected(id: string) {
     setSelected((prev) => {
@@ -679,6 +707,40 @@ export default function ProductsManager({
         </div>
       )}
 
+      {/* Stock filter + search */}
+      {products.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-1">
+            {(
+              [
+                ["all", "All", "bg-purple-600 text-white"],
+                ["low", "Low stock", "bg-amber-500 text-black"],
+                ["out", "Out of stock", "bg-red-600 text-white"],
+              ] as const
+            ).map(([value, label, activeClass]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setStockFilter(value)}
+                aria-pressed={stockFilter === value}
+                className={`rounded-lg px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${
+                  stockFilter === value ? activeClass : "bg-white/5 text-white/40 hover:text-white"
+                }`}
+              >
+                {label} <span className="opacity-70">{stockCounts[value]}</span>
+              </button>
+            ))}
+          </div>
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name, category or code…"
+            className="min-w-[180px] flex-1 rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-white placeholder:text-white/25 focus:border-purple-400/50 focus:outline-none"
+          />
+        </div>
+      )}
+
       {/* Bulk actions */}
       {products.length > 0 && (
         <div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-white/5 bg-zinc-900/95 px-4 py-2 backdrop-blur">
@@ -686,7 +748,7 @@ export default function ProductsManager({
             <input
               type="checkbox"
               checked={allSelected}
-              onChange={() => setSelected(allSelected ? new Set() : new Set(products.map((p) => p.id)))}
+              onChange={() => setSelected(allSelected ? new Set() : new Set(shown.map((p) => p.id)))}
               className="h-3.5 w-3.5 accent-purple-500"
             />
             {selectedIds.length ? `${selectedIds.length} selected` : "Select all"}
@@ -733,9 +795,11 @@ export default function ProductsManager({
       <div className="overflow-hidden rounded-xl border border-white/5 bg-zinc-900">
         {products.length === 0 ? (
           <EmptyState icon="inventory_2" message="No products yet" />
+        ) : shown.length === 0 ? (
+          <EmptyState icon="inventory_2" message="No products match this filter" />
         ) : (
           <ul className="divide-y divide-white/5">
-            {products.map((product) => (
+            {shown.map((product) => (
               <li
                 key={product.id}
                 className={`flex flex-wrap items-center gap-3 px-4 py-3 ${selected.has(product.id) ? "bg-purple-500/[0.07]" : ""}`}
@@ -784,7 +848,15 @@ export default function ProductsManager({
                       </span>
                     )}
                     {" · "}
-                    <span className={!product.stock ? "text-red-400" : undefined}>
+                    <span
+                      className={
+                        stockLevel(product) === "out"
+                          ? "text-red-400"
+                          : stockLevel(product) === "low"
+                            ? "text-amber-300"
+                            : undefined
+                      }
+                    >
                       {product.stock ? `${product.stock} in stock` : "Sold out — hidden from shop"}
                     </span>
                   </p>

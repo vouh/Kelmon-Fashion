@@ -1,6 +1,8 @@
 import Link from "next/link";
 import AdminShell from "@/components/admin/AdminShell";
 import OrdersManager from "@/components/admin/OrdersManager";
+import QuickStkButton from "@/components/admin/QuickStkButton";
+import RequestPaymentButton from "@/components/admin/RequestPaymentButton";
 import { getAllOrders } from "@/lib/supabase/orders";
 import { getProducts } from "@/lib/supabase/products";
 import { createClient, getAdminEmail } from "@/lib/supabase/server";
@@ -33,7 +35,17 @@ export default async function AdminOrdersPage({
   const adminEmail = await getAdminEmail();
 
   return (
-    <AdminShell adminEmail={adminEmail} title="All Orders" subtitle={`${orders.length} total`}>
+    <AdminShell
+      adminEmail={adminEmail}
+      title="All Orders"
+      subtitle={`${orders.length} total`}
+      actions={
+        <>
+          <QuickStkButton />
+          <RequestPaymentButton products={products} />
+        </>
+      }
+    >
       {userId && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-xs text-white/80">
           <span className="material-symbols-outlined text-base text-purple-300">filter_alt</span>
