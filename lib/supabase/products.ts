@@ -156,10 +156,15 @@ export async function getAllProductsForAdmin(): Promise<Product[]> {
   let data: ProductRow[] | null;
   let error: { message: string } | null;
   try {
+    // Secondary id sort keeps the catalogue still after an edit. Many products
+    // share the same created_at (batch imports), and without a tie-breaker
+    // Postgres reshuffles them on every refresh — so the row you just saved
+    // appears to jump around in /admin/products.
     ({ data, error } = await supabase
       .from("products")
       .select("*")
-      .order("created_at", { ascending: false }));
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true }));
   } catch (fetchError) {
     console.warn("[products] getAllProductsForAdmin request unavailable", fetchError);
     return [];
