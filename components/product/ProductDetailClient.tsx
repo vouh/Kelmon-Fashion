@@ -88,9 +88,16 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
       selectedVariant
     );
     setQuantity(1);
-    if (added === 0) toast(`You already have all ${stock} in your cart`);
-    else if (added < qty) toast(`Only ${stock} in stock — added ${added} to your cart`);
-    else toast(`Added ${product.name} to cart`);
+    // Never tell shoppers the exact count unless only one piece is left —
+    // full stock numbers stay on the admin side.
+    if (added === 0) toast("You already have the maximum in your cart");
+    else if (added < qty) {
+      toast(
+        stock === 1
+          ? "Only 1 left — added it to your cart"
+          : `Added ${added} to your cart (that's all we can sell right now)`
+      );
+    } else toast(`Added ${product.name} to cart`);
   };
 
   const handleBuyNow = () => {
@@ -268,15 +275,17 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                     ? "Sold out"
                     : product.preorder
                       ? <span className="font-semibold text-[#A8843F] dark:text-[#E3C47E]">Available on pre-order</span>
-                      : stock <= 5
-                      ? `Only ${stock} left · Fast delivery available`
-                      : "In stock · Fast delivery available"}
+                      : stock === 1
+                        ? "Only 1 left · Fast delivery available"
+                        : "In stock · Fast delivery available"}
                 </li>
                 {inCart > 0 && !soldOut && (
                   <li>
                     {allInCart
-                      ? `You have all ${stock} in your cart`
-                      : `${inCart} in your cart · you can add ${available} more`}
+                      ? "You have the maximum in your cart"
+                      : stock === 1
+                        ? "1 in your cart"
+                        : `${inCart} in your cart`}
                   </li>
                 )}
               </ul>
@@ -304,7 +313,7 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                     aria-label="Increase quantity"
                     onClick={() => canIncrease && setQuantity(qty + 1)}
                     disabled={!canIncrease}
-                    title={canIncrease ? undefined : `Only ${available} available`}
+                    title={canIncrease ? undefined : "That's all we can sell right now"}
                     className="w-8 h-8 flex items-center justify-center text-primary rounded-full hover:bg-primary/10 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                   >
                     <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
@@ -403,7 +412,7 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
             aria-label="Increase quantity"
             onClick={() => canIncrease && setQuantity(qty + 1)}
                     disabled={!canIncrease}
-                    title={canIncrease ? undefined : `Only ${available} available`}
+                    title={canIncrease ? undefined : "That's all we can sell right now"}
             className="w-8 h-8 flex items-center justify-center text-primary disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <span className="material-symbols-outlined text-[18px]" aria-hidden="true">

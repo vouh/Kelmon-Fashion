@@ -39,3 +39,5 @@ Thumbs.db
 # ── Project-specific ignores ──────────────────────────────────────────────
 backup_code.html
 screen.png
+# One-off import/logo helper scripts and generated webps
+tmp/
